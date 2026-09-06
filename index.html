@@ -249,7 +249,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -260,6 +260,7 @@ function App() {
           dbSelect("spieltage"),
           dbSelect("spiele"),
           dbSelect("torschuetzen"),
+          dbSelect("spieltag_gegner"),
         ]);
       setPlayers(playersRaw);
       const basisMap = {};
@@ -284,6 +285,7 @@ function App() {
       const spieltageFull = spieltageRaw.map((s) => ({
         id: s.id,
         date: s.date,
+        zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
         spiele: spieleRaw
           .filter((sp) => sp.spieltag_id === s.id)
           .map((sp) => ({
@@ -438,6 +440,18 @@ function App() {
               }, "Spiel aktualisiert")
             }
             onRemoveSpiel={(spieltagId, spielId) => wrapAction(() => dbDelete("spiele", spielId))}
+            onToggleGegnerZuordnung={(spieltagId, opponentId, istZugeordnet) =>
+              wrapAction(async () => {
+                if (istZugeordnet) {
+                  await dbDeleteWhere(
+                    "spieltag_gegner",
+                    `spieltag_id=eq.${spieltagId}&opponent_id=eq.${opponentId}`
+                  );
+                } else {
+                  await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
+                }
+              })
+            }
           />
         )}
         {tab === "verwaltung" && (
@@ -970,7 +984,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel }) {
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung }) {
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
@@ -1001,6 +1015,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
             onAddSpiel={(spiel) => onAddSpiel(s.id, spiel)}
             onUpdateSpiel={(spiel) => onUpdateSpiel(s.id, spiel)}
             onRemoveSpiel={(spielId) => onRemoveSpiel(s.id, spielId)}
+            onToggleGegnerZuordnung={(opponentId, istZugeordnet) => onToggleGegnerZuordnung(s.id, opponentId, istZugeordnet)}
           />
         ))}
       </div>
@@ -1008,7 +1023,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel }) {
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -1067,6 +1082,10 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
   };
 
   const gegnerName = (id) => gegner.find((g) => g.id === id)?.name || "Unbekannt";
+  const spielGegnerOptionen =
+    spieltag.zugeordneteGegner.length > 0
+      ? gegner.filter((g) => spieltag.zugeordneteGegner.includes(g.id))
+      : gegner;
   const spielerName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
 
   return (
@@ -1114,6 +1133,25 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             </div>
           )}
 
+          <div style={{ marginBottom: 14 }}>
+            <label style={styles.label}>Gegner an diesem Spieltag</label>
+            <div style={{ ...styles.chipGroup, marginTop: 6 }}>
+              {gegner.length === 0 && <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>}
+              {gegner.map((g) => {
+                const zugeordnet = spieltag.zugeordneteGegner.includes(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => onToggleGegnerZuordnung(g.id, zugeordnet)}
+                    style={{ ...styles.chip, ...(zugeordnet ? styles.chipActive : {}) }}
+                  >
+                    {g.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div style={styles.basisGrid}>
             {editingId && (
               <div style={styles.editBanner}>
@@ -1126,8 +1164,10 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             <div>
               <label style={styles.label}>Gegner</label>
               <div style={{ ...styles.chipGroup, marginTop: 6 }}>
-                {gegner.length === 0 && <span style={styles.hint}>Noch kein Gegner angelegt.</span>}
-                {gegner.map((g) => (
+                {spielGegnerOptionen.length === 0 && (
+                  <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>
+                )}
+                {spielGegnerOptionen.map((g) => (
                   <button
                     key={g.id}
                     onClick={() => setOpponentId(g.id)}
