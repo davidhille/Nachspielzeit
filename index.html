@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nachspielzeit — SV Heimstetten U8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #F7F4F3; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useMemo } = React;
+
+/* ---------- Supabase-Verbindung ---------- */
+const SUPABASE_URL = "https://ttydglqmpkgfqkrovdjf.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0eWRnbHFtcGtnZnFrcm92ZGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NjY4NzIsImV4cCI6MjEwNDE0Mjg3Mn0.GW-ppcVrqrFmuCs1FGfPsez3O-b23YSy4VzgooIrqCk";
+const REST = SUPABASE_URL + "/rest/v1/";
+
+let ACCESS_CODE = localStorage.getItem("nsz_access_code") || "";
+
+const baseHeaders = (extra = {}) => ({
+  apikey: SUPABASE_KEY,
+  Authorization: `Bearer ${SUPABASE_KEY}`,
+  "Content-Type": "application/json",
+  ...extra,
+});
+const dbHeaders = (extra = {}) => baseHeaders({ "x-access-code": ACCESS_CODE, ...extra });
+
+async function verifyAccessCode(code) {
+  const res = await fetch(REST + "rpc/check_access_code", {
+    method: "POST",
+    headers: baseHeaders(),
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) return false;
+  return (await res.json()) === true;
+}
+
+async function dbSelect(table) {
+  const res = await fetch(REST + table + "?select=*", { headers: dbHeaders() });
+  if (!res.ok) throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
+  return res.json();
+}
+async function dbInsert(table, rowOrRows) {
+  const res = await fetch(REST + table, {
+    method: "POST",
+    headers: dbHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify(rowOrRows),
+  });
+  if (!res.ok) throw new Error(`Speichern in "${table}" fehlgeschlagen: ${await res.text()}`);
+  return res.json();
+}
+async function dbUpsert(table, row, conflictCol) {
+  const res = await fetch(`${REST}${table}?on_conflict=${conflictCol}`, {
+    method: "POST",
+    headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`Speichern in "${table}" fehlgeschlagen: ${await res.text()}`);
+  return res.json();
+}
+async function dbUpdate(table, id, patch, idCol = "id") {
+  const res = await fetch(`${REST}${table}?${idCol}=eq.${id}`, {
+    method: "PATCH",
+    headers: dbHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`Aktualisieren von "${table}" fehlgeschlagen: ${await res.text()}`);
+  return res.json();
+}
+async function dbDelete(table, id, idCol = "id") {
+  const res = await fetch(`${REST}${table}?${idCol}=eq.${id}`, { method: "DELETE", headers: dbHeaders() });
+  if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
+}
+async function dbDeleteWhere(table, qs) {
+  const res = await fetch(`${REST}${table}?${qs}`, { method: "DELETE", headers: dbHeaders() });
+  if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
+}
+
+/* ---------- Logo ---------- */
+const LOGO_DATA_URI = "data:image/png;base64,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";
+
+/* ---------- Konstanten ---------- */
+const KARTEN = { keine: 0, gelb: -0.5, blau: -1.0, rot: -2.0 };
+const TEILNAHME = { anwesend: 0.5, verspaetet: -0.25, unentschuldigt: -0.25, entschuldigt: 0 };
+const TEILNAHME_LABEL = {
+  anwesend: "Anwesend",
+  verspaetet: "Verspätet",
+  unentschuldigt: "Unentschuldigt gefehlt",
+  entschuldigt: "Abgemeldet",
+};
+const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+const toLocalISODate = (d) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+const todayISO = () => toLocalISODate(new Date());
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const monthLabel = (key) => {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+};
+const formatTerminLabel = (dateStr) => {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${WOCHENTAGE[d.getDay()]}, ${d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+};
+
+// Saison läuft von September bis einschließlich Juli des Folgejahres.
+function seasonKeyOf(mkey) {
+  const [y, m] = mkey.split("-").map(Number);
+  if (m >= 9) return `${y}-${y + 1}`;
+  if (m <= 7) return `${y - 1}-${y}`;
+  return null;
+}
+
+function trainingPunkte(entry) {
+  return (Number(entry.vorkommnis) || 0) + KARTEN[entry.karte] + TEILNAHME[entry.teilnahme];
+}
+
+function basisNachMonat(playerId, basis, entwicklungen, monatKeyInklusiv) {
+  const grund = Number(basis[playerId]) || 0;
+  const bonus = entwicklungen
+    .filter((e) => e.playerId === playerId && e.month <= monatKeyInklusiv)
+    .reduce((sum, e) => sum + Number(e.punkte || 0), 0);
+  return grund + bonus;
+}
+
+function aktuelleBasis(playerId, basis, entwicklungen, biMonatKeyExklusiv) {
+  const grund = Number(basis[playerId]) || 0;
+  const bonus = entwicklungen
+    .filter((e) => e.playerId === playerId && e.month < biMonatKeyExklusiv)
+    .reduce((sum, e) => sum + Number(e.punkte || 0), 0);
+  return grund + bonus;
+}
+
+/* ---------- Zugangscode-Gate ---------- */
+
+function Gate({ onUnlock }) {
+  const [code, setCode] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  const pruefen = async () => {
+    if (!code.trim()) return;
+    setChecking(true);
+    setFehler("");
+    try {
+      const ok = await verifyAccessCode(code.trim());
+      if (ok) {
+        localStorage.setItem("nsz_access_code", code.trim());
+        onUnlock(code.trim());
+      } else {
+        setFehler("Zugangscode ist falsch.");
+      }
+    } catch (e) {
+      setFehler("Verbindung fehlgeschlagen. Internet prüfen und erneut versuchen.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div style={styles.loadingScreen}>
+      <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={{ width: 64, marginBottom: 4 }} />
+      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "#1C2B22" }}>
+        Nachspielzeit
+      </div>
+      <input
+        style={{ ...styles.input, maxWidth: 240, textAlign: "center" }}
+        placeholder="Zugangscode"
+        type="password"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") pruefen();
+        }}
+        autoFocus
+      />
+      {fehler && <div style={{ color: "#9B2226", fontSize: 13 }}>{fehler}</div>}
+      <button style={{ ...styles.primaryBtn, maxWidth: 240 }} onClick={pruefen} disabled={checking || !code.trim()}>
+        {checking ? "Prüfe …" : "Anmelden"}
+      </button>
+    </div>
+  );
+}
+
+function Root() {
+  const [unlocked, setUnlocked] = useState(!!ACCESS_CODE);
+  if (!unlocked) {
+    return (
+      <Gate
+        onUnlock={(code) => {
+          ACCESS_CODE = code;
+          setUnlocked(true);
+        }}
+      />
+    );
+  }
+  return <App />;
+}
+
+/* ---------- App ---------- */
+
+function App() {
+  const [tab, setTab] = useState("dashboard");
+  const [players, setPlayers] = useState([]);
+  const [basis, setBasis] = useState({});
+  const [trainings, setTrainings] = useState([]);
+  const [entwicklungen, setEntwicklungen] = useState([]);
+  const [gegner, setGegner] = useState([]);
+  const [spieltage, setSpieltage] = useState([]);
+  const [termine, setTermine] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2200);
+  };
+
+  const refreshAll = useCallback(async () => {
+    try {
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw] =
+        await Promise.all([
+          dbSelect("players"),
+          dbSelect("basisqualitaet"),
+          dbSelect("trainingstermine"),
+          dbSelect("trainings"),
+          dbSelect("entwicklungen"),
+          dbSelect("gegner"),
+          dbSelect("spieltage"),
+          dbSelect("spiele"),
+          dbSelect("torschuetzen"),
+        ]);
+      setPlayers(playersRaw);
+      const basisMap = {};
+      basisRaw.forEach((r) => (basisMap[r.player_id] = Number(r.wert)));
+      setBasis(basisMap);
+      setTermine(termineRaw);
+      setTrainings(
+        trainingsRaw.map((t) => ({
+          id: t.id,
+          date: t.date,
+          playerId: t.player_id,
+          vorkommnis: Number(t.vorkommnis),
+          karte: t.karte,
+          teilnahme: t.teilnahme,
+          kommentar: t.kommentar || "",
+        }))
+      );
+      setEntwicklungen(
+        entwRaw.map((e) => ({ id: e.id, month: e.month, playerId: e.player_id, punkte: Number(e.punkte) }))
+      );
+      setGegner(gegnerRaw);
+      const spieltageFull = spieltageRaw.map((s) => ({
+        id: s.id,
+        date: s.date,
+        spiele: spieleRaw
+          .filter((sp) => sp.spieltag_id === s.id)
+          .map((sp) => ({
+            id: sp.id,
+            opponentId: sp.opponent_id,
+            ourGoals: sp.our_goals,
+            theirGoals: sp.their_goals,
+            scorers: torRaw
+              .filter((t) => t.spiel_id === sp.id)
+              .map((t) => ({ id: t.id, playerId: t.player_id, tore: t.tore })),
+          })),
+      }));
+      setSpieltage(spieltageFull);
+      setError("");
+    } catch (e) {
+      console.error(e);
+      setError(e.message || "Unbekannter Fehler beim Laden der Daten.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
+  const activePlayers = useMemo(() => players.filter((p) => p.active !== false), [players]);
+
+  const wrapAction = async (fn, successMsg) => {
+    try {
+      await fn();
+      await refreshAll();
+      if (successMsg) showToast(successMsg);
+    } catch (e) {
+      console.error(e);
+      window.alert(e.message || "Etwas ist schiefgelaufen.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={styles.loadingScreen}>
+        <div style={styles.loadingBall} />
+        <span>Lade Daten aus der Datenbank …</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.loadingScreen}>
+        <span style={{ color: "#9B2226", fontWeight: 600 }}>Verbindung fehlgeschlagen</span>
+        <span style={{ fontSize: 13, color: "#8A6F6F", textAlign: "center", padding: "0 24px" }}>{error}</span>
+        <button style={styles.primaryBtn} onClick={refreshAll}>
+          Erneut versuchen
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.app}>
+      <Header tab={tab} setTab={setTab} />
+      <main style={styles.main}>
+        {tab === "dashboard" && (
+          <Dashboard
+            players={players}
+            basis={basis}
+            trainings={trainings}
+            entwicklungen={entwicklungen}
+            spieltage={spieltage}
+            gegner={gegner}
+          />
+        )}
+        {tab === "training" && (
+          <TrainingBewertung
+            players={activePlayers}
+            trainings={trainings}
+            termine={termine}
+            onSave={(entries, date) =>
+              wrapAction(async () => {
+                await dbDeleteWhere("trainings", `date=eq.${date}`);
+                await dbInsert(
+                  "trainings",
+                  entries.map((e) => ({
+                    id: e.id,
+                    date: e.date,
+                    player_id: e.playerId,
+                    vorkommnis: e.vorkommnis,
+                    karte: e.karte,
+                    teilnahme: e.teilnahme,
+                    kommentar: e.kommentar || "",
+                  }))
+                );
+              }, "Trainingsbewertung gespeichert")
+            }
+          />
+        )}
+        {tab === "entwicklung" && (
+          <MonatsEntwicklung
+            players={activePlayers}
+            entwicklungen={entwicklungen}
+            onSave={(entries, month) =>
+              wrapAction(async () => {
+                await dbDeleteWhere("entwicklungen", `month=eq.${month}`);
+                await dbInsert(
+                  "entwicklungen",
+                  entries.map((e) => ({ id: e.id, month: e.month, player_id: e.playerId, punkte: e.punkte }))
+                );
+              }, "Monatsentwicklung gespeichert")
+            }
+          />
+        )}
+        {tab === "spieltage" && (
+          <Spieltage
+            players={players}
+            gegner={gegner}
+            spieltage={spieltage}
+            onAddSpieltag={(date) => wrapAction(() => dbInsert("spieltage", { id: uid(), date }))}
+            onRemoveSpieltag={(id) => wrapAction(() => dbDelete("spieltage", id))}
+            onAddSpiel={(spieltagId, spiel) =>
+              wrapAction(async () => {
+                await dbInsert("spiele", {
+                  id: spiel.id,
+                  spieltag_id: spieltagId,
+                  opponent_id: spiel.opponentId,
+                  our_goals: spiel.ourGoals,
+                  their_goals: spiel.theirGoals,
+                });
+                if (spiel.scorers.length > 0) {
+                  await dbInsert(
+                    "torschuetzen",
+                    spiel.scorers.map((s) => ({ id: s.id, spiel_id: spiel.id, player_id: s.playerId, tore: s.tore }))
+                  );
+                }
+              }, "Spiel gespeichert")
+            }
+            onUpdateSpiel={(spieltagId, spiel) =>
+              wrapAction(async () => {
+                await dbUpdate("spiele", spiel.id, {
+                  opponent_id: spiel.opponentId,
+                  our_goals: spiel.ourGoals,
+                  their_goals: spiel.theirGoals,
+                });
+                await dbDeleteWhere("torschuetzen", `spiel_id=eq.${spiel.id}`);
+                if (spiel.scorers.length > 0) {
+                  await dbInsert(
+                    "torschuetzen",
+                    spiel.scorers.map((s) => ({ id: s.id, spiel_id: spiel.id, player_id: s.playerId, tore: s.tore }))
+                  );
+                }
+              }, "Spiel aktualisiert")
+            }
+            onRemoveSpiel={(spieltagId, spielId) => wrapAction(() => dbDelete("spiele", spielId))}
+          />
+        )}
+        {tab === "verwaltung" && (
+          <Verwaltung
+            players={players}
+            basis={basis}
+            termine={termine}
+            gegner={gegner}
+            onAdd={(name) => wrapAction(() => dbInsert("players", { id: uid(), name, active: true }))}
+            onToggleActive={(id) => {
+              const p = players.find((x) => x.id === id);
+              return wrapAction(() => dbUpdate("players", id, { active: !(p?.active !== false) }));
+            }}
+            onRemove={(id) => wrapAction(() => dbDelete("players", id))}
+            onBasisChange={(playerId, wert) =>
+              wrapAction(() => dbUpsert("basisqualitaet", { player_id: playerId, wert }, "player_id"))
+            }
+            onGenerateTermine={(neueTermine) =>
+              wrapAction(async () => {
+                const bestehendeDaten = new Set(termine.map((t) => t.date));
+                const zusaetzliche = neueTermine.filter((t) => !bestehendeDaten.has(t.date));
+                if (zusaetzliche.length > 0) await dbInsert("trainingstermine", zusaetzliche);
+              }, "Termine angelegt")
+            }
+            onToggleAbsage={(id) => {
+              const t = termine.find((x) => x.id === id);
+              const neuerStatus = t?.status === "abgesagt" ? "geplant" : "abgesagt";
+              return wrapAction(() => dbUpdate("trainingstermine", id, { status: neuerStatus }));
+            }}
+            onRemoveTermin={(id) => wrapAction(() => dbDelete("trainingstermine", id))}
+            onAddGegner={(name) => wrapAction(() => dbInsert("gegner", { id: uid(), name }))}
+            onRemoveGegner={(id) => wrapAction(() => dbDelete("gegner", id))}
+          />
+        )}
+      </main>
+      {toast && <div style={styles.toast}>{toast}</div>}
+    </div>
+  );
+}
+
+/* ---------- Header ---------- */
+
+function Header({ tab, setTab }) {
+  const items = [
+    ["dashboard", "Übersicht"],
+    ["training", "Training bewerten"],
+    ["entwicklung", "Monatsentwicklung"],
+    ["spieltage", "Spieltage"],
+    ["verwaltung", "Verwaltung"],
+  ];
+  return (
+    <header style={styles.header}>
+      <div style={styles.headerTop}>
+        <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
+        <div style={{ flex: 1 }}>
+          <div style={styles.title}>Nachspielzeit</div>
+          <div style={styles.subtitle}>SV Heimstetten · Saison 2026/27</div>
+        </div>
+        <button
+          style={{ background: "transparent", border: "none", color: "#F3D2D1", fontSize: 12, cursor: "pointer" }}
+          onClick={() => {
+            localStorage.removeItem("nsz_access_code");
+            window.location.reload();
+          }}
+        >
+          Abmelden
+        </button>
+      </div>
+      <nav style={styles.nav}>
+        {items.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+    </header>
+  );
+}
+
+/* ---------- Dashboard ---------- */
+
+function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner }) {
+  const months = useMemo(() => {
+    const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
+    set.add(monthKey(new Date()));
+    return Array.from(set).sort();
+  }, [trainings]);
+  const [month, setMonth] = useState(months[months.length - 1]);
+
+  useEffect(() => {
+    if (!months.includes(month)) setMonth(months[months.length - 1]);
+  }, [months]); // eslint-disable-line
+
+  const rows = players.map((p) => {
+    const monatsPunkte = trainings
+      .filter((t) => t.playerId === p.id && t.date.slice(0, 7) === month)
+      .reduce((sum, t) => sum + trainingPunkte(t), 0);
+    const saisonPunkte = trainings
+      .filter((t) => t.playerId === p.id && seasonKeyOf(t.date.slice(0, 7)) === seasonKeyOf(month))
+      .reduce((sum, t) => sum + trainingPunkte(t), 0);
+    const basisAktuell = aktuelleBasis(p.id, basis, entwicklungen, month);
+    return {
+      id: p.id,
+      name: p.name,
+      active: p.active !== false,
+      monatsPunkte,
+      saisonPunkte,
+      basisAktuell,
+      gesamtMonat: monatsPunkte + basisAktuell,
+      gesamtSaison: saisonPunkte + basisAktuell,
+    };
+  });
+  rows.sort((a, b) => b.gesamtMonat - a.gesamtMonat);
+
+  return (
+    <section>
+      <div style={styles.rowBetween}>
+        <h2 style={styles.h2}>Punktestand</h2>
+        <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {monthLabel(m)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
+
+      {rows.length > 0 && (
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Spieler</th>
+                <th style={styles.th}>Basis-Qualität</th>
+                <th style={styles.th}>Trainingspunkte (Monat)</th>
+                <th style={styles.th}>Gesamt (Monat)</th>
+                <th style={styles.th}>Trainingspunkte (Saison)</th>
+                <th style={styles.th}>Gesamt (Saison)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.id} style={!r.active ? { opacity: 0.5 } : undefined}>
+                  <td style={styles.tdName}>
+                    <span style={styles.rank}>{i + 1}</span>
+                    {r.name}
+                  </td>
+                  <td style={styles.td}>{r.basisAktuell.toFixed(2)}</td>
+                  <td style={styles.td}>{r.monatsPunkte.toFixed(2)}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: "#AE1E1D" }}>{r.gesamtMonat.toFixed(2)}</td>
+                  <td style={styles.td}>{r.saisonPunkte.toFixed(2)}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: "#AE1E1D" }}>{r.gesamtSaison.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <SaisonBilanz spieltage={spieltage} players={players} month={month} />
+      <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} />
+    </section>
+  );
+}
+
+function SaisonBilanz({ spieltage, players, month }) {
+  const saison = seasonKeyOf(month);
+
+  const spieleDerSaison = useMemo(
+    () => spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison).flatMap((s) => s.spiele),
+    [spieltage, saison]
+  );
+
+  const bilanz = spieleDerSaison.reduce(
+    (acc, sp) => {
+      acc.toreFuer += sp.ourGoals;
+      acc.toreGegen += sp.theirGoals;
+      if (sp.ourGoals > sp.theirGoals) acc.siege += 1;
+      else if (sp.ourGoals < sp.theirGoals) acc.niederlagen += 1;
+      else acc.unentschieden += 1;
+      sp.scorers.forEach((sc) => {
+        acc.tore[sc.playerId] = (acc.tore[sc.playerId] || 0) + Number(sc.tore || 0);
+      });
+      return acc;
+    },
+    { siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0, tore: {} }
+  );
+
+  const spielerName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
+  const torschuetzen = Object.entries(bilanz.tore)
+    .map(([playerId, tore]) => ({ playerId, tore }))
+    .sort((a, b) => b.tore - a.tore);
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <h3 style={styles.h3}>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</h3>
+
+      {spieleDerSaison.length === 0 && (
+        <EmptyState text="Noch keine Spiele in dieser Saison erfasst. Lege sie unter „Spieltage“ an." />
+      )}
+
+      {spieleDerSaison.length > 0 && (
+        <>
+          <div style={styles.statsRow}>
+            <div style={styles.statBox}>
+              <div style={styles.statValue}>{spieleDerSaison.length}</div>
+              <div style={styles.statLabel}>Spiele</div>
+            </div>
+            <div style={styles.statBox}>
+              <div style={styles.statValue}>{bilanz.siege}</div>
+              <div style={styles.statLabel}>Siege</div>
+            </div>
+            <div style={styles.statBox}>
+              <div style={styles.statValue}>{bilanz.unentschieden}</div>
+              <div style={styles.statLabel}>Unentschieden</div>
+            </div>
+            <div style={styles.statBox}>
+              <div style={styles.statValue}>{bilanz.niederlagen}</div>
+              <div style={styles.statLabel}>Niederlagen</div>
+            </div>
+            <div style={styles.statBox}>
+              <div style={styles.statValue}>
+                {bilanz.toreFuer}:{bilanz.toreGegen}
+              </div>
+              <div style={styles.statLabel}>Tore</div>
+            </div>
+          </div>
+
+          {torschuetzen.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={styles.subheading}>Torschützenliste</div>
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <tbody>
+                    {torschuetzen.map((t, i) => (
+                      <tr key={t.playerId}>
+                        <td style={styles.tdName}>
+                          <span style={styles.rank}>{i + 1}</span>
+                          {spielerName(t.playerId)}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right", fontWeight: 700 }}>{t.tore}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month }) {
+  const saison = seasonKeyOf(month);
+  const saisonMonate = useMemo(() => months.filter((m) => seasonKeyOf(m) === saison).sort(), [months, saison]);
+
+  if (players.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <h3 style={styles.h3}>Entwicklungsverlauf (Basis-Qualität)</h3>
+      {saisonMonate.length < 2 ? (
+        <EmptyState text="Noch nicht genug Monate mit Daten für einen Verlauf." />
+      ) : (
+        <div style={styles.sparkGrid}>
+          {players.map((p) => {
+            const werte = saisonMonate.map((m) => basisNachMonat(p.id, basis, entwicklungen, m));
+            const letzterWert = werte[werte.length - 1];
+            return (
+              <div key={p.id} style={styles.sparkCard}>
+                <div style={styles.sparkHead}>
+                  <span style={styles.cardName}>{p.name}</span>
+                  <span style={styles.sparkValue}>{letzterWert.toFixed(1)}</span>
+                </div>
+                <Sparkline values={werte} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Sparkline({ values, width = 220, height = 46 }) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = values.length > 1 ? width / (values.length - 1) : 0;
+  const points = values
+    .map((v, i) => {
+      const x = i * step;
+      const y = height - ((v - min) / range) * (height - 6) - 3;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const lastX = (values.length - 1) * step;
+  const lastY = height - ((values[values.length - 1] - min) / range) * (height - 6) - 3;
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <polyline points={points} fill="none" stroke="#AE1E1D" strokeWidth="2" />
+      <circle cx={lastX} cy={lastY} r="3" fill="#AE1E1D" />
+    </svg>
+  );
+}
+
+/* ---------- Training bewerten ---------- */
+
+function TrainingBewertung({ players, trainings, termine, onSave }) {
+  const geplanteTermine = useMemo(
+    () =>
+      termine
+        .filter((t) => t.status !== "abgesagt")
+        .slice()
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [termine]
+  );
+  const today = todayISO();
+  const defaultDate = geplanteTermine.find((t) => t.date <= today)?.date || geplanteTermine[0]?.date || "";
+  const [date, setDate] = useState(defaultDate);
+  const [rows, setRows] = useState({});
+
+  useEffect(() => {
+    if (!date && geplanteTermine[0]) setDate(geplanteTermine[0].date);
+  }, [geplanteTermine]); // eslint-disable-line
+
+  useEffect(() => {
+    const init = {};
+    players.forEach((p) => {
+      const existing = trainings.find((t) => t.date === date && t.playerId === p.id);
+      init[p.id] = existing
+        ? { vorkommnis: existing.vorkommnis, karte: existing.karte, teilnahme: existing.teilnahme, kommentar: existing.kommentar || "" }
+        : { vorkommnis: 0, karte: "keine", teilnahme: "anwesend", kommentar: "" };
+    });
+    setRows(init);
+  }, [date, players, trainings]);
+
+  const getRow = (id) => rows[id] || { vorkommnis: 0, karte: "keine", teilnahme: "anwesend", kommentar: "" };
+  const setRow = (id, patch) => setRows((r) => ({ ...r, [id]: { ...getRow(id), ...patch } }));
+
+  const save = () => {
+    if (players.length === 0 || !date) return;
+    const entries = players.map((p) => ({ id: uid(), date, playerId: p.id, ...getRow(p.id) }));
+    onSave(entries, date);
+  };
+
+  return (
+    <section>
+      <div style={styles.rowBetween}>
+        <h2 style={styles.h2}>Training bewerten</h2>
+        {geplanteTermine.length > 0 ? (
+          <select style={styles.select} value={date} onChange={(e) => setDate(e.target.value)}>
+            {geplanteTermine.map((t) => (
+              <option key={t.id} value={t.date}>
+                {formatTerminLabel(t.date)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span style={styles.hint}>Keine Termine angelegt</span>
+        )}
+      </div>
+
+      {geplanteTermine.length === 0 && (
+        <EmptyState text="Noch keine Trainingstermine angelegt. Lege sie unter „Verwaltung“ an." />
+      )}
+      {geplanteTermine.length > 0 && players.length === 0 && (
+        <EmptyState text="Noch keine aktiven Spieler vorhanden." />
+      )}
+
+      <div style={styles.cardList}>
+        {players.map((p) => {
+          const row = getRow(p.id);
+          const punkte = trainingPunkte(row);
+          return (
+            <div key={p.id} style={styles.card}>
+              <div style={styles.cardHead}>
+                <span style={styles.cardName}>{p.name}</span>
+                <span
+                  style={{
+                    ...styles.pill,
+                    background: punkte >= 0 ? "#DCEFE3" : "#FBE0E0",
+                    color: punkte >= 0 ? "#1B4332" : "#9B2226",
+                  }}
+                >
+                  {punkte >= 0 ? "+" : ""}
+                  {punkte.toFixed(2)} Pkt.
+                </span>
+              </div>
+
+              <div style={styles.fieldRow}>
+                <label style={styles.label}>Teilnahme</label>
+                <select style={styles.select} value={row.teilnahme} onChange={(e) => setRow(p.id, { teilnahme: e.target.value })}>
+                  {Object.keys(TEILNAHME).map((k) => (
+                    <option key={k} value={k}>
+                      {TEILNAHME_LABEL[k]} ({TEILNAHME[k] > 0 ? "+" : ""}
+                      {TEILNAHME[k]})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={styles.fieldRow}>
+                <label style={styles.label}>Besonderes Vorkommnis</label>
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.25}
+                  value={row.vorkommnis}
+                  onChange={(e) => setRow(p.id, { vorkommnis: Number(e.target.value) })}
+                  style={styles.range}
+                />
+                <span style={styles.rangeValue}>
+                  {row.vorkommnis > 0 ? "+" : ""}
+                  {Number(row.vorkommnis).toFixed(2)}
+                </span>
+              </div>
+
+              <div style={styles.fieldRow}>
+                <label style={styles.label}>Karte</label>
+                <div style={styles.chipGroup}>
+                  {Object.keys(KARTEN).map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => setRow(p.id, { karte: k })}
+                      style={{ ...styles.chip, ...(row.karte === k ? styles.chipActive : {}) }}
+                    >
+                      {k === "keine" ? "Keine" : k[0].toUpperCase() + k.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <label style={styles.label}>Kommentar (optional)</label>
+                <textarea
+                  style={styles.textarea}
+                  placeholder="Etwas Besonderes zu diesem Spieler festhalten…"
+                  value={row.kommentar || ""}
+                  onChange={(e) => setRow(p.id, { kommentar: e.target.value })}
+                  rows={2}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {players.length > 0 && date && (
+        <button style={styles.primaryBtn} onClick={save}>
+          Trainingsbewertung speichern
+        </button>
+      )}
+    </section>
+  );
+}
+
+/* ---------- Monatsentwicklung ---------- */
+
+function MonatsEntwicklung({ players, entwicklungen, onSave }) {
+  const [month, setMonth] = useState(monthKey(new Date()));
+  const [values, setValues] = useState({});
+
+  useEffect(() => {
+    const init = {};
+    players.forEach((p) => {
+      const existing = entwicklungen.find((e) => e.playerId === p.id && e.month === month);
+      init[p.id] = existing ? existing.punkte : 0;
+    });
+    setValues(init);
+  }, [month, players, entwicklungen]);
+
+  const save = () => {
+    const entries = players.map((p) => ({ id: uid(), month, playerId: p.id, punkte: Number(values[p.id] || 0) }));
+    onSave(entries, month);
+  };
+
+  return (
+    <section>
+      <div style={styles.rowBetween}>
+        <h2 style={styles.h2}>Monatsentwicklung</h2>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={styles.select} />
+      </div>
+      <p style={styles.hint}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
+
+      {players.length === 0 && <EmptyState text="Noch keine aktiven Spieler vorhanden." />}
+
+      <div style={styles.cardList}>
+        {players.map((p) => (
+          <div key={p.id} style={styles.card}>
+            <div style={styles.cardHead}>
+              <span style={styles.cardName}>{p.name}</span>
+            </div>
+            <div style={styles.fieldRow}>
+              <input
+                type="range"
+                min={-1}
+                max={1}
+                step={0.25}
+                value={values[p.id] ?? 0}
+                onChange={(e) => setValues((v) => ({ ...v, [p.id]: Number(e.target.value) }))}
+                style={styles.range}
+              />
+              <span style={styles.rangeValue}>
+                {(values[p.id] ?? 0) > 0 ? "+" : ""}
+                {Number(values[p.id] ?? 0).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {players.length > 0 && (
+        <button style={styles.primaryBtn} onClick={save}>
+          Monatsentwicklung speichern
+        </button>
+      )}
+    </section>
+  );
+}
+
+/* ---------- Spieltage ---------- */
+
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel }) {
+  const [neuesDatum, setNeuesDatum] = useState(todayISO());
+  const [openSpieltag, setOpenSpieltag] = useState(null);
+  const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
+
+  return (
+    <section>
+      <h2 style={styles.h2}>Spieltage</h2>
+
+      <div style={{ ...styles.addRow, marginTop: 4 }}>
+        <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
+        <button style={styles.secondaryBtn} onClick={() => onAddSpieltag(neuesDatum)}>
+          Spieltag anlegen
+        </button>
+      </div>
+
+      {sorted.length === 0 && <EmptyState text="Noch keine Spieltage angelegt." />}
+
+      <div style={styles.cardList}>
+        {sorted.map((s) => (
+          <SpieltagCard
+            key={s.id}
+            spieltag={s}
+            players={players}
+            gegner={gegner}
+            open={openSpieltag === s.id}
+            onToggle={() => setOpenSpieltag(openSpieltag === s.id ? null : s.id)}
+            onRemoveSpieltag={() => onRemoveSpieltag(s.id)}
+            onAddSpiel={(spiel) => onAddSpiel(s.id, spiel)}
+            onUpdateSpiel={(spiel) => onUpdateSpiel(s.id, spiel)}
+            onRemoveSpiel={(spielId) => onRemoveSpiel(s.id, spielId)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel }) {
+  const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
+  const [ourGoals, setOurGoals] = useState(0);
+  const [theirGoals, setTheirGoals] = useState(0);
+  const [tally, setTally] = useState({});
+  const [editingId, setEditingId] = useState(null);
+
+  useEffect(() => {
+    if (!opponentId && gegner[0]) setOpponentId(gegner[0].id);
+  }, [gegner]); // eslint-disable-line
+
+  const inc = (playerId) => {
+    setTally((t) => ({ ...t, [playerId]: (t[playerId] || 0) + 1 }));
+    setOurGoals((g) => Number(g) + 1);
+  };
+  const dec = (playerId) => {
+    setTally((t) => {
+      const current = (t[playerId] || 0) - 1;
+      const next = { ...t };
+      if (current <= 0) delete next[playerId];
+      else next[playerId] = current;
+      return next;
+    });
+    setOurGoals((g) => Math.max(0, Number(g) - 1));
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setOpponentId(gegner[0]?.id || "");
+    setOurGoals(0);
+    setTheirGoals(0);
+    setTally({});
+  };
+
+  const startEdit = (sp) => {
+    setEditingId(sp.id);
+    setOpponentId(sp.opponentId);
+    setOurGoals(sp.ourGoals);
+    setTheirGoals(sp.theirGoals);
+    const t = {};
+    sp.scorers.forEach((sc) => (t[sc.playerId] = sc.tore));
+    setTally(t);
+  };
+
+  const saveSpiel = () => {
+    if (!opponentId) return;
+    const spiel = {
+      id: editingId || uid(),
+      opponentId,
+      ourGoals: Number(ourGoals) || 0,
+      theirGoals: Number(theirGoals) || 0,
+      scorers: Object.entries(tally).map(([playerId, tore]) => ({ id: uid(), playerId, tore })),
+    };
+    if (editingId) onUpdateSpiel(spiel);
+    else onAddSpiel(spiel);
+    resetForm();
+  };
+
+  const gegnerName = (id) => gegner.find((g) => g.id === id)?.name || "Unbekannt";
+  const spielerName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.cardHead}>
+        <span style={styles.cardName}>
+          {new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+          <span style={styles.mutedTag}>
+            {" "}
+            · {spieltag.spiele.length} {spieltag.spiele.length === 1 ? "Spiel" : "Spiele"}
+          </span>
+        </span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={styles.linkBtn} onClick={onToggle}>
+            {open ? "Schließen" : "Öffnen"}
+          </button>
+          <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={onRemoveSpieltag}>
+            Entfernen
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <>
+          {spieltag.spiele.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              {spieltag.spiele.map((sp) => (
+                <div key={sp.id} style={styles.spielRow}>
+                  <div>
+                    <strong>{gegnerName(sp.opponentId)}</strong> — {sp.ourGoals}:{sp.theirGoals}
+                    {sp.scorers.length > 0 && (
+                      <div style={styles.hint}>Tore: {sp.scorers.map((sc) => `${spielerName(sc.playerId)} (${sc.tore})`).join(", ")}</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <button style={styles.linkBtn} onClick={() => startEdit(sp)}>
+                      Bearbeiten
+                    </button>
+                    <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={() => onRemoveSpiel(sp.id)}>
+                      Entfernen
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={styles.basisGrid}>
+            {editingId && (
+              <div style={styles.editBanner}>
+                Spiel wird bearbeitet.{" "}
+                <button style={styles.linkBtn} onClick={resetForm}>
+                  Abbrechen
+                </button>
+              </div>
+            )}
+            <div>
+              <label style={styles.label}>Gegner</label>
+              <div style={{ ...styles.chipGroup, marginTop: 6 }}>
+                {gegner.length === 0 && <span style={styles.hint}>Noch kein Gegner angelegt.</span>}
+                {gegner.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => setOpponentId(g.id)}
+                    style={{ ...styles.chip, ...(opponentId === g.id ? styles.chipActive : {}) }}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={styles.fieldRow}>
+              <label style={styles.label}>Ergebnis (Wir : Gegner)</label>
+              <input
+                type="number"
+                min={0}
+                style={{ ...styles.input, flex: "none", width: 60 }}
+                value={ourGoals}
+                onChange={(e) => setOurGoals(e.target.value)}
+              />
+              <span>:</span>
+              <input
+                type="number"
+                min={0}
+                style={{ ...styles.input, flex: "none", width: 60 }}
+                value={theirGoals}
+                onChange={(e) => setTheirGoals(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 4 }}>
+              <label style={styles.label}>Torschützen — antippen zum Erfassen</label>
+              <div style={styles.scorerGrid}>
+                {players.map((p) => {
+                  const count = tally[p.id] || 0;
+                  return (
+                    <div key={p.id} style={{ ...styles.scorerTile, ...(count > 0 ? styles.scorerTileActive : {}) }}>
+                      <button style={styles.scorerName} onClick={() => inc(p.id)}>
+                        {p.name}
+                      </button>
+                      <div style={styles.scorerStepper}>
+                        <button style={styles.stepBtn} onClick={() => dec(p.id)} disabled={count === 0}>
+                          −
+                        </button>
+                        <span style={styles.stepCount}>{count}</span>
+                        <button style={styles.stepBtn} onClick={() => inc(p.id)}>
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {players.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
+              </div>
+            </div>
+
+            <button style={{ ...styles.primaryBtn, marginTop: 10 }} onClick={saveSpiel} disabled={!opponentId}>
+              {editingId ? "Änderungen speichern" : "Spiel speichern"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Verwaltung ---------- */
+
+function Verwaltung({
+  players,
+  basis,
+  termine,
+  gegner,
+  onAdd,
+  onToggleActive,
+  onRemove,
+  onBasisChange,
+  onGenerateTermine,
+  onToggleAbsage,
+  onRemoveTermin,
+  onAddGegner,
+  onRemoveGegner,
+}) {
+  return (
+    <section>
+      <h2 style={styles.h2}>Verwaltung</h2>
+      <SpielerBereich
+        players={players}
+        basis={basis}
+        onAdd={onAdd}
+        onToggleActive={onToggleActive}
+        onRemove={onRemove}
+        onBasisChange={onBasisChange}
+      />
+      <TrainingsplanBereich
+        termine={termine}
+        onGenerateTermine={onGenerateTermine}
+        onToggleAbsage={onToggleAbsage}
+        onRemoveTermin={onRemoveTermin}
+      />
+      <GegnerBereich gegner={gegner} onAddGegner={onAddGegner} onRemoveGegner={onRemoveGegner} />
+    </section>
+  );
+}
+
+function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBasisChange }) {
+  const [name, setName] = useState("");
+  const [openId, setOpenId] = useState(null);
+
+  return (
+    <div>
+      <h3 style={styles.h3}>Spieler</h3>
+      <div style={styles.addRow}>
+        <input
+          style={styles.input}
+          placeholder="Name des Spielers"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) {
+              onAdd(name.trim());
+              setName("");
+            }
+          }}
+        />
+        <button
+          style={styles.secondaryBtn}
+          onClick={() => {
+            if (name.trim()) {
+              onAdd(name.trim());
+              setName("");
+            }
+          }}
+        >
+          Hinzufügen
+        </button>
+      </div>
+
+      {players.length === 0 && <EmptyState text="Noch keine Spieler angelegt." />}
+
+      <div style={styles.cardList}>
+        {players.map((p) => {
+          const wert = Number(basis[p.id]) || 0;
+          const open = openId === p.id;
+          return (
+            <div key={p.id} style={styles.card}>
+              <div style={styles.cardHead}>
+                <span style={styles.cardName}>
+                  {p.name}
+                  {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
+                </span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button style={styles.linkBtn} onClick={() => setOpenId(open ? null : p.id)}>
+                    {open ? "Schließen" : "Basis-Qualität"}
+                  </button>
+                  <button style={styles.linkBtn} onClick={() => onToggleActive(p.id)}>
+                    {p.active === false ? "Aktivieren" : "Deaktivieren"}
+                  </button>
+                  <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={() => onRemove(p.id)}>
+                    Entfernen
+                  </button>
+                </div>
+              </div>
+
+              {open && (
+                <div style={styles.basisGrid}>
+                  <div style={styles.basisItem}>
+                    <label style={styles.label}>Basis-Qualität</label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={40}
+                      step={0.5}
+                      value={wert}
+                      onChange={(e) => onBasisChange(p.id, Number(e.target.value))}
+                      style={styles.range}
+                    />
+                    <span style={styles.rangeValue}>{wert.toFixed(1)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRemoveTermin }) {
+  const [wochentage, setWochentage] = useState([2, 4]);
+  const [wochen, setWochen] = useState(8);
+
+  const toggleWochentag = (idx) => {
+    setWochentage((w) => (w.includes(idx) ? w.filter((x) => x !== idx) : [...w, idx].sort()));
+  };
+
+  const generieren = () => {
+    if (wochentage.length === 0) return;
+    const neue = [];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    for (let i = 0; i < wochen * 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      if (wochentage.includes(d.getDay())) {
+        neue.push({ id: uid(), date: toLocalISODate(d), status: "geplant" });
+      }
+    }
+    onGenerateTermine(neue);
+  };
+
+  const sortiert = [...termine].sort((a, b) => a.date.localeCompare(b.date));
+  const heute = todayISO();
+  const kommende = sortiert.filter((t) => t.date >= heute);
+  const vergangene = sortiert.filter((t) => t.date < heute).reverse();
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <h3 style={styles.h3}>Trainingsplan</h3>
+
+      <div style={styles.card}>
+        <div style={styles.cardHead}>
+          <span style={styles.cardName}>Termine generieren</span>
+        </div>
+        <div style={styles.fieldRow}>
+          <label style={styles.label}>Wochentage</label>
+          <div style={styles.chipGroup}>
+            {[1, 2, 3, 4, 5].map((idx) => (
+              <button
+                key={idx}
+                onClick={() => toggleWochentag(idx)}
+                style={{ ...styles.chip, ...(wochentage.includes(idx) ? styles.chipActive : {}) }}
+              >
+                {WOCHENTAGE[idx]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={styles.fieldRow}>
+          <label style={styles.label}>Wochen im Voraus</label>
+          <input
+            type="number"
+            min={1}
+            max={52}
+            style={{ ...styles.input, flex: "none", width: 70 }}
+            value={wochen}
+            onChange={(e) => setWochen(Number(e.target.value) || 1)}
+          />
+        </div>
+        <button style={{ ...styles.secondaryBtn, marginTop: 10 }} onClick={generieren}>
+          Termine generieren
+        </button>
+      </div>
+
+      {sortiert.length === 0 && (
+        <div style={{ marginTop: 12 }}>
+          <EmptyState text="Noch keine Trainingstermine angelegt." />
+        </div>
+      )}
+
+      {kommende.length > 0 && (
+        <>
+          <div style={styles.subheading}>Kommende Termine</div>
+          <div style={styles.cardList}>
+            {kommende.map((t) => (
+              <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {vergangene.length > 0 && (
+        <>
+          <div style={styles.subheading}>Vergangene Termine</div>
+          <div style={styles.cardList}>
+            {vergangene.map((t) => (
+              <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
+  const abgesagt = termin.status === "abgesagt";
+  return (
+    <div style={styles.spielRow}>
+      <div>
+        {formatTerminLabel(termin.date)}
+        {abgesagt && <span style={{ ...styles.mutedTag, color: "#9B2226" }}> · abgesagt</span>}
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button style={styles.linkBtn} onClick={() => onToggleAbsage(termin.id)}>
+          {abgesagt ? "Wieder aktivieren" : "Absagen"}
+        </button>
+        <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={() => onRemoveTermin(termin.id)}>
+          Entfernen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GegnerBereich({ gegner, onAddGegner, onRemoveGegner }) {
+  const [name, setName] = useState("");
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <h3 style={styles.h3}>Gegner</h3>
+      <div style={styles.addRow}>
+        <input
+          style={styles.input}
+          placeholder="Name des Gegners"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) {
+              onAddGegner(name.trim());
+              setName("");
+            }
+          }}
+        />
+        <button
+          style={styles.secondaryBtn}
+          onClick={() => {
+            if (name.trim()) {
+              onAddGegner(name.trim());
+              setName("");
+            }
+          }}
+        >
+          Hinzufügen
+        </button>
+      </div>
+      {gegner.length > 0 && (
+        <div style={styles.chipGroup}>
+          {gegner.map((g) => (
+            <span key={g.id} style={styles.chip}>
+              {g.name}
+              <button style={styles.chipRemove} onClick={() => onRemoveGegner(g.id)}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {gegner.length === 0 && <div style={styles.hint}>Noch keine Gegner hinterlegt.</div>}
+    </div>
+  );
+}
+
+function EmptyState({ text }) {
+  return <div style={styles.empty}>{text}</div>;
+}
+
+/* ---------- Styles ---------- */
+
+const styles = {
+  app: { fontFamily: "'Inter', system-ui, sans-serif", background: "#F7F4F3", minHeight: "100vh", color: "#1C2B22" },
+  loadingScreen: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100vh",
+    gap: 12,
+    color: "#8A6F6F",
+    fontFamily: "'Inter', system-ui, sans-serif",
+  },
+  loadingBall: {
+    width: 28,
+    height: 28,
+    borderRadius: "50%",
+    border: "3px solid #EADADA",
+    borderTopColor: "#AE1E1D",
+    animation: "spin 0.8s linear infinite",
+  },
+  header: { background: "#AE1E1D", color: "#F8FAF8", padding: "20px 20px 0 20px" },
+  headerTop: { display: "flex", alignItems: "center", gap: 12, paddingBottom: 16 },
+  crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 6, padding: 3 },
+  title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1 },
+  subtitle: { fontSize: 13, color: "#F3D2D1", marginTop: 2 },
+  nav: { display: "flex", gap: 4, overflowX: "auto" },
+  navBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#F3D2D1",
+    padding: "10px 14px",
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    borderBottom: "2px solid transparent",
+    whiteSpace: "nowrap",
+  },
+  navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
+  main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
+  h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0" },
+  h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0" },
+  subheading: { fontSize: 13, fontWeight: 600, color: "#8A6F6F", margin: "16px 0 8px 0" },
+  rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 6 },
+  select: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "8px 10px", fontSize: 14, color: "#1C2B22" },
+  input: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "10px 12px", fontSize: 14, flex: 1 },
+  textarea: {
+    border: "1px solid #E4D2D2",
+    background: "#fff",
+    borderRadius: 8,
+    padding: "8px 10px",
+    fontSize: 13,
+    width: "100%",
+    marginTop: 6,
+    fontFamily: "'Inter', system-ui, sans-serif",
+    resize: "vertical",
+  },
+  addRow: { display: "flex", gap: 8, marginBottom: 16 },
+  tableWrap: { overflowX: "auto", background: "#fff", borderRadius: 12, border: "1px solid #EADADA" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
+  th: { textAlign: "left", padding: "10px 12px", color: "#8A6F6F", fontWeight: 600, fontSize: 12, borderBottom: "1px solid #EADADA" },
+  td: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9" },
+  tdName: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9", display: "flex", alignItems: "center", gap: 8, fontWeight: 500 },
+  rank: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    background: "#F3E9E9",
+    color: "#8A6F6F",
+    fontSize: 11,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+  },
+  cardList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 },
+  card: { background: "#fff", border: "1px solid #EADADA", borderRadius: 12, padding: 14 },
+  cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
+  cardName: { fontWeight: 600, fontSize: 15 },
+  mutedTag: { color: "#B08A8A", fontWeight: 400, fontSize: 13 },
+  pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
+  fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
+  label: { fontSize: 13, color: "#8A6F6F", minWidth: 130 },
+  range: { flex: 1, accentColor: "#AE1E1D", minWidth: 100 },
+  rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right" },
+  chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
+  chip: { border: "1px solid #E4D2D2", background: "#fff", color: "#8A6F6F", padding: "5px 12px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
+  chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
+  chipRemove: { background: "transparent", border: "none", color: "#9B2226", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
+  primaryBtn: { background: "#AE1E1D", color: "#fff", border: "none", borderRadius: 10, padding: "12px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%" },
+  secondaryBtn: { background: "#7A1310", color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", height: 40, fontSize: 14, fontWeight: 600, cursor: "pointer" },
+  linkBtn: { background: "transparent", border: "none", color: "#AE1E1D", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 },
+  basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3E9E9", display: "flex", flexDirection: "column", gap: 8 },
+  basisItem: { display: "flex", alignItems: "center", gap: 10 },
+  empty: { background: "#fff", border: "1px dashed #E4D2D2", borderRadius: 12, padding: 24, textAlign: "center", color: "#8A6F6F", fontSize: 14 },
+  hint: { fontSize: 13, color: "#8A6F6F", marginTop: -4, marginBottom: 6 },
+  toast: {
+    position: "fixed",
+    bottom: 20,
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#AE1E1D",
+    color: "#fff",
+    padding: "10px 18px",
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 500,
+    boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+  },
+  statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
+  statBox: { flex: "1 1 90px", background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 8px", textAlign: "center" },
+  statValue: { fontSize: 18, fontWeight: 700, color: "#AE1E1D", fontFamily: "'Space Grotesk', sans-serif" },
+  statLabel: { fontSize: 11, color: "#8A6F6F", marginTop: 2 },
+  sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
+  sparkCard: { background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 12px" },
+  sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  sparkValue: { fontSize: 14, fontWeight: 700, color: "#AE1E1D" },
+  spielRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    background: "#FBF5F5",
+    border: "1px solid #F3E9E9",
+    borderRadius: 8,
+    padding: "8px 10px",
+    fontSize: 13,
+  },
+  scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
+  scorerTile: { border: "1px solid #EADADA", borderRadius: 10, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: 6 },
+  scorerTileActive: { borderColor: "#AE1E1D", background: "#FBEAEA" },
+  scorerName: { background: "transparent", border: "none", padding: 0, textAlign: "left", fontSize: 14, fontWeight: 600, color: "#1C2B22", cursor: "pointer" },
+  scorerStepper: { display: "flex", alignItems: "center", gap: 8 },
+  stepBtn: { width: 26, height: 26, borderRadius: 8, border: "1px solid #E4D2D2", background: "#fff", color: "#AE1E1D", fontSize: 15, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
+  stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center" },
+  editBanner: { background: "#FFF3D6", color: "#7A5A00", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
+};
+
+const styleSheet = document.createElement("style");
+styleSheet.textContent = "@keyframes spin { to { transform: rotate(360deg); } }";
+document.head.appendChild(styleSheet);
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
+</script>
+</body>
+</html>
