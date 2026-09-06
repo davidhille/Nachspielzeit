@@ -1643,7 +1643,7 @@ try {
     var source = document.getElementById("app-source").textContent;
     try {
       var output = Babel.transform(source, {
-        presets: ["react"],
+        presets: [["react", { runtime: "classic" }]],
         sourceType: "script",
       }).code;
       var runner = document.createElement("script");
