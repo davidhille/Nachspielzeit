@@ -30,7 +30,7 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
+<script type="text/plain" id="app-source">
 const { useState, useEffect, useCallback, useMemo } = React;
 
 /* ---------- Supabase-Verbindung ---------- */
@@ -1637,6 +1637,25 @@ try {
     (e.message || e) +
     "</div>";
 }
+</script>
+<script>
+  (function () {
+    var source = document.getElementById("app-source").textContent;
+    try {
+      var output = Babel.transform(source, {
+        presets: ["react"],
+        sourceType: "script",
+      }).code;
+      var runner = document.createElement("script");
+      runner.textContent = output;
+      document.body.appendChild(runner);
+    } catch (e) {
+      document.getElementById("root").innerHTML =
+        '<div style="padding:20px;font-family:monospace;white-space:pre-wrap;color:#9B2226;font-size:13px;">Fehler beim Übersetzen des Codes:\n\n' +
+        (e.message || e) +
+        "</div>";
+    }
+  })();
 </script>
 </body>
 </html>
