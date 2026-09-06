@@ -249,7 +249,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -261,6 +261,7 @@ function App() {
           dbSelect("spiele"),
           dbSelect("torschuetzen"),
           dbSelect("spieltag_gegner"),
+          dbSelect("spieltag_teilnehmer"),
         ]);
       setPlayers(playersRaw);
       const basisMap = {};
@@ -286,6 +287,7 @@ function App() {
         id: s.id,
         date: s.date,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
+        teilnehmer: stRaw.filter((t) => t.spieltag_id === s.id).map((t) => t.player_id),
         spiele: spieleRaw
           .filter((sp) => sp.spieltag_id === s.id)
           .map((sp) => ({
@@ -449,6 +451,18 @@ function App() {
                   );
                 } else {
                   await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
+                }
+              })
+            }
+            onToggleTeilnehmer={(spieltagId, playerId, istDabei) =>
+              wrapAction(async () => {
+                if (istDabei) {
+                  await dbDeleteWhere(
+                    "spieltag_teilnehmer",
+                    `spieltag_id=eq.${spieltagId}&player_id=eq.${playerId}`
+                  );
+                } else {
+                  await dbInsert("spieltag_teilnehmer", { spieltag_id: spieltagId, player_id: playerId });
                 }
               })
             }
@@ -984,7 +998,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung }) {
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung, onToggleTeilnehmer }) {
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
@@ -1016,6 +1030,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
             onUpdateSpiel={(spiel) => onUpdateSpiel(s.id, spiel)}
             onRemoveSpiel={(spielId) => onRemoveSpiel(s.id, spielId)}
             onToggleGegnerZuordnung={(opponentId, istZugeordnet) => onToggleGegnerZuordnung(s.id, opponentId, istZugeordnet)}
+            onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
           />
         ))}
       </div>
@@ -1023,7 +1038,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung }) {
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung, onToggleTeilnehmer }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -1087,6 +1102,8 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
       ? gegner.filter((g) => spieltag.zugeordneteGegner.includes(g.id))
       : gegner;
   const spielerName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
+  const torschuetzenOptionen =
+    spieltag.teilnehmer.length > 0 ? players.filter((p) => spieltag.teilnehmer.includes(p.id)) : players;
 
   return (
     <div style={styles.card}>
@@ -1152,6 +1169,25 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             </div>
           </div>
 
+          <div style={{ marginBottom: 14 }}>
+            <label style={styles.label}>Kader an diesem Spieltag</label>
+            <div style={{ ...styles.chipGroup, marginTop: 6 }}>
+              {players.length === 0 && <span style={styles.hint}>Noch keine Spieler in der Verwaltung angelegt.</span>}
+              {players.map((p) => {
+                const dabei = spieltag.teilnehmer.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => onToggleTeilnehmer(p.id, dabei)}
+                    style={{ ...styles.chip, ...(dabei ? styles.chipActive : {}) }}
+                  >
+                    {p.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div style={styles.basisGrid}>
             {editingId && (
               <div style={styles.editBanner}>
@@ -1201,7 +1237,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             <div style={{ marginTop: 4 }}>
               <label style={styles.label}>Torschützen — antippen zum Erfassen</label>
               <div style={styles.scorerGrid}>
-                {players.map((p) => {
+                {torschuetzenOptionen.map((p) => {
                   const count = tally[p.id] || 0;
                   return (
                     <div key={p.id} style={{ ...styles.scorerTile, ...(count > 0 ? styles.scorerTileActive : {}) }}>
@@ -1220,7 +1256,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                     </div>
                   );
                 })}
-                {players.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
+                {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
               </div>
             </div>
 
