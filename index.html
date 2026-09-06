@@ -193,7 +193,7 @@ function Gate({ onUnlock }) {
         Nachspielzeit
       </div>
       <input
-        style={{ ...styles.input, maxWidth: 240, textAlign: "center" }}
+        style={{ ...styles.input, flex: "none", width: 220, maxWidth: 240, textAlign: "center" }}
         placeholder="Zugangscode"
         type="password"
         value={code}
@@ -204,7 +204,11 @@ function Gate({ onUnlock }) {
         autoFocus
       />
       {fehler && <div style={{ color: "#9B2226", fontSize: 13 }}>{fehler}</div>}
-      <button style={{ ...styles.primaryBtn, maxWidth: 240 }} onClick={pruefen} disabled={checking || !code.trim()}>
+      <button
+        style={{ ...styles.primaryBtn, flex: "none", width: 220, maxWidth: 240 }}
+        onClick={pruefen}
+        disabled={checking || !code.trim()}
+      >
         {checking ? "Prüfe …" : "Anmelden"}
       </button>
     </div>
