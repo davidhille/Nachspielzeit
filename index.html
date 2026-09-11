@@ -1296,24 +1296,50 @@ function Verwaltung({
   onAddGegner,
   onRemoveGegner,
 }) {
+  const [subTab, setSubTab] = useState("spieler");
+  const items = [
+    ["spieler", "Spieler"],
+    ["trainingsplan", "Trainingsplan"],
+    ["gegner", "Gegner"],
+  ];
+
   return (
     <section>
       <h2 style={styles.h2}>Verwaltung</h2>
-      <SpielerBereich
-        players={players}
-        basis={basis}
-        onAdd={onAdd}
-        onToggleActive={onToggleActive}
-        onRemove={onRemove}
-        onBasisChange={onBasisChange}
-      />
-      <TrainingsplanBereich
-        termine={termine}
-        onGenerateTermine={onGenerateTermine}
-        onToggleAbsage={onToggleAbsage}
-        onRemoveTermin={onRemoveTermin}
-      />
-      <GegnerBereich gegner={gegner} onAddGegner={onAddGegner} onRemoveGegner={onRemoveGegner} />
+
+      <div style={styles.subNav}>
+        {items.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setSubTab(key)}
+            style={{ ...styles.subNavBtn, ...(subTab === key ? styles.subNavBtnActive : {}) }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "spieler" && (
+        <SpielerBereich
+          players={players}
+          basis={basis}
+          onAdd={onAdd}
+          onToggleActive={onToggleActive}
+          onRemove={onRemove}
+          onBasisChange={onBasisChange}
+        />
+      )}
+      {subTab === "trainingsplan" && (
+        <TrainingsplanBereich
+          termine={termine}
+          onGenerateTermine={onGenerateTermine}
+          onToggleAbsage={onToggleAbsage}
+          onRemoveTermin={onRemoveTermin}
+        />
+      )}
+      {subTab === "gegner" && (
+        <GegnerBereich gegner={gegner} onAddGegner={onAddGegner} onRemoveGegner={onRemoveGegner} />
+      )}
     </section>
   );
 }
@@ -1439,7 +1465,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
   const vergangene = sortiert.filter((t) => t.date < heute).reverse();
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div style={{ marginTop: 4 }}>
       <h3 style={styles.h3}>Trainingsplan</h3>
 
       <div style={styles.card}>
@@ -1534,7 +1560,7 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner }) {
   const [name, setName] = useState("");
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div style={{ marginTop: 4 }}>
       <h3 style={styles.h3}>Gegner</h3>
       <div style={styles.addRow}>
         <input
@@ -1662,6 +1688,18 @@ const styles = {
     whiteSpace: "nowrap",
   },
   navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
+  subNav: { display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" },
+  subNavBtn: {
+    border: "1px solid #E4D2D2",
+    background: "#fff",
+    color: "#8A6F6F",
+    padding: "8px 14px",
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  subNavBtnActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0" },
