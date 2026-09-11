@@ -121,6 +121,9 @@ const toLocalISODate = (d) => {
 };
 const todayISO = () => toLocalISODate(new Date());
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const confirmAnd = (message, fn) => {
+  if (window.confirm(message)) fn();
+};
 
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const monthLabel = (key) => {
@@ -1119,7 +1122,10 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
           <button style={styles.linkBtn} onClick={onToggle}>
             {open ? "Schließen" : "Öffnen"}
           </button>
-          <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={onRemoveSpieltag}>
+          <button
+            style={{ ...styles.linkBtn, color: "#9B2226" }}
+            onClick={() => confirmAnd("Diesen Spieltag inklusive aller Spiele und Torschützen wirklich entfernen?", onRemoveSpieltag)}
+          >
             Entfernen
           </button>
         </div>
@@ -1141,7 +1147,10 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                     <button style={styles.linkBtn} onClick={() => startEdit(sp)}>
                       Bearbeiten
                     </button>
-                    <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={() => onRemoveSpiel(sp.id)}>
+                    <button
+                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => onRemoveSpiel(sp.id))}
+                    >
                       Entfernen
                     </button>
                   </div>
@@ -1362,7 +1371,15 @@ function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBas
                   <button style={styles.linkBtn} onClick={() => onToggleActive(p.id)}>
                     {p.active === false ? "Aktivieren" : "Deaktivieren"}
                   </button>
-                  <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={() => onRemove(p.id)}>
+                  <button
+                    style={{ ...styles.linkBtn, color: "#9B2226" }}
+                    onClick={() =>
+                      confirmAnd(
+                        `${p.name} wirklich entfernen? Alle Bewertungen, Entwicklungsdaten und Torschützen-Einträge dieses Spielers gehen dabei verloren.`,
+                        () => onRemove(p.id)
+                      )
+                    }
+                  >
                     Entfernen
                   </button>
                 </div>
@@ -1502,7 +1519,10 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
         <button style={styles.linkBtn} onClick={() => onToggleAbsage(termin.id)}>
           {abgesagt ? "Wieder aktivieren" : "Absagen"}
         </button>
-        <button style={{ ...styles.linkBtn, color: "#9B2226" }} onClick={() => onRemoveTermin(termin.id)}>
+        <button
+          style={{ ...styles.linkBtn, color: "#9B2226" }}
+          onClick={() => confirmAnd("Diesen Trainingstermin wirklich entfernen?", () => onRemoveTermin(termin.id))}
+        >
           Entfernen
         </button>
       </div>
@@ -1546,7 +1566,10 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner }) {
           {gegner.map((g) => (
             <span key={g.id} style={styles.chip}>
               {g.name}
-              <button style={styles.chipRemove} onClick={() => onRemoveGegner(g.id)}>
+              <button
+                style={styles.chipRemove}
+                onClick={() => confirmAnd(`Gegner "${g.name}" wirklich entfernen?`, () => onRemoveGegner(g.id))}
+              >
                 ×
               </button>
             </span>
