@@ -574,6 +574,7 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
     return Array.from(set).sort();
   }, [trainings]);
   const [month, setMonth] = useState(months[months.length - 1]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
 
   useEffect(() => {
     if (!months.includes(month)) setMonth(months[months.length - 1]);
@@ -599,6 +600,21 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
     };
   });
   rows.sort((a, b) => b.gesamtMonat - a.gesamtMonat);
+
+  if (selectedPlayerId) {
+    const player = players.find((p) => p.id === selectedPlayerId);
+    return (
+      <SpielerDetail
+        player={player}
+        trainings={trainings}
+        entwicklungen={entwicklungen}
+        basis={basis}
+        spieltage={spieltage}
+        month={month}
+        onClose={() => setSelectedPlayerId(null)}
+      />
+    );
+  }
 
   return (
     <section>
@@ -633,7 +649,9 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
                 <tr key={r.id} style={!r.active ? { opacity: 0.5 } : undefined}>
                   <td style={styles.tdName}>
                     <span style={styles.rank}>{i + 1}</span>
-                    {r.name}
+                    <button style={styles.playerNameBtn} onClick={() => setSelectedPlayerId(r.id)}>
+                      {r.name}
+                    </button>
                   </td>
                   <td style={styles.td}>{r.basisAktuell.toFixed(2)}</td>
                   <td style={styles.td}>{r.monatsPunkte.toFixed(2)}</td>
@@ -731,6 +749,122 @@ function TrainerNotizen({ trainings, players, month }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose }) {
+  if (!player) {
+    return (
+      <section>
+        <button style={styles.linkBtn} onClick={onClose}>
+          ← Zurück
+        </button>
+        <EmptyState text="Spieler nicht gefunden." />
+      </section>
+    );
+  }
+
+  const saison = seasonKeyOf(month);
+  const eigeneTrainings = trainings.filter((t) => t.playerId === player.id).sort((a, b) => b.date.localeCompare(a.date));
+  const saisonTrainings = eigeneTrainings.filter((t) => seasonKeyOf(t.date.slice(0, 7)) === saison);
+  const monatsPunkte = saisonTrainings
+    .filter((t) => t.date.slice(0, 7) === month)
+    .reduce((sum, t) => sum + trainingPunkte(t), 0);
+  const saisonPunkte = saisonTrainings.reduce((sum, t) => sum + trainingPunkte(t), 0);
+  const basisAktuell = aktuelleBasis(player.id, basis, entwicklungen, month);
+  const gesamt = saisonTrainings.length;
+  const anwesend = saisonTrainings.filter((t) => t.teilnahme === "anwesend").length;
+  const quote = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
+
+  const spieltageDabei = spieltage
+    .filter((s) => s.teilnehmer.includes(player.id))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const toreGesamt = spieltage
+    .flatMap((s) => s.spiele)
+    .flatMap((sp) => sp.scorers)
+    .filter((sc) => sc.playerId === player.id)
+    .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
+
+  return (
+    <section>
+      <button style={styles.linkBtn} onClick={onClose}>
+        ← Zurück zur Übersicht
+      </button>
+      <h2 style={{ ...styles.h2, marginTop: 10 }}>{player.name}</h2>
+
+      <div style={styles.statsRow}>
+        <div style={styles.statBox}>
+          <div style={styles.statValue}>{monatsPunkte.toFixed(2)}</div>
+          <div style={styles.statLabel}>Punkte (Monat)</div>
+        </div>
+        <div style={styles.statBox}>
+          <div style={styles.statValue}>{saisonPunkte.toFixed(2)}</div>
+          <div style={styles.statLabel}>Punkte (Saison)</div>
+        </div>
+        <div style={styles.statBox}>
+          <div style={styles.statValue}>{basisAktuell.toFixed(1)}</div>
+          <div style={styles.statLabel}>Basis-Qualität</div>
+        </div>
+        <div style={styles.statBox}>
+          <div style={styles.statValue}>{quote != null ? quote.toFixed(0) + "%" : "–"}</div>
+          <div style={styles.statLabel}>Anwesenheit</div>
+        </div>
+        <div style={styles.statBox}>
+          <div style={styles.statValue}>{toreGesamt}</div>
+          <div style={styles.statLabel}>Tore gesamt</div>
+        </div>
+      </div>
+
+      <div style={styles.subheading}>Trainingshistorie {saison ? saison.replace("-", "/") : ""}</div>
+      {saisonTrainings.length === 0 ? (
+        <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison." />
+      ) : (
+        <div style={styles.cardList}>
+          {saisonTrainings.map((t) => (
+            <div key={t.id} style={styles.card}>
+              <div style={styles.cardHead}>
+                <span style={styles.cardName}>{formatTerminLabel(t.date)}</span>
+                <span
+                  style={{
+                    ...styles.pill,
+                    background: trainingPunkte(t) >= 0 ? "#DCEFE3" : "#FBE0E0",
+                    color: trainingPunkte(t) >= 0 ? "#1B4332" : "#9B2226",
+                  }}
+                >
+                  {trainingPunkte(t) >= 0 ? "+" : ""}
+                  {trainingPunkte(t).toFixed(2)} Pkt.
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: "#8A6F6F" }}>
+                {TEILNAHME_LABEL[t.teilnahme]}
+                {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
+              </div>
+              {t.kommentar && <div style={{ marginTop: 6, fontSize: 13 }}>{t.kommentar}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={styles.subheading}>Spieltag-Teilnahmen</div>
+      {spieltageDabei.length === 0 ? (
+        <EmptyState text="Noch an keinem Spieltag teilgenommen." />
+      ) : (
+        <div style={styles.cardList}>
+          {spieltageDabei.map((s) => {
+            const toreAnDiesemTag = s.spiele
+              .flatMap((sp) => sp.scorers)
+              .filter((sc) => sc.playerId === player.id)
+              .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
+            return (
+              <div key={s.id} style={styles.spielRow}>
+                <div>{formatTerminLabel(s.date)}</div>
+                <div>{toreAnDiesemTag > 0 ? `${toreAnDiesemTag} Tor(e)` : ""}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1831,6 +1965,17 @@ const styles = {
     fontWeight: 700,
   },
   cardList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 },
+  playerNameBtn: {
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    font: "inherit",
+    fontWeight: 500,
+    color: "#1C2B22",
+    textDecoration: "underline",
+    textDecorationColor: "#E4D2D2",
+    cursor: "pointer",
+  },
   card: { background: "#fff", border: "1px solid #EADADA", borderRadius: 12, padding: 14 },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardName: { fontWeight: 600, fontSize: 15 },
