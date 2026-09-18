@@ -1025,21 +1025,19 @@ function TrainingBewertung({ players, trainings, termine, onSave }) {
   const bewerteteDaten = useMemo(() => new Set(trainings.map((t) => t.date)), [trainings]);
   const today = todayISO();
 
-  const ermittleDefaultDate = (liste) => {
-    const vergangeneUnbewertet = liste.filter((t) => t.date <= today && !bewerteteDaten.has(t.date));
-    return (
-      vergangeneUnbewertet[0]?.date ||
-      liste.find((t) => t.date <= today)?.date ||
-      liste[0]?.date ||
-      ""
-    );
+  const ermittleDefaultDate = (liste, bewertet) => {
+    const vergangeneUnbewertet = liste.filter((t) => t.date <= today && !bewertet.has(t.date));
+    if (vergangeneUnbewertet.length > 0) return vergangeneUnbewertet[0].date;
+    const kommende = liste.filter((t) => t.date > today).sort((a, b) => a.date.localeCompare(b.date));
+    if (kommende.length > 0) return kommende[0].date;
+    return liste.find((t) => t.date <= today)?.date || liste[0]?.date || "";
   };
 
-  const [date, setDate] = useState(() => ermittleDefaultDate(geplanteTermine));
+  const [date, setDate] = useState(() => ermittleDefaultDate(geplanteTermine, bewerteteDaten));
   const [rows, setRows] = useState({});
 
   useEffect(() => {
-    if (!date && geplanteTermine[0]) setDate(ermittleDefaultDate(geplanteTermine));
+    if (!date && geplanteTermine[0]) setDate(ermittleDefaultDate(geplanteTermine, bewerteteDaten));
   }, [geplanteTermine]); // eslint-disable-line
 
   useEffect(() => {
@@ -1060,6 +1058,9 @@ function TrainingBewertung({ players, trainings, termine, onSave }) {
     if (players.length === 0 || !date) return;
     const entries = players.map((p) => ({ id: uid(), date, playerId: p.id, ...getRow(p.id) }));
     onSave(entries, date);
+    const bewertetNachSpeichern = new Set(bewerteteDaten);
+    bewertetNachSpeichern.add(date);
+    setDate(ermittleDefaultDate(geplanteTermine, bewertetNachSpeichern));
   };
 
   const aktuellBewertet = bewerteteDaten.has(date);
