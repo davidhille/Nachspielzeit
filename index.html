@@ -1022,13 +1022,24 @@ function TrainingBewertung({ players, trainings, termine, onSave }) {
         .sort((a, b) => b.date.localeCompare(a.date)),
     [termine]
   );
+  const bewerteteDaten = useMemo(() => new Set(trainings.map((t) => t.date)), [trainings]);
   const today = todayISO();
-  const defaultDate = geplanteTermine.find((t) => t.date <= today)?.date || geplanteTermine[0]?.date || "";
-  const [date, setDate] = useState(defaultDate);
+
+  const ermittleDefaultDate = (liste) => {
+    const vergangeneUnbewertet = liste.filter((t) => t.date <= today && !bewerteteDaten.has(t.date));
+    return (
+      vergangeneUnbewertet[0]?.date ||
+      liste.find((t) => t.date <= today)?.date ||
+      liste[0]?.date ||
+      ""
+    );
+  };
+
+  const [date, setDate] = useState(() => ermittleDefaultDate(geplanteTermine));
   const [rows, setRows] = useState({});
 
   useEffect(() => {
-    if (!date && geplanteTermine[0]) setDate(geplanteTermine[0].date);
+    if (!date && geplanteTermine[0]) setDate(ermittleDefaultDate(geplanteTermine));
   }, [geplanteTermine]); // eslint-disable-line
 
   useEffect(() => {
@@ -1051,6 +1062,8 @@ function TrainingBewertung({ players, trainings, termine, onSave }) {
     onSave(entries, date);
   };
 
+  const aktuellBewertet = bewerteteDaten.has(date);
+
   return (
     <section>
       <div style={styles.rowBetween}>
@@ -1060,6 +1073,7 @@ function TrainingBewertung({ players, trainings, termine, onSave }) {
             {geplanteTermine.map((t) => (
               <option key={t.id} value={t.date}>
                 {formatTerminLabel(t.date)}
+                {bewerteteDaten.has(t.date) ? " ✓ bewertet" : ""}
               </option>
             ))}
           </select>
@@ -1073,6 +1087,11 @@ function TrainingBewertung({ players, trainings, termine, onSave }) {
       )}
       {geplanteTermine.length > 0 && players.length === 0 && (
         <EmptyState text="Noch keine aktiven Spieler vorhanden." />
+      )}
+      {aktuellBewertet && (
+        <div style={styles.editBanner}>
+          Dieser Termin wurde bereits bewertet — Änderungen überschreiben die bestehende Bewertung.
+        </div>
       )}
 
       <div style={styles.cardList}>
