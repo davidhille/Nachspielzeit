@@ -117,9 +117,16 @@ const LOGO_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAB4CAY
 
 /* ---------- Konstanten ---------- */
 const KARTEN = { keine: 0, gelb: -0.5, blau: -1.0, rot: -2.0 };
-const TEILNAHME = { anwesend: 0.5, verspaetet: -0.25, unentschuldigt: -0.25, entschuldigt: 0 };
+const TEILNAHME = {
+  anwesend: 0.5,
+  anwesend_nicht_angemeldet: -0.25,
+  verspaetet: -0.25,
+  unentschuldigt: -0.25,
+  entschuldigt: 0,
+};
 const TEILNAHME_LABEL = {
   anwesend: "Anwesend",
+  anwesend_nicht_angemeldet: "Anwesend (nicht angemeldet)",
   verspaetet: "Verspätet",
   unentschuldigt: "Unentschuldigt gefehlt",
   entschuldigt: "Abgemeldet",
