@@ -687,11 +687,12 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
       const eigene = trainings.filter((t) => t.playerId === p.id && seasonKeyOf(t.date.slice(0, 7)) === saison);
       const gesamt = eigene.length;
       const anwesend = eigene.filter((t) => t.teilnahme === "anwesend").length;
+      const nichtAngemeldet = eigene.filter((t) => t.teilnahme === "anwesend_nicht_angemeldet").length;
       const verspaetet = eigene.filter((t) => t.teilnahme === "verspaetet").length;
       const unentschuldigt = eigene.filter((t) => t.teilnahme === "unentschuldigt").length;
       const abgemeldet = eigene.filter((t) => t.teilnahme === "entschuldigt").length;
-      const quote = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
-      return { id: p.id, name: p.name, gesamt, anwesend, verspaetet, unentschuldigt, abgemeldet, quote };
+      const quote = gesamt > 0 ? ((anwesend + nichtAngemeldet) / gesamt) * 100 : null;
+      return { id: p.id, name: p.name, gesamt, anwesend, nichtAngemeldet, verspaetet, unentschuldigt, abgemeldet, quote };
     })
     .filter((r) => r.gesamt > 0)
     .sort((a, b) => (b.quote ?? 0) - (a.quote ?? 0));
@@ -707,6 +708,7 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
               <tr>
                 <th style={styles.th}>Spieler</th>
                 <th style={styles.th}>Anwesend</th>
+                <th style={styles.th}>Anwesend (n.a.)</th>
                 <th style={styles.th}>Verspätet</th>
                 <th style={styles.th}>Unentschuldigt</th>
                 <th style={styles.th}>Abgemeldet</th>
@@ -718,6 +720,7 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
                 <tr key={r.id}>
                   <td style={styles.tdName}>{r.name}</td>
                   <td style={styles.td}>{r.anwesend}</td>
+                  <td style={styles.td}>{r.nichtAngemeldet}</td>
                   <td style={styles.td}>{r.verspaetet}</td>
                   <td style={styles.td}>{r.unentschuldigt}</td>
                   <td style={styles.td}>{r.abgemeldet}</td>
@@ -780,7 +783,9 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   const saisonPunkte = saisonTrainings.reduce((sum, t) => sum + trainingPunkte(t), 0);
   const basisAktuell = aktuelleBasis(player.id, basis, entwicklungen, month);
   const gesamt = saisonTrainings.length;
-  const anwesend = saisonTrainings.filter((t) => t.teilnahme === "anwesend").length;
+  const anwesend = saisonTrainings.filter(
+    (t) => t.teilnahme === "anwesend" || t.teilnahme === "anwesend_nicht_angemeldet"
+  ).length;
   const quote = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
 
   const spieltageDabei = spieltage
