@@ -465,18 +465,6 @@ function App() {
               }, "Spiel aktualisiert")
             }
             onRemoveSpiel={(spieltagId, spielId) => wrapAction(() => dbDelete("spiele", spielId))}
-            onToggleGegnerZuordnung={(spieltagId, opponentId, istZugeordnet) =>
-              wrapAction(async () => {
-                if (istZugeordnet) {
-                  await dbDeleteWhere(
-                    "spieltag_gegner",
-                    `spieltag_id=eq.${spieltagId}&opponent_id=eq.${opponentId}`
-                  );
-                } else {
-                  await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
-                }
-              })
-            }
             onToggleTeilnehmer={(spieltagId, playerId, istDabei) =>
               wrapAction(async () => {
                 if (istDabei) {
@@ -521,6 +509,19 @@ function App() {
             onRemoveTermin={(id) => wrapAction(() => dbDelete("trainingstermine", id))}
             onAddGegner={(name) => wrapAction(() => dbInsert("gegner", { id: uid(), name }))}
             onRemoveGegner={(id) => wrapAction(() => dbDelete("gegner", id))}
+            spieltage={spieltage}
+            onToggleGegnerZuordnung={(spieltagId, opponentId, istZugeordnet) =>
+              wrapAction(async () => {
+                if (istZugeordnet) {
+                  await dbDeleteWhere(
+                    "spieltag_gegner",
+                    `spieltag_id=eq.${spieltagId}&opponent_id=eq.${opponentId}`
+                  );
+                } else {
+                  await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
+                }
+              })
+            }
           />
         )}
       </main>
@@ -1261,7 +1262,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung, onToggleTeilnehmer }) {
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
@@ -1292,7 +1293,6 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
             onAddSpiel={(spiel) => onAddSpiel(s.id, spiel)}
             onUpdateSpiel={(spiel) => onUpdateSpiel(s.id, spiel)}
             onRemoveSpiel={(spielId) => onRemoveSpiel(s.id, spielId)}
-            onToggleGegnerZuordnung={(opponentId, istZugeordnet) => onToggleGegnerZuordnung(s.id, opponentId, istZugeordnet)}
             onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
           />
         ))}
@@ -1301,7 +1301,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleGegnerZuordnung, onToggleTeilnehmer }) {
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -1420,25 +1420,6 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
           )}
 
           <div style={{ marginBottom: 14 }}>
-            <label style={styles.label}>Gegner an diesem Spieltag</label>
-            <div style={{ ...styles.chipGroup, marginTop: 6 }}>
-              {gegner.length === 0 && <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>}
-              {gegner.map((g) => {
-                const zugeordnet = spieltag.zugeordneteGegner.includes(g.id);
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => onToggleGegnerZuordnung(g.id, zugeordnet)}
-                    style={{ ...styles.chip, ...(zugeordnet ? styles.chipActive : {}) }}
-                  >
-                    {g.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
             <label style={styles.label}>Kader an diesem Spieltag</label>
             <div style={{ ...styles.chipGroup, marginTop: 6 }}>
               {players.length === 0 && <span style={styles.hint}>Noch keine Spieler in der Verwaltung angelegt.</span>}
@@ -1555,6 +1536,8 @@ function Verwaltung({
   onRemoveTermin,
   onAddGegner,
   onRemoveGegner,
+  spieltage,
+  onToggleGegnerZuordnung,
 }) {
   const [subTab, setSubTab] = useState("spieler");
   const items = [
@@ -1598,7 +1581,13 @@ function Verwaltung({
         />
       )}
       {subTab === "gegner" && (
-        <GegnerBereich gegner={gegner} onAddGegner={onAddGegner} onRemoveGegner={onRemoveGegner} />
+        <GegnerBereich
+          gegner={gegner}
+          onAddGegner={onAddGegner}
+          onRemoveGegner={onRemoveGegner}
+          spieltage={spieltage}
+          onToggleGegnerZuordnung={onToggleGegnerZuordnung}
+        />
       )}
     </section>
   );
@@ -1816,8 +1805,10 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
   );
 }
 
-function GegnerBereich({ gegner, onAddGegner, onRemoveGegner }) {
+function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggleGegnerZuordnung }) {
   const [name, setName] = useState("");
+  const [openId, setOpenId] = useState(null);
+  const sortiereSpieltage = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div style={{ marginTop: 4 }}>
@@ -1847,22 +1838,54 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner }) {
           Hinzufügen
         </button>
       </div>
-      {gegner.length > 0 && (
-        <div style={styles.chipGroup}>
-          {gegner.map((g) => (
-            <span key={g.id} style={styles.chip}>
-              {g.name}
-              <button
-                style={styles.chipRemove}
-                onClick={() => confirmAnd(`Gegner "${g.name}" wirklich entfernen?`, () => onRemoveGegner(g.id))}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      {gegner.length === 0 && <div style={styles.hint}>Noch keine Gegner hinterlegt.</div>}
+
+      {gegner.length === 0 && <EmptyState text="Noch keine Gegner hinterlegt." />}
+
+      <div style={styles.cardList}>
+        {gegner.map((g) => {
+          const open = openId === g.id;
+          return (
+            <div key={g.id} style={styles.card}>
+              <div style={styles.cardHead}>
+                <span style={styles.cardName}>{g.name}</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={styles.linkBtn} onClick={() => setOpenId(open ? null : g.id)}>
+                    {open ? "Schließen" : "Spieltage zuordnen"}
+                  </button>
+                  <button
+                    style={{ ...styles.linkBtn, color: "#9B2226" }}
+                    onClick={() => confirmAnd(`Gegner "${g.name}" wirklich entfernen?`, () => onRemoveGegner(g.id))}
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              </div>
+
+              {open && (
+                <div style={styles.basisGrid}>
+                  {sortiereSpieltage.length === 0 && (
+                    <span style={styles.hint}>Noch keine Spieltage unter „Spieltage“ angelegt.</span>
+                  )}
+                  <div style={styles.chipGroup}>
+                    {sortiereSpieltage.map((s) => {
+                      const zugeordnet = s.zugeordneteGegner.includes(g.id);
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => onToggleGegnerZuordnung(s.id, g.id, zugeordnet)}
+                          style={{ ...styles.chip, ...(zugeordnet ? styles.chipActive : {}) }}
+                        >
+                          {formatTerminLabel(s.date)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
