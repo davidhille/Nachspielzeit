@@ -583,6 +583,8 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
   }, [trainings]);
   const [month, setMonth] = useState(months[months.length - 1]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [sortKey, setSortKey] = useState("gesamtMonat");
+  const [sortDir, setSortDir] = useState("desc");
 
   useEffect(() => {
     if (!months.includes(month)) setMonth(months[months.length - 1]);
@@ -607,7 +609,29 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
       gesamtSaison: saisonPunkte + basisAktuell,
     };
   });
-  rows.sort((a, b) => b.gesamtMonat - a.gesamtMonat);
+  rows.sort((a, b) => {
+    let cmp;
+    if (sortKey === "name") cmp = a.name.localeCompare(b.name, "de");
+    else cmp = a[sortKey] - b[sortKey];
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  const spalten = [
+    ["name", "Spieler"],
+    ["basisAktuell", "Basis-Qualität"],
+    ["monatsPunkte", "Trainingspunkte (Monat)"],
+    ["gesamtMonat", "Gesamt (Monat)"],
+    ["saisonPunkte", "Trainingspunkte (Saison)"],
+    ["gesamtSaison", "Gesamt (Saison)"],
+  ];
+  const sortiereNach = (key) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  };
 
   if (selectedPlayerId) {
     const player = players.find((p) => p.id === selectedPlayerId);
@@ -644,12 +668,12 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Spieler</th>
-                <th style={styles.th}>Basis-Qualität</th>
-                <th style={styles.th}>Trainingspunkte (Monat)</th>
-                <th style={styles.th}>Gesamt (Monat)</th>
-                <th style={styles.th}>Trainingspunkte (Saison)</th>
-                <th style={styles.th}>Gesamt (Saison)</th>
+                {spalten.map(([key, label]) => (
+                  <th key={key} style={{ ...styles.th, cursor: "pointer", userSelect: "none" }} onClick={() => sortiereNach(key)}>
+                    {label}
+                    {sortKey === key && <span style={{ marginLeft: 4 }}>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
