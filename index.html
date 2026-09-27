@@ -1325,6 +1325,26 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
   );
 }
 
+function EditIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
 function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
@@ -1419,27 +1439,53 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
         <>
           {spieltag.spiele.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-              {spieltag.spiele.map((sp) => (
-                <div key={sp.id} style={styles.spielRow}>
-                  <div>
-                    <strong>{gegnerName(sp.opponentId)}</strong> — {sp.ourGoals}:{sp.theirGoals}
-                    {sp.scorers.length > 0 && (
-                      <div style={styles.hint}>Tore: {sp.scorers.map((sc) => `${spielerName(sc.playerId)} (${sc.tore})`).join(", ")}</div>
-                    )}
+              {spieltag.spiele.map((sp) => {
+                const ergebnis =
+                  sp.ourGoals > sp.theirGoals ? "sieg" : sp.ourGoals < sp.theirGoals ? "niederlage" : "unentschieden";
+                const ergebnisStyle = {
+                  sieg: { borderLeft: "4px solid #2E7D32", background: "#EFF7EF" },
+                  niederlage: { borderLeft: "4px solid #9B2226", background: "#FBEFEF" },
+                  unentschieden: { borderLeft: "4px solid #B08A8A", background: "#F5F0F0" },
+                }[ergebnis];
+                return (
+                  <div key={sp.id} style={{ ...styles.spielRow, ...ergebnisStyle }}>
+                    <div>
+                      <strong>
+                        SVH {sp.ourGoals}:{sp.theirGoals} {gegnerName(sp.opponentId)}
+                      </strong>
+                      {sp.scorers.length > 0 && (
+                        <div style={{ ...styles.hint, marginTop: 6 }}>
+                          <span>Tore: </span>
+                          {sp.scorers.map((sc, i) => (
+                            <React.Fragment key={sc.id}>
+                              <strong style={{ color: "#1C2B22" }}>{spielerName(sc.playerId)}</strong> ({sc.tore})
+                              {i < sp.scorers.length - 1 ? ", " : ""}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <button
+                        style={{ ...styles.linkBtn, display: "flex", alignItems: "center" }}
+                        onClick={() => startEdit(sp)}
+                        title="Bearbeiten"
+                        aria-label="Bearbeiten"
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        style={{ ...styles.linkBtn, color: "#9B2226", display: "flex", alignItems: "center" }}
+                        onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => onRemoveSpiel(sp.id))}
+                        title="Entfernen"
+                        aria-label="Entfernen"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <button style={styles.linkBtn} onClick={() => startEdit(sp)}>
-                      Bearbeiten
-                    </button>
-                    <button
-                      style={{ ...styles.linkBtn, color: "#9B2226" }}
-                      onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => onRemoveSpiel(sp.id))}
-                    >
-                      Entfernen
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
