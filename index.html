@@ -459,6 +459,8 @@ function App() {
             entwicklungen={entwicklungen}
             spieltage={spieltage}
             gegner={gegner}
+            selectedPlayerId={selectedPlayerId}
+            onSelectPlayer={setSelectedPlayerId}
           />
         )}
         {tab === "training" && (
@@ -617,6 +619,10 @@ function App() {
             trashSpieltage={trashSpieltage}
             onRestore={(table, id) => wrapAction(() => dbUpdate(table, id, { deleted_at: null }), "Wiederhergestellt")}
             onHardDelete={(table, id, label) => wrapAction(() => dbDelete(table, id), `${label} endgültig gelöscht`)}
+            onOpenPlayer={(id) => {
+              setSelectedPlayerId(id);
+              setTab("dashboard");
+            }}
           />
         )}
       </main>
@@ -725,7 +731,7 @@ function SaisonwechselHinweis({ seasons }) {
 
 /* ---------- Dashboard ---------- */
 
-function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner }) {
+function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner, selectedPlayerId, onSelectPlayer }) {
   const months = useMemo(() => {
     const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
     set.add(monthKey(new Date()));
@@ -737,7 +743,6 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
   }, [months]);
   const [season, setSeason] = useState(() => seasonKeyOf(months[months.length - 1]) || seasons[seasons.length - 1]);
   const [month, setMonth] = useState(months[months.length - 1]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [sortKey, setSortKey] = useState("gesamtMonat");
   const [sortDir, setSortDir] = useState("desc");
 
@@ -807,7 +812,7 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
         basis={basis}
         spieltage={spieltage}
         month={month}
-        onClose={() => setSelectedPlayerId(null)}
+        onClose={() => onSelectPlayer(null)}
       />
     );
   }
@@ -858,7 +863,7 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
                   <td style={styles.tdName}>
                     <span style={styles.rank}>{i + 1}</span>
                     <Avatar name={r.name} size={26} photoUrl={r.photoUrl} />
-                    <button style={styles.playerNameBtn} onClick={() => setSelectedPlayerId(r.id)}>
+                    <button style={styles.playerNameBtn} onClick={() => onSelectPlayer(r.id)}>
                       {r.name}
                     </button>
                   </td>
@@ -1889,6 +1894,7 @@ function Verwaltung({
   trashSpieltage,
   onRestore,
   onHardDelete,
+  onOpenPlayer,
 }) {
   const [subTab, setSubTab] = useState("spieler");
   const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
@@ -1925,6 +1931,7 @@ function Verwaltung({
           onBasisChange={onBasisChange}
           onUploadPhoto={onUploadPhoto}
           onRemovePhoto={onRemovePhoto}
+          onOpenPlayer={onOpenPlayer}
         />
       )}
       {subTab === "trainingsplan" && (
@@ -2062,7 +2069,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
   );
 }
 
-function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBasisChange, onUploadPhoto, onRemovePhoto }) {
+function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBasisChange, onUploadPhoto, onRemovePhoto, onOpenPlayer }) {
   const [name, setName] = useState("");
   const [openId, setOpenId] = useState(null);
   const [uploadTargetId, setUploadTargetId] = useState(null);
@@ -2121,7 +2128,9 @@ function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBas
               <div style={styles.cardHead}>
                 <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
                   <Avatar name={p.name} size={26} photoUrl={p.photo_url} />
-                  {p.name}
+                  <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
+                    {p.name}
+                  </button>
                   {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
                 </span>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
