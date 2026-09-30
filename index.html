@@ -791,6 +791,36 @@ function Header({ tab, setTab }) {
     ["spieltage", "Spieltage"],
     ["verwaltung", "Verwaltung"],
   ];
+  const navRef = useRef(null);
+  const [scrollFade, setScrollFade] = useState({ left: false, right: false });
+
+  const updateFade = useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setScrollFade({
+      left: el.scrollLeft > 2,
+      right: el.scrollLeft < maxScroll - 2,
+    });
+  }, []);
+
+  useEffect(() => {
+    updateFade();
+    const el = navRef.current;
+    if (!el) return;
+    const onResize = () => updateFade();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [updateFade]);
+
+  const maskStops = scrollFade.left && scrollFade.right
+    ? "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)"
+    : scrollFade.left
+    ? "linear-gradient(to right, transparent 0%, black 8%, black 100%)"
+    : scrollFade.right
+    ? "linear-gradient(to right, black 92%, transparent 100%)"
+    : "none";
+
   return (
     <header className="app-header" style={styles.header}>
       <div style={styles.headerTop}>
@@ -809,7 +839,11 @@ function Header({ tab, setTab }) {
           Abmelden
         </button>
       </div>
-      <nav style={styles.nav}>
+      <nav
+        ref={navRef}
+        style={{ ...styles.nav, WebkitMaskImage: maskStops, maskImage: maskStops }}
+        onScroll={updateFade}
+      >
         {items.map(([key, label]) => (
           <button
             key={key}
@@ -2710,8 +2744,6 @@ const styles = {
     display: "flex",
     gap: 4,
     overflowX: "auto",
-    WebkitMaskImage: "linear-gradient(to right, black 92%, transparent 100%)",
-    maskImage: "linear-gradient(to right, black 92%, transparent 100%)",
   },
   navBtn: {
     background: "transparent",
@@ -2723,6 +2755,7 @@ const styles = {
     cursor: "pointer",
     borderBottom: "2px solid transparent",
     whiteSpace: "nowrap",
+    minHeight: 40,
   },
   navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
   subNav: { display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" },
@@ -2823,7 +2856,16 @@ const styles = {
     boxShadow: "0 -8px 12px -8px rgba(0,0,0,0.15)",
   },
   secondaryBtn: { background: "#7A1310", color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", height: 40, fontSize: 14, fontWeight: 600, cursor: "pointer" },
-  linkBtn: { background: "transparent", border: "none", color: "var(--accent-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 },
+  linkBtn: {
+    background: "transparent",
+    border: "none",
+    color: "var(--accent-text)",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    padding: "6px 4px",
+    minHeight: 32,
+  },
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
   empty: { background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 14 },
