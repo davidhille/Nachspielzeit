@@ -30,6 +30,14 @@
         "</div>";
     }
   });
+  document.addEventListener(
+    "pointerup",
+    function (e) {
+      var btn = e.target.closest && e.target.closest("button");
+      if (btn) requestAnimationFrame(function () { btn.blur(); });
+    },
+    true
+  );
 </script>
 <style>
   :root {
