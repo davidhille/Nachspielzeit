@@ -1785,15 +1785,17 @@ function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBas
 function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRemoveTermin }) {
   const [wochentage, setWochentage] = useState([2, 4]);
   const [wochen, setWochen] = useState(8);
+  const [startDatum, setStartDatum] = useState(todayISO());
 
   const toggleWochentag = (idx) => {
     setWochentage((w) => (w.includes(idx) ? w.filter((x) => x !== idx) : [...w, idx].sort()));
   };
 
   const generieren = () => {
-    if (wochentage.length === 0) return;
+    if (wochentage.length === 0 || !startDatum) return;
     const neue = [];
-    const start = new Date();
+    const [jahr, monat, tag] = startDatum.split("-").map(Number);
+    const start = new Date(jahr, monat - 1, tag);
     start.setHours(0, 0, 0, 0);
     for (let i = 0; i < wochen * 7; i++) {
       const d = new Date(start);
@@ -1817,6 +1819,15 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
       <div style={styles.card}>
         <div style={styles.cardHead}>
           <span style={styles.cardName}>Termine generieren</span>
+        </div>
+        <div style={styles.fieldRow}>
+          <label style={styles.label}>Erstes Training ab</label>
+          <input
+            type="date"
+            style={{ ...styles.input, flex: "none", width: 160 }}
+            value={startDatum}
+            onChange={(e) => setStartDatum(e.target.value)}
+          />
         </div>
         <div style={styles.fieldRow}>
           <label style={styles.label}>Wochentage</label>
