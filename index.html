@@ -67,11 +67,6 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .app-header :focus-visible { outline-color: #FFFFFF; }
   .app-header { position: relative; overflow: hidden; }
-  .app-header::after {
-    content: ""; position: absolute; top: -50px; right: -20px; width: 150px; height: 150px;
-    border-radius: 999px; pointer-events: none;
-    background: radial-gradient(circle, rgba(242,169,59,0.3), transparent 70%);
-  }
   .app-header > * { position: relative; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
