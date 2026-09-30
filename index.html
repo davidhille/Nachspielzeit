@@ -1705,7 +1705,12 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
     <section>
       <div style={styles.rowBetween}>
         <h2 style={styles.h2}>Monatsentwicklung</h2>
-        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={styles.select} />
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          style={{ ...styles.select, minWidth: 150, flexShrink: 0 }}
+        />
       </div>
       <p style={styles.hint}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
 
