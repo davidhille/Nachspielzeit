@@ -1838,6 +1838,32 @@ function RestoreIcon({ size = 14 }) {
   );
 }
 
+function GoalStepper({ value, onChange }) {
+  const n = Number(value) || 0;
+  return (
+    <div style={styles.goalStepper}>
+      <button
+        type="button"
+        style={{ ...styles.goalStepperBtn, ...(n <= 0 ? { opacity: 0.35, cursor: "default" } : {}) }}
+        disabled={n <= 0}
+        onClick={(e) => { onChange(Math.max(0, n - 1)); e.currentTarget.blur(); }}
+        aria-label="Tor abziehen"
+      >
+        −
+      </button>
+      <span style={styles.goalStepperValue}>{n}</span>
+      <button
+        type="button"
+        style={styles.goalStepperBtn}
+        onClick={(e) => { onChange(n + 1); e.currentTarget.blur(); }}
+        aria-label="Tor hinzufügen"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 function ChevronIcon({ size = 14, open }) {
   return (
     <svg
@@ -2114,21 +2140,9 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
 
             <div style={styles.fieldRow}>
               <label style={styles.label}>Ergebnis (Wir : Gegner)</label>
-              <input
-                type="number"
-                min={0}
-                style={{ ...styles.input, flex: "none", width: 60 }}
-                value={ourGoals}
-                onChange={(e) => setOurGoals(e.target.value)}
-              />
+              <GoalStepper value={ourGoals} onChange={setOurGoals} />
               <span>:</span>
-              <input
-                type="number"
-                min={0}
-                style={{ ...styles.input, flex: "none", width: 60 }}
-                value={theirGoals}
-                onChange={(e) => setTheirGoals(e.target.value)}
-              />
+              <GoalStepper value={theirGoals} onChange={setTheirGoals} />
             </div>
 
             <div style={{ marginTop: 4 }}>
@@ -3078,6 +3092,39 @@ const styles = {
   mutedTag: { color: "var(--muted-2)", fontWeight: 400, fontSize: 13 },
   pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
   fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
+  goalStepper: {
+    display: "flex",
+    alignItems: "center",
+    gap: 2,
+    background: "var(--surface-2)",
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    padding: 2,
+  },
+  goalStepperBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    border: "none",
+    outline: "none",
+    background: "var(--surface)",
+    color: "var(--accent-text)",
+    fontSize: 17,
+    fontWeight: 700,
+    lineHeight: 1,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  goalStepperValue: {
+    minWidth: 26,
+    textAlign: "center",
+    fontFamily: "'Space Grotesk', sans-serif",
+    fontSize: 16,
+    fontWeight: 700,
+    color: "var(--text)",
+  },
   label: { fontSize: 13, color: "var(--muted)", minWidth: 130 },
   range: { flex: 1, accentColor: "#AE1E1D", minWidth: 100 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
