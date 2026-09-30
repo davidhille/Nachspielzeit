@@ -1429,16 +1429,6 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
 
   const aktuellBewertet = bewerteteDaten.has(date);
 
-  const alleAnwesend = () => {
-    setRows((r) => {
-      const next = { ...r };
-      players.forEach((p) => {
-        next[p.id] = { ...getRow(p.id), teilnahme: "anwesend" };
-      });
-      return next;
-    });
-  };
-
   const deleteBewertung = () => {
     if (!date || !onDelete) return;
     confirmAnd(
@@ -1475,13 +1465,6 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
       )}
       {geplanteTermine.length > 0 && players.length === 0 && (
         <EmptyState text="Noch keine aktiven Spieler vorhanden." />
-      )}
-      {geplanteTermine.length > 0 && players.length > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <button style={styles.linkBtn} onClick={alleAnwesend}>
-            Alle auf „Anwesend" setzen
-          </button>
-        </div>
       )}
       {aktuellBewertet && (
         <div style={{ ...styles.editBanner, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -2608,10 +2591,10 @@ const styles = {
     borderRadius: 16,
     padding: "32px 28px",
     width: 260,
-    boxShadow: "0 8px 24px rgba(174,30,29,0.08)",
+    boxShadow: "0 8px 24px rgba(174,30,29,0.10), 0 2px 6px rgba(28,20,20,0.04)",
   },
   loginLogo: { width: 56, height: "auto", objectFit: "contain", marginBottom: 4 },
-  loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "#1C2B22" },
+  loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "#1C2B22", letterSpacing: "-0.01em" },
   loginSubtitle: { fontSize: 12, color: "#8A6F6F", marginTop: -8, marginBottom: 6 },
   loginInput: {
     border: "1px solid #E4D2D2",
@@ -2638,7 +2621,7 @@ const styles = {
   header: { background: "#AE1E1D", color: "#F8FAF8", padding: "20px 20px 0 20px" },
   headerTop: { display: "flex", alignItems: "center", gap: 12, paddingBottom: 16 },
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 6, padding: 3 },
-  title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1 },
+  title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1, letterSpacing: "-0.01em" },
   subtitle: { fontSize: 13, color: "#F3D2D1", marginTop: 2 },
   nav: {
     display: "flex",
@@ -2672,8 +2655,8 @@ const styles = {
   },
   subNavBtnActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
-  h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0" },
-  h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0" },
+  h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
+  h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
   subheading: { fontSize: 13, fontWeight: 600, color: "#8A6F6F", margin: "16px 0 8px 0" },
   rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 6 },
   select: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "8px 10px", fontSize: 14, color: "#1C2B22" },
@@ -2692,7 +2675,7 @@ const styles = {
     resize: "vertical",
   },
   addRow: { display: "flex", gap: 8, marginBottom: 16 },
-  tableWrap: { overflowX: "auto", background: "#fff", borderRadius: 12, border: "1px solid #EADADA" },
+  tableWrap: { overflowX: "auto", background: "#fff", borderRadius: 12, border: "1px solid #EADADA", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", padding: "10px 12px", color: "#8A6F6F", fontWeight: 600, fontSize: 12, borderBottom: "1px solid #EADADA" },
   td: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9" },
@@ -2721,7 +2704,7 @@ const styles = {
     textDecorationColor: "#E4D2D2",
     cursor: "pointer",
   },
-  card: { background: "#fff", border: "1px solid #EADADA", borderRadius: 12, padding: 14 },
+  card: { background: "#fff", border: "1px solid #EADADA", borderRadius: 12, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardName: { fontWeight: 600, fontSize: 15 },
   mutedTag: { color: "#B08A8A", fontWeight: 400, fontSize: 13 },
@@ -2729,12 +2712,24 @@ const styles = {
   fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
   label: { fontSize: 13, color: "#8A6F6F", minWidth: 130 },
   range: { flex: 1, accentColor: "#AE1E1D", minWidth: 100 },
-  rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right" },
+  rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
   chip: { border: "1px solid #E4D2D2", background: "#fff", color: "#8A6F6F", padding: "5px 12px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   chipRemove: { background: "transparent", border: "none", color: "#9B2226", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
-  primaryBtn: { background: "#AE1E1D", color: "#fff", border: "none", borderRadius: 10, padding: "12px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%" },
+  primaryBtn: {
+    background: "#AE1E1D",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "12px 18px",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    width: "100%",
+    boxShadow: "0 2px 8px rgba(174,30,29,0.25)",
+    transition: "background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease",
+  },
   stickyBar: {
     position: "sticky",
     bottom: 0,
@@ -2800,13 +2795,13 @@ const styles = {
     zIndex: 70,
   },
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
-  statBox: { flex: "1 1 90px", background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 8px", textAlign: "center" },
-  statValue: { fontSize: 18, fontWeight: 700, color: "#AE1E1D", fontFamily: "'Space Grotesk', sans-serif" },
+  statBox: { flex: "1 1 90px", background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  statValue: { fontSize: 18, fontWeight: 700, color: "#AE1E1D", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
   statLabel: { fontSize: 11, color: "#8A6F6F", marginTop: 2 },
   sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
-  sparkCard: { background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 12px" },
+  sparkCard: { background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-  sparkValue: { fontSize: 14, fontWeight: 700, color: "#AE1E1D" },
+  sparkValue: { fontSize: 14, fontWeight: 700, color: "#AE1E1D", fontVariantNumeric: "tabular-nums" },
   spielRow: {
     display: "flex",
     alignItems: "flex-start",
@@ -2819,12 +2814,12 @@ const styles = {
     fontSize: 13,
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
-  scorerTile: { border: "1px solid #EADADA", borderRadius: 10, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: 6 },
+  scorerTile: { border: "1px solid #EADADA", borderRadius: 10, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   scorerTileActive: { borderColor: "#AE1E1D", background: "#FBEAEA" },
   scorerName: { background: "transparent", border: "none", padding: 0, textAlign: "left", fontSize: 14, fontWeight: 600, color: "#1C2B22", cursor: "pointer" },
   scorerStepper: { display: "flex", alignItems: "center", gap: 8 },
   stepBtn: { width: 26, height: 26, borderRadius: 8, border: "1px solid #E4D2D2", background: "#fff", color: "#AE1E1D", fontSize: 15, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
-  stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center" },
+  stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center", fontVariantNumeric: "tabular-nums" },
   editBanner: { background: "#FFF3D6", color: "#7A5A00", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
   seasonHint: {
     background: "#E8F0FE",
@@ -2873,7 +2868,12 @@ const styles = {
 
 const styleSheet = document.createElement("style");
 styleSheet.textContent =
-  "@keyframes spin { to { transform: rotate(360deg); } } @keyframes progressSlide { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }";
+  "@keyframes spin { to { transform: rotate(360deg); } } " +
+  "@keyframes progressSlide { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } } " +
+  "button { transition: filter 120ms ease, transform 80ms ease, opacity 120ms ease; } " +
+  "button:active { transform: scale(0.97); } " +
+  "button:hover:not(:disabled) { filter: brightness(0.96); } " +
+  "button:disabled { cursor: default; opacity: 0.6; }";
 document.head.appendChild(styleSheet);
 
 try {
