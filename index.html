@@ -468,7 +468,7 @@ function App() {
     return (
       <div style={styles.loadingScreen}>
         <span style={{ color: "#9B2226", fontWeight: 600 }}>Verbindung fehlgeschlagen</span>
-        <span style={{ fontSize: 13, color: "#8A6F6F", textAlign: "center", padding: "0 24px" }}>{error}</span>
+        <span style={{ fontSize: 13, color: "#76595A", textAlign: "center", padding: "0 24px" }}>{error}</span>
         <button style={styles.primaryBtn} onClick={refreshAll}>
           Erneut versuchen
         </button>
@@ -1143,7 +1143,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                   {trainingPunkte(t).toFixed(2)} Pkt.
                 </span>
               </div>
-              <div style={{ fontSize: 13, color: "#8A6F6F" }}>
+              <div style={{ fontSize: 13, color: "#76595A" }}>
                 {TEILNAHME_LABEL[t.teilnahme]}
                 {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
               </div>
@@ -1939,11 +1939,11 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                         {p.name}
                       </button>
                       <div style={styles.scorerStepper}>
-                        <button style={styles.stepBtn} onClick={() => dec(p.id)} disabled={count === 0}>
+                        <button style={styles.stepBtn} onClick={() => dec(p.id)} disabled={count === 0} aria-label={`Tor von ${p.name} abziehen`}>
                           −
                         </button>
-                        <span style={styles.stepCount}>{count}</span>
-                        <button style={styles.stepBtn} onClick={() => inc(p.id)}>
+                        <span style={styles.stepCount} aria-live="polite">{count}</span>
+                        <button style={styles.stepBtn} onClick={() => inc(p.id)} aria-label={`Tor für ${p.name} hinzufügen`}>
                           +
                         </button>
                       </div>
@@ -2588,7 +2588,7 @@ const styles = {
     justifyContent: "center",
     height: "100vh",
     gap: 12,
-    color: "#8A6F6F",
+    color: "#76595A",
     fontFamily: "'Inter', system-ui, sans-serif",
   },
   loadingBall: {
@@ -2613,7 +2613,7 @@ const styles = {
   },
   loginLogo: { width: 56, height: "auto", objectFit: "contain", marginBottom: 4 },
   loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "#1C2B22", letterSpacing: "-0.01em" },
-  loginSubtitle: { fontSize: 12, color: "#8A6F6F", marginTop: -8, marginBottom: 6 },
+  loginSubtitle: { fontSize: 12, color: "#76595A", marginTop: -8, marginBottom: 6 },
   loginInput: {
     border: "1px solid #E4D2D2",
     background: "#fff",
@@ -2664,7 +2664,7 @@ const styles = {
   subNavBtn: {
     border: "1px solid #E4D2D2",
     background: "#fff",
-    color: "#8A6F6F",
+    color: "#76595A",
     padding: "8px 14px",
     borderRadius: 999,
     fontSize: 13,
@@ -2675,11 +2675,11 @@ const styles = {
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
-  subheading: { fontSize: 13, fontWeight: 600, color: "#8A6F6F", margin: "16px 0 8px 0" },
+  subheading: { fontSize: 13, fontWeight: 600, color: "#76595A", margin: "16px 0 8px 0" },
   rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 6 },
   select: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "8px 10px", fontSize: 14, color: "#1C2B22" },
   selectGroup: { display: "flex", flexDirection: "column", gap: 2 },
-  selectGroupLabel: { fontSize: 11, fontWeight: 600, color: "#8A6F6F", textTransform: "uppercase", letterSpacing: "0.03em" },
+  selectGroupLabel: { fontSize: 12, fontWeight: 600, color: "#76595A", textTransform: "uppercase", letterSpacing: "0.03em" },
   input: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "10px 12px", fontSize: 14, flex: 1 },
   textarea: {
     border: "1px solid #E4D2D2",
@@ -2695,7 +2695,7 @@ const styles = {
   addRow: { display: "flex", gap: 8, marginBottom: 16 },
   tableWrap: { overflowX: "auto", background: "#fff", borderRadius: 12, border: "1px solid #EADADA", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
-  th: { textAlign: "left", padding: "10px 12px", color: "#8A6F6F", fontWeight: 600, fontSize: 12, borderBottom: "1px solid #EADADA" },
+  th: { textAlign: "left", padding: "10px 12px", color: "#76595A", fontWeight: 600, fontSize: 12, borderBottom: "1px solid #EADADA" },
   td: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9" },
   tdName: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9", display: "flex", alignItems: "center", gap: 8, fontWeight: 500 },
   rank: {
@@ -2703,8 +2703,8 @@ const styles = {
     height: 20,
     borderRadius: 6,
     background: "#F3E9E9",
-    color: "#8A6F6F",
-    fontSize: 11,
+    color: "#76595A",
+    fontSize: 12,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2728,11 +2728,11 @@ const styles = {
   mutedTag: { color: "#B08A8A", fontWeight: 400, fontSize: 13 },
   pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
   fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
-  label: { fontSize: 13, color: "#8A6F6F", minWidth: 130 },
+  label: { fontSize: 13, color: "#76595A", minWidth: 130 },
   range: { flex: 1, accentColor: "#AE1E1D", minWidth: 100 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
-  chip: { border: "1px solid #E4D2D2", background: "#fff", color: "#8A6F6F", padding: "5px 12px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
+  chip: { border: "1px solid #E4D2D2", background: "#fff", color: "#76595A", minHeight: 44, padding: "10px 16px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   chipRemove: { background: "transparent", border: "none", color: "#9B2226", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   primaryBtn: {
@@ -2761,8 +2761,8 @@ const styles = {
   linkBtn: { background: "transparent", border: "none", color: "#AE1E1D", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 },
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3E9E9", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
-  empty: { background: "#fff", border: "1px dashed #E4D2D2", borderRadius: 12, padding: 24, textAlign: "center", color: "#8A6F6F", fontSize: 14 },
-  hint: { fontSize: 13, color: "#8A6F6F", marginTop: -4, marginBottom: 6 },
+  empty: { background: "#fff", border: "1px dashed #E4D2D2", borderRadius: 12, padding: 24, textAlign: "center", color: "#76595A", fontSize: 14 },
+  hint: { fontSize: 13, color: "#76595A", marginTop: -4, marginBottom: 6 },
   toast: {
     position: "fixed",
     bottom: 20,
@@ -2815,7 +2815,7 @@ const styles = {
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
   statBox: { flex: "1 1 90px", background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   statValue: { fontSize: 18, fontWeight: 700, color: "#AE1E1D", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
-  statLabel: { fontSize: 11, color: "#8A6F6F", marginTop: 2 },
+  statLabel: { fontSize: 12, color: "#76595A", marginTop: 2 },
   sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
   sparkCard: { background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
@@ -2834,9 +2834,9 @@ const styles = {
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
   scorerTile: { border: "1px solid #EADADA", borderRadius: 10, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   scorerTileActive: { borderColor: "#AE1E1D", background: "#FBEAEA" },
-  scorerName: { background: "transparent", border: "none", padding: 0, textAlign: "left", fontSize: 14, fontWeight: 600, color: "#1C2B22", cursor: "pointer" },
-  scorerStepper: { display: "flex", alignItems: "center", gap: 8 },
-  stepBtn: { width: 26, height: 26, borderRadius: 8, border: "1px solid #E4D2D2", background: "#fff", color: "#AE1E1D", fontSize: 15, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
+  scorerName: { background: "transparent", border: "none", padding: 0, minHeight: 44, textAlign: "left", fontSize: 14, fontWeight: 600, color: "#1C2B22", cursor: "pointer" },
+  scorerStepper: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 },
+  stepBtn: { width: 44, height: 44, borderRadius: 8, border: "1px solid #E4D2D2", background: "#fff", color: "#AE1E1D", fontSize: 20, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
   stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center", fontVariantNumeric: "tabular-nums" },
   editBanner: { background: "#FFF3D6", color: "#7A5A00", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
   seasonHint: {
