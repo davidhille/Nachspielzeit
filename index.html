@@ -1657,7 +1657,7 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
                   {Object.keys(KARTEN).map((k) => (
                     <button
                       key={k}
-                      onClick={() => setRow(p.id, { karte: k })}
+                      onClick={(e) => { setRow(p.id, { karte: k }); e.currentTarget.blur(); }}
                       style={{ ...styles.chip, ...(row.karte === k ? styles.chipActive : {}) }}
                     >
                       {k === "keine" ? "Keine" : k[0].toUpperCase() + k.slice(1)}
@@ -2059,7 +2059,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                 return (
                   <button
                     key={p.id}
-                    onClick={() => onToggleTeilnehmer(p.id, dabei)}
+                    onClick={(e) => { onToggleTeilnehmer(p.id, dabei); e.currentTarget.blur(); }}
                     style={{ ...styles.teilnehmerChip, ...(dabei ? styles.teilnehmerChipActive : {}) }}
                   >
                     <span style={styles.teilnehmerChipAvatarWrap}>
@@ -2095,7 +2095,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                 {spielGegnerOptionen.map((g) => (
                   <button
                     key={g.id}
-                    onClick={() => setOpponentId(g.id)}
+                    onClick={(e) => { setOpponentId(g.id); e.currentTarget.blur(); }}
                     style={{ ...styles.chip, ...(opponentId === g.id ? styles.chipActive : {}) }}
                   >
                     {g.name}
@@ -2586,7 +2586,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             {[1, 2, 3, 4, 5].map((idx) => (
               <button
                 key={idx}
-                onClick={() => toggleWochentag(idx)}
+                onClick={(e) => { toggleWochentag(idx); e.currentTarget.blur(); }}
                 style={{ ...styles.chip, ...(wochentage.includes(idx) ? styles.chipActive : {}) }}
               >
                 {WOCHENTAGE[idx]}
@@ -2760,7 +2760,7 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggl
                       return (
                         <button
                           key={s.id}
-                          onClick={() => onToggleGegnerZuordnung(s.id, g.id, zugeordnet)}
+                          onClick={(e) => { onToggleGegnerZuordnung(s.id, g.id, zugeordnet); e.currentTarget.blur(); }}
                           style={{ ...styles.chip, ...(zugeordnet ? styles.chipActive : {}) }}
                         >
                           {formatTerminLabel(s.date)}
