@@ -67,11 +67,6 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .app-header :focus-visible { outline-color: #FFFFFF; }
   .app-header { position: relative; overflow: hidden; }
-  .app-header::before {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background-image: radial-gradient(rgba(255,255,255,0.14) 1.5px, transparent 1.5px);
-    background-size: 14px 14px; opacity: 0.6;
-  }
   .app-header::after {
     content: ""; position: absolute; top: -50px; right: -20px; width: 150px; height: 150px;
     border-radius: 999px; pointer-events: none;
