@@ -2184,12 +2184,12 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
               <div key={p.id} style={styles.card}>
                 <div style={styles.cardHead}>
                   <span style={styles.cardName}>{p.name}</span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button style={styles.linkBtn} onClick={() => onRestore("players", p.id)}>
+                  <div style={styles.cardActions}>
+                    <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => onRestore("players", p.id)}>
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                       onClick={() =>
                         confirmAnd(`Spieler "${p.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("players", p.id, "Spieler")
@@ -2214,12 +2214,12 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
               <div key={g.id} style={styles.card}>
                 <div style={styles.cardHead}>
                   <span style={styles.cardName}>{g.name}</span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button style={styles.linkBtn} onClick={() => onRestore("gegner", g.id)}>
+                  <div style={styles.cardActions}>
+                    <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => onRestore("gegner", g.id)}>
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                       onClick={() =>
                         confirmAnd(`Gegner "${g.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("gegner", g.id, "Gegner")
@@ -2244,12 +2244,12 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
               <div key={s.id} style={styles.card}>
                 <div style={styles.cardHead}>
                   <span style={styles.cardName}>{formatTerminLabel(s.date)}</span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button style={styles.linkBtn} onClick={() => onRestore("spieltage", s.id)}>
+                  <div style={styles.cardActions}>
+                    <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => onRestore("spieltage", s.id)}>
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                       onClick={() =>
                         confirmAnd(
                           `Spieltag vom ${formatTerminLabel(s.date)} endgültig löschen? Das kann nicht rückgängig gemacht werden.`,
@@ -2345,15 +2345,15 @@ function SpielerBereich({
                   </button>
                   {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
                 </span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button style={styles.linkBtn} onClick={() => setOpenId(open ? null : p.id)}>
+                <div style={styles.cardActions}>
+                  <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => setOpenId(open ? null : p.id)}>
                     {open ? "Schließen" : "Einstellungen"}
                   </button>
-                  <button style={styles.linkBtn} onClick={() => onToggleActive(p.id)}>
+                  <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => onToggleActive(p.id)}>
                     {p.active === false ? "Aktivieren" : "Deaktivieren"}
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                     onClick={() =>
                       confirmAnd(
                         `${p.name} in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`,
@@ -2594,12 +2594,12 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggl
             <div key={g.id} style={styles.card}>
               <div style={styles.cardHead}>
                 <span style={styles.cardName}>{g.name}</span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button style={styles.linkBtn} onClick={() => setOpenId(open ? null : g.id)}>
+                <div style={styles.cardActions}>
+                  <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => setOpenId(open ? null : g.id)}>
                     {open ? "Schließen" : "Spieltage zuordnen"}
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                     onClick={() =>
                       confirmAnd(`Gegner "${g.name}" in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`, () =>
                         onRemoveGegner(g.id)
@@ -2769,7 +2769,7 @@ const styles = {
     background: "var(--surface)",
     color: "var(--muted)",
     padding: "8px 14px",
-    borderRadius: 999,
+    borderRadius: 8,
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
@@ -2827,6 +2827,7 @@ const styles = {
   },
   card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
+  cardActions: { display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", WebkitOverflowScrolling: "touch", maxWidth: "100%" },
   cardName: { fontWeight: 600, fontSize: 15 },
   mutedTag: { color: "var(--muted-2)", fontWeight: 400, fontSize: 13 },
   pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
@@ -2835,7 +2836,7 @@ const styles = {
   range: { flex: 1, accentColor: "#AE1E1D", minWidth: 100 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
-  chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 16px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
+  chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   primaryBtn: {
