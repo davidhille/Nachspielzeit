@@ -40,7 +40,7 @@
 <body>
 <div id="root"></div>
 <script type="text/plain" id="app-source">
-const { useState, useEffect, useCallback, useMemo } = React;
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /* ---------- Supabase-Verbindung ---------- */
 const SUPABASE_URL = "https://ttydglqmpkgfqkrovdjf.supabase.co";
@@ -267,13 +267,19 @@ function App() {
   const [gegner, setGegner] = useState([]);
   const [spieltage, setSpieltage] = useState([]);
   const [termine, setTermine] = useState([]);
+  const [trashPlayers, setTrashPlayers] = useState([]);
+  const [trashGegner, setTrashGegner] = useState([]);
+  const [trashSpieltage, setTrashSpieltage] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2200);
+  const showToast = (msg, undo) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message: msg, undo: undo || null });
+    toastTimerRef.current = setTimeout(() => setToast(null), undo ? 6000 : 2200);
   };
 
   const refreshAll = useCallback(async () => {
@@ -292,7 +298,8 @@ function App() {
           dbSelect("spieltag_gegner"),
           dbSelect("spieltag_teilnehmer"),
         ]);
-      setPlayers(playersRaw);
+      setPlayers(playersRaw.filter((p) => !p.deleted_at));
+      setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
       const basisMap = {};
       basisRaw.forEach((r) => (basisMap[r.player_id] = Number(r.wert)));
       setBasis(basisMap);
@@ -311,10 +318,12 @@ function App() {
       setEntwicklungen(
         entwRaw.map((e) => ({ id: e.id, month: e.month, playerId: e.player_id, punkte: Number(e.punkte) }))
       );
-      setGegner(gegnerRaw);
+      setGegner(gegnerRaw.filter((g) => !g.deleted_at));
+      setTrashGegner(gegnerRaw.filter((g) => g.deleted_at));
       const spieltageFull = spieltageRaw.map((s) => ({
         id: s.id,
         date: s.date,
+        deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
         teilnehmer: stRaw.filter((t) => t.spieltag_id === s.id).map((t) => t.player_id),
         spiele: spieleRaw
@@ -329,7 +338,8 @@ function App() {
               .map((t) => ({ id: t.id, playerId: t.player_id, tore: t.tore })),
           })),
       }));
-      setSpieltage(spieltageFull);
+      setSpieltage(spieltageFull.filter((s) => !s.deletedAt));
+      setTrashSpieltage(spieltageFull.filter((s) => s.deletedAt));
       setError("");
     } catch (e) {
       console.error(e);
@@ -345,16 +355,26 @@ function App() {
 
   const activePlayers = useMemo(() => players.filter((p) => p.active !== false), [players]);
 
-  const wrapAction = async (fn, successMsg) => {
+  const wrapAction = async (fn, successMsg, undo) => {
+    setBusy(true);
     try {
       await fn();
       await refreshAll();
-      if (successMsg) showToast(successMsg);
+      if (successMsg) showToast(successMsg, undo);
     } catch (e) {
       console.error(e);
       window.alert(e.message || "Etwas ist schiefgelaufen.");
+    } finally {
+      setBusy(false);
     }
   };
+
+  const softDelete = (table, id, entityLabel) =>
+    wrapAction(
+      () => dbUpdate(table, id, { deleted_at: new Date().toISOString() }),
+      `${entityLabel} gelöscht`,
+      () => wrapAction(() => dbUpdate(table, id, { deleted_at: null }), "Wiederhergestellt")
+    );
 
   if (loading) {
     return (
@@ -441,7 +461,7 @@ function App() {
             gegner={gegner}
             spieltage={spieltage}
             onAddSpieltag={(date) => wrapAction(() => dbInsert("spieltage", { id: uid(), date }))}
-            onRemoveSpieltag={(id) => wrapAction(() => dbDelete("spieltage", id))}
+            onRemoveSpieltag={(id) => softDelete("spieltage", id, "Spieltag")}
             onAddSpiel={(spieltagId, spiel) =>
               wrapAction(async () => {
                 await dbInsert("spiele", {
@@ -501,7 +521,7 @@ function App() {
               const p = players.find((x) => x.id === id);
               return wrapAction(() => dbUpdate("players", id, { active: !(p?.active !== false) }));
             }}
-            onRemove={(id) => wrapAction(() => dbDelete("players", id))}
+            onRemove={(id) => softDelete("players", id, "Spieler")}
             onBasisChange={(playerId, wert) =>
               wrapAction(() => dbUpsert("basisqualitaet", { player_id: playerId, wert }, "player_id"))
             }
@@ -519,7 +539,7 @@ function App() {
             }}
             onRemoveTermin={(id) => wrapAction(() => dbDelete("trainingstermine", id))}
             onAddGegner={(name) => wrapAction(() => dbInsert("gegner", { id: uid(), name }))}
-            onRemoveGegner={(id) => wrapAction(() => dbDelete("gegner", id))}
+            onRemoveGegner={(id) => softDelete("gegner", id, "Gegner")}
             spieltage={spieltage}
             onToggleGegnerZuordnung={(spieltagId, opponentId, istZugeordnet) =>
               wrapAction(async () => {
@@ -533,10 +553,31 @@ function App() {
                 }
               })
             }
+            trashPlayers={trashPlayers}
+            trashGegner={trashGegner}
+            trashSpieltage={trashSpieltage}
+            onRestore={(table, id) => wrapAction(() => dbUpdate(table, id, { deleted_at: null }), "Wiederhergestellt")}
+            onHardDelete={(table, id, label) => wrapAction(() => dbDelete(table, id), `${label} endgültig gelöscht`)}
           />
         )}
       </main>
-      {toast && <div style={styles.toast}>{toast}</div>}
+      {busy && <div style={styles.progressBar} />}
+      {toast && (
+        <div style={styles.toast}>
+          <span>{toast.message}</span>
+          {toast.undo && (
+            <button
+              style={styles.toastUndoBtn}
+              onClick={() => {
+                toast.undo();
+                setToast(null);
+              }}
+            >
+              Rückgängig
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -584,6 +625,45 @@ function Header({ tab, setTab }) {
   );
 }
 
+function SaisonwechselHinweis({ seasons }) {
+  const heute = new Date();
+  const monatNr = heute.getMonth() + 1;
+  const jahr = heute.getFullYear();
+  const zeigenGrundsaetzlich = monatNr === 8 || monatNr === 9;
+  const neueSaison = monatNr === 8 ? `${jahr}-${jahr + 1}` : seasonKeyOf(monthKey(heute));
+  const storageKey = `nsz_season_hint_${neueSaison}`;
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(storageKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const hatSchonDaten = neueSaison && seasons.includes(neueSaison);
+  if (!zeigenGrundsaetzlich || !neueSaison || hatSchonDaten || dismissed) return null;
+
+  return (
+    <div style={styles.seasonHint}>
+      <span>
+        Die Saison {neueSaison.replace("-", "/")} {monatNr === 8 ? "beginnt bald" : "hat begonnen"}. Frühere
+        Saisons bleiben über die Saison-Auswahl weiterhin gespeichert und abrufbar.
+      </span>
+      <button
+        style={styles.linkBtn}
+        onClick={() => {
+          try {
+            localStorage.setItem(storageKey, "1");
+          } catch {}
+          setDismissed(true);
+        }}
+      >
+        Verstanden
+      </button>
+    </div>
+  );
+}
+
 /* ---------- Dashboard ---------- */
 
 function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner }) {
@@ -592,14 +672,27 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
     set.add(monthKey(new Date()));
     return Array.from(set).sort();
   }, [trainings]);
+  const seasons = useMemo(() => {
+    const set = new Set(months.map((m) => seasonKeyOf(m)).filter(Boolean));
+    return Array.from(set).sort();
+  }, [months]);
+  const [season, setSeason] = useState(() => seasonKeyOf(months[months.length - 1]) || seasons[seasons.length - 1]);
   const [month, setMonth] = useState(months[months.length - 1]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [sortKey, setSortKey] = useState("gesamtMonat");
   const [sortDir, setSortDir] = useState("desc");
 
   useEffect(() => {
-    if (!months.includes(month)) setMonth(months[months.length - 1]);
-  }, [months]); // eslint-disable-line
+    if (seasons.length > 0 && !seasons.includes(season)) setSeason(seasons[seasons.length - 1]);
+  }, [seasons]); // eslint-disable-line
+
+  const monateDerSaison = useMemo(() => months.filter((m) => seasonKeyOf(m) === season), [months, season]);
+
+  useEffect(() => {
+    if (monateDerSaison.length > 0 && !monateDerSaison.includes(month)) {
+      setMonth(monateDerSaison[monateDerSaison.length - 1]);
+    }
+  }, [season, monateDerSaison]); // eslint-disable-line
 
   const rows = players.map((p) => {
     const monatsPunkte = trainings
@@ -661,15 +754,27 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
 
   return (
     <section>
+      <SaisonwechselHinweis seasons={seasons} />
       <div style={styles.rowBetween}>
         <h2 style={styles.h2}>Punktestand</h2>
-        <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {monthLabel(m)}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: "flex", gap: 8 }}>
+          {seasons.length > 1 && (
+            <select style={styles.select} value={season || ""} onChange={(e) => setSeason(e.target.value)}>
+              {seasons.map((s) => (
+                <option key={s} value={s}>
+                  Saison {s.replace("-", "/")}
+                </option>
+              ))}
+            </select>
+          )}
+          <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
+            {monateDerSaison.map((m) => (
+              <option key={m} value={m}>
+                {monthLabel(m)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
@@ -692,6 +797,7 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
                 <tr key={r.id} style={!r.active ? { opacity: 0.5 } : undefined}>
                   <td style={styles.tdName}>
                     <span style={styles.rank}>{i + 1}</span>
+                    <Avatar name={r.name} size={26} />
                     <button style={styles.playerNameBtn} onClick={() => setSelectedPlayerId(r.id)}>
                       {r.name}
                     </button>
@@ -1237,7 +1343,10 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
           return (
             <div key={p.id} style={styles.card}>
               <div style={styles.cardHead}>
-                <span style={styles.cardName}>{p.name}</span>
+                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
+                  <Avatar name={p.name} size={26} />
+                  {p.name}
+                </span>
                 <span
                   style={{
                     ...styles.pill,
@@ -1310,9 +1419,11 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
       </div>
 
       {players.length > 0 && date && (
-        <button style={styles.primaryBtn} onClick={save}>
-          Trainingsbewertung speichern
-        </button>
+        <div style={styles.stickyBar}>
+          <button style={styles.primaryBtn} onClick={save}>
+            Trainingsbewertung speichern
+          </button>
+        </div>
       )}
     </section>
   );
@@ -1374,9 +1485,11 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
       </div>
 
       {players.length > 0 && (
-        <button style={styles.primaryBtn} onClick={save}>
-          Monatsentwicklung speichern
-        </button>
+        <div style={styles.stickyBar}>
+          <button style={styles.primaryBtn} onClick={save}>
+            Monatsentwicklung speichern
+          </button>
+        </div>
       )}
     </section>
   );
@@ -1706,12 +1819,19 @@ function Verwaltung({
   onRemoveGegner,
   spieltage,
   onToggleGegnerZuordnung,
+  trashPlayers,
+  trashGegner,
+  trashSpieltage,
+  onRestore,
+  onHardDelete,
 }) {
   const [subTab, setSubTab] = useState("spieler");
+  const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   const items = [
     ["spieler", "Spieler"],
     ["trainingsplan", "Trainingsplan"],
     ["gegner", "Gegner"],
+    ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ];
 
   return (
@@ -1757,7 +1877,121 @@ function Verwaltung({
           onToggleGegnerZuordnung={onToggleGegnerZuordnung}
         />
       )}
+      {subTab === "papierkorb" && (
+        <PapierkorbBereich
+          trashPlayers={trashPlayers}
+          trashGegner={trashGegner}
+          trashSpieltage={trashSpieltage}
+          onRestore={onRestore}
+          onHardDelete={onHardDelete}
+        />
+      )}
     </section>
+  );
+}
+
+function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestore, onHardDelete }) {
+  const gesamt = trashPlayers.length + trashGegner.length + trashSpieltage.length;
+  return (
+    <div style={{ marginTop: 4 }}>
+      <h3 style={styles.h3}>Papierkorb</h3>
+      <p style={styles.hint}>
+        Gelöschte Spieler, Gegner und Spieltage bleiben hier, bis du sie endgültig entfernst.
+      </p>
+
+      {gesamt === 0 && <EmptyState text="Der Papierkorb ist leer." />}
+
+      {trashPlayers.length > 0 && (
+        <>
+          <div style={styles.subheading}>Spieler</div>
+          <div style={styles.cardList}>
+            {trashPlayers.map((p) => (
+              <div key={p.id} style={styles.card}>
+                <div style={styles.cardHead}>
+                  <span style={styles.cardName}>{p.name}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={styles.linkBtn} onClick={() => onRestore("players", p.id)}>
+                      Wiederherstellen
+                    </button>
+                    <button
+                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      onClick={() =>
+                        confirmAnd(`Spieler "${p.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
+                          onHardDelete("players", p.id, "Spieler")
+                        )
+                      }
+                    >
+                      Endgültig löschen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {trashGegner.length > 0 && (
+        <>
+          <div style={styles.subheading}>Gegner</div>
+          <div style={styles.cardList}>
+            {trashGegner.map((g) => (
+              <div key={g.id} style={styles.card}>
+                <div style={styles.cardHead}>
+                  <span style={styles.cardName}>{g.name}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={styles.linkBtn} onClick={() => onRestore("gegner", g.id)}>
+                      Wiederherstellen
+                    </button>
+                    <button
+                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      onClick={() =>
+                        confirmAnd(`Gegner "${g.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
+                          onHardDelete("gegner", g.id, "Gegner")
+                        )
+                      }
+                    >
+                      Endgültig löschen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {trashSpieltage.length > 0 && (
+        <>
+          <div style={styles.subheading}>Spieltage</div>
+          <div style={styles.cardList}>
+            {trashSpieltage.map((s) => (
+              <div key={s.id} style={styles.card}>
+                <div style={styles.cardHead}>
+                  <span style={styles.cardName}>{formatTerminLabel(s.date)}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={styles.linkBtn} onClick={() => onRestore("spieltage", s.id)}>
+                      Wiederherstellen
+                    </button>
+                    <button
+                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      onClick={() =>
+                        confirmAnd(
+                          `Spieltag vom ${formatTerminLabel(s.date)} endgültig löschen? Das kann nicht rückgängig gemacht werden.`,
+                          () => onHardDelete("spieltage", s.id, "Spieltag")
+                        )
+                      }
+                    >
+                      Endgültig löschen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1803,7 +2037,8 @@ function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBas
           return (
             <div key={p.id} style={styles.card}>
               <div style={styles.cardHead}>
-                <span style={styles.cardName}>
+                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
+                  <Avatar name={p.name} size={26} />
                   {p.name}
                   {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
                 </span>
@@ -2073,6 +2308,34 @@ function EmptyState({ text }) {
   return <div style={styles.empty}>{text}</div>;
 }
 
+const AVATAR_FARBEN = ["#AE1E1D", "#2E7D32", "#1565C0", "#8A6F00", "#6A4C93", "#B0603E", "#2B6F76", "#8A2B5A"];
+function avatarFarbe(name) {
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_FARBEN[hash % AVATAR_FARBEN.length];
+}
+function initialen(name) {
+  const teile = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (teile.length === 0) return "?";
+  if (teile.length === 1) return teile[0].slice(0, 2).toUpperCase();
+  return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
+}
+function Avatar({ name, size = 32 }) {
+  return (
+    <span
+      style={{
+        ...styles.avatar,
+        width: size,
+        height: size,
+        fontSize: Math.max(11, Math.round(size * 0.38)),
+        background: avatarFarbe(name),
+      }}
+    >
+      {initialen(name)}
+    </span>
+  );
+}
+
 /* ---------- Styles ---------- */
 
 const styles = {
@@ -2224,6 +2487,15 @@ const styles = {
   chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   chipRemove: { background: "transparent", border: "none", color: "#9B2226", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   primaryBtn: { background: "#AE1E1D", color: "#fff", border: "none", borderRadius: 10, padding: "12px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%" },
+  stickyBar: {
+    position: "sticky",
+    bottom: 0,
+    background: "#F7F4F3",
+    paddingTop: 12,
+    paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+    marginTop: 16,
+    boxShadow: "0 -8px 12px -8px rgba(0,0,0,0.15)",
+  },
   secondaryBtn: { background: "#7A1310", color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", height: 40, fontSize: 14, fontWeight: 600, cursor: "pointer" },
   linkBtn: { background: "transparent", border: "none", color: "#AE1E1D", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 },
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3E9E9", display: "flex", flexDirection: "column", gap: 8 },
@@ -2242,6 +2514,42 @@ const styles = {
     fontSize: 13,
     fontWeight: 500,
     boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    zIndex: 60,
+  },
+  toastUndoBtn: {
+    background: "rgba(255,255,255,0.18)",
+    border: "none",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    padding: "4px 10px",
+    borderRadius: 999,
+    whiteSpace: "nowrap",
+  },
+  avatar: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    color: "#fff",
+    fontWeight: 700,
+    flexShrink: 0,
+    letterSpacing: "-0.02em",
+  },
+  progressBar: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    background: "linear-gradient(90deg, transparent, #AE1E1D, transparent)",
+    backgroundSize: "200% 100%",
+    animation: "progressSlide 1.1s linear infinite",
+    zIndex: 70,
   },
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
   statBox: { flex: "1 1 90px", background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 8px", textAlign: "center" },
@@ -2270,10 +2578,23 @@ const styles = {
   stepBtn: { width: 26, height: 26, borderRadius: 8, border: "1px solid #E4D2D2", background: "#fff", color: "#AE1E1D", fontSize: 15, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
   stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center" },
   editBanner: { background: "#FFF3D6", color: "#7A5A00", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
+  seasonHint: {
+    background: "#E8F0FE",
+    color: "#1A3D6D",
+    borderRadius: 8,
+    padding: "10px 14px",
+    fontSize: 13,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
 };
 
 const styleSheet = document.createElement("style");
-styleSheet.textContent = "@keyframes spin { to { transform: rotate(360deg); } }";
+styleSheet.textContent =
+  "@keyframes spin { to { transform: rotate(360deg); } } @keyframes progressSlide { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }";
 document.head.appendChild(styleSheet);
 
 try {
