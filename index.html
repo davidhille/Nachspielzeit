@@ -709,6 +709,7 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
       )}
 
       <SaisonBilanz spieltage={spieltage} players={players} month={month} />
+      <GegnerBilanzTabelle spieltage={spieltage} gegner={gegner} />
       <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} />
       <AnwesenheitsStatistik trainings={trainings} players={players} month={month} />
       <TrainerNotizen trainings={trainings} players={players} month={month} />
@@ -1000,6 +1001,76 @@ function SaisonBilanz({ spieltage, players, month }) {
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+function GegnerBilanzTabelle({ spieltage, gegner }) {
+  const bilanzen = useMemo(() => {
+    const alleSpiele = spieltage.flatMap((s) => s.spiele);
+    const map = {};
+    alleSpiele.forEach((sp) => {
+      if (!sp.opponentId) return;
+      if (!map[sp.opponentId]) {
+        map[sp.opponentId] = { spiele: 0, siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0 };
+      }
+      const b = map[sp.opponentId];
+      b.spiele += 1;
+      b.toreFuer += sp.ourGoals;
+      b.toreGegen += sp.theirGoals;
+      if (sp.ourGoals > sp.theirGoals) b.siege += 1;
+      else if (sp.ourGoals < sp.theirGoals) b.niederlagen += 1;
+      else b.unentschieden += 1;
+    });
+    return gegner
+      .filter((g) => map[g.id])
+      .map((g) => ({ id: g.id, name: g.name, ...map[g.id] }))
+      .sort((a, b) => b.spiele - a.spiele);
+  }, [spieltage, gegner]);
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <h3 style={styles.h3}>Bilanz pro Gegner</h3>
+      {bilanzen.length === 0 ? (
+        <EmptyState text="Noch keine Spiele gegen hinterlegte Gegner erfasst." />
+      ) : (
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Gegner</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>Spiele</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>S</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>U</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>N</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>Tore</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>Diff.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bilanzen.map((b) => {
+                const diff = b.toreFuer - b.toreGegen;
+                return (
+                  <tr key={b.id}>
+                    <td style={styles.tdName}>{b.name}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{b.spiele}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{b.siege}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{b.unentschieden}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{b.niederlagen}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>
+                      {b.toreFuer}:{b.toreGegen}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: diff > 0 ? "#2E7D32" : diff < 0 ? "#C62828" : "#5B4747" }}>
+                      {diff > 0 ? "+" : ""}
+                      {diff}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
