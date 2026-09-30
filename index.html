@@ -1940,6 +1940,30 @@ function CheckBadge({ size = 9 }) {
   );
 }
 
+function SpieltagZusammenfassung({ spiele }) {
+  const stats = spiele.reduce(
+    (acc, sp) => {
+      acc.toreFuer += sp.ourGoals;
+      acc.toreGegen += sp.theirGoals;
+      if (sp.ourGoals > sp.theirGoals) acc.siege += 1;
+      else if (sp.ourGoals < sp.theirGoals) acc.niederlagen += 1;
+      else acc.unentschieden += 1;
+      return acc;
+    },
+    { siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0 }
+  );
+  return (
+    <div style={styles.spieltagSummary}>
+      {stats.siege > 0 && <span style={{ ...styles.summaryPill, ...styles.summaryPillWin }}>{stats.siege}S</span>}
+      {stats.unentschieden > 0 && <span style={{ ...styles.summaryPill, ...styles.summaryPillDraw }}>{stats.unentschieden}U</span>}
+      {stats.niederlagen > 0 && <span style={{ ...styles.summaryPill, ...styles.summaryPillLoss }}>{stats.niederlagen}N</span>}
+      <span style={styles.summaryGoals}>
+        Tore {stats.toreFuer}:{stats.toreGegen}
+      </span>
+    </div>
+  );
+}
+
 function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
@@ -2029,6 +2053,8 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
           </button>
         </div>
       </div>
+
+      {!open && spieltag.spiele.length > 0 && <SpieltagZusammenfassung spiele={spieltag.spiele} />}
 
       {open && (
         <>
@@ -3090,6 +3116,22 @@ const styles = {
   },
   cardName: { fontWeight: 600, fontSize: 15 },
   mutedTag: { color: "var(--muted-2)", fontWeight: 400, fontSize: 13 },
+  spieltagSummary: { display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" },
+  summaryPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 22,
+    height: 22,
+    padding: "0 6px",
+    borderRadius: 999,
+    fontSize: 11.5,
+    fontWeight: 700,
+  },
+  summaryPillWin: { background: "var(--win-bg)", color: "var(--success-text)" },
+  summaryPillDraw: { background: "var(--draw-bg)", color: "var(--muted)" },
+  summaryPillLoss: { background: "var(--loss-bg)", color: "var(--loss-text)" },
+  summaryGoals: { fontSize: 12.5, color: "var(--muted)", fontWeight: 600 },
   pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
   fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
   goalStepper: {
