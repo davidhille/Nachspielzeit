@@ -918,75 +918,6 @@ function SaisonwechselHinweis({ seasons }) {
 
 /* ---------- Dashboard ---------- */
 
-function MonatsUebersicht({ rows, trainings, spieltage, month }) {
-  const activeRows = rows.filter((r) => r.active);
-  if (activeRows.length === 0) return null;
-
-  const topSpieler = activeRows.reduce((best, r) => (r.gesamtMonat > best.gesamtMonat ? r : best), activeRows[0]);
-  const trainingsCount = trainings.filter((t) => t.date.slice(0, 7) === month).length;
-  const avgPunkte = activeRows.reduce((sum, r) => sum + r.gesamtMonat, 0) / activeRows.length;
-  const spieltageMonat = spieltage.filter((s) => s.date.slice(0, 7) === month);
-  const anwesenheit =
-    spieltageMonat.length > 0
-      ? Math.round(
-          (spieltageMonat.reduce((sum, s) => sum + s.teilnehmer.filter((id) => activeRows.some((r) => r.id === id)).length, 0) /
-            (spieltageMonat.length * activeRows.length)) *
-            100
-        )
-      : null;
-
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={styles.heroCard}>
-        <div style={styles.heroGlow} />
-        <div style={styles.heroInner}>
-          <Avatar name={topSpieler.name} size={56} photoUrl={topSpieler.photoUrl} ring="white" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={styles.heroKicker}>Spieler des Monats</div>
-            <div style={styles.heroName}>{topSpieler.name}</div>
-          </div>
-          <div style={styles.heroBadge}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#F2A93B" stroke="#F2A93B">
-              <path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9-6.3 3.9 1.7-7-5.4-4.7 7.1-.6z" />
-            </svg>
-            <span style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{topSpieler.gesamtMonat.toFixed(1)}</span>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.statTiles}>
-        <div style={styles.statTile}>
-          <div style={{ ...styles.statIconWrap, background: "var(--accent-soft)" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C4271F" strokeWidth="2">
-              <path d="M4 22V4a2 2 0 0 1 2-2h13.5a.5.5 0 0 1 .5.5V15a.5.5 0 0 1-.5.5H6a2 2 0 0 0-2 2Zm0 0a2 2 0 0 0 2 2h14" />
-            </svg>
-          </div>
-          <div style={styles.statValue}>{trainingsCount}</div>
-          <div style={styles.statLabel}>Trainings</div>
-        </div>
-        <div style={styles.statTile}>
-          <div style={{ ...styles.statIconWrap, background: "#FBF2E3" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B0781C" strokeWidth="2">
-              <path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9-6.3 3.9 1.7-7-5.4-4.7 7.1-.6z" />
-            </svg>
-          </div>
-          <div style={styles.statValue}>{avgPunkte.toFixed(1)}</div>
-          <div style={styles.statLabel}>Ø Punkte</div>
-        </div>
-        <div style={styles.statTile}>
-          <div style={{ ...styles.statIconWrap, background: "#EAF3EC" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2A6B4A" strokeWidth="2">
-              <path d="M3 12h4l3 8 4-16 3 8h4" />
-            </svg>
-          </div>
-          <div style={styles.statValue}>{anwesenheit === null ? "–" : `${anwesenheit}%`}</div>
-          <div style={styles.statLabel}>Anwesenheit</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner, selectedPlayerId, onSelectPlayer, onOpenSettings }) {
   const months = useMemo(() => {
     const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
@@ -1106,8 +1037,6 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
       </div>
 
       {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
-
-      {rows.length > 0 && <MonatsUebersicht rows={rows} trainings={trainings} spieltage={spieltage} month={month} />}
 
       {rows.length > 0 && (
         <div style={styles.tableWrap}>
@@ -2945,7 +2874,16 @@ const styles = {
   },
   selectGroup: { display: "flex", flexDirection: "column", gap: 2 },
   selectGroupLabel: { fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.03em" },
-  input: { border: "1px solid var(--border-strong)", background: "var(--surface)", borderRadius: 8, padding: "10px 12px", fontSize: 14, flex: 1 },
+  input: {
+    border: "1px solid var(--border-strong)",
+    background: "var(--surface)",
+    borderRadius: 8,
+    padding: "10px 12px",
+    fontSize: 14,
+    flex: 1,
+    color: "var(--text)",
+    fontFamily: "'Inter', system-ui, sans-serif",
+  },
   textarea: {
     border: "1px solid var(--border-strong)",
     background: "var(--surface)",
@@ -2959,65 +2897,6 @@ const styles = {
   },
   addRow: { display: "flex", gap: 8, marginBottom: 16 },
   tableWrap: { overflowX: "auto", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
-  heroCard: {
-    position: "relative",
-    borderRadius: 20,
-    padding: 18,
-    background: "linear-gradient(135deg, #2A6B4A, #1C4F37)",
-    overflow: "hidden",
-    boxShadow: "0 10px 24px -10px rgba(42,107,74,0.5)",
-    marginBottom: 10,
-  },
-  heroGlow: {
-    position: "absolute",
-    top: -30,
-    right: -20,
-    width: 110,
-    height: 110,
-    borderRadius: 999,
-    background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)",
-  },
-  heroInner: { position: "relative", display: "flex", alignItems: "center", gap: 14 },
-  heroKicker: { color: "rgba(255,255,255,0.75)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" },
-  heroName: {
-    color: "#fff",
-    fontSize: 19,
-    fontWeight: 700,
-    marginTop: 1,
-    fontFamily: "'Space Grotesk', sans-serif",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  heroBadge: {
-    background: "rgba(255,255,255,0.16)",
-    padding: "6px 10px",
-    borderRadius: 999,
-    display: "flex",
-    alignItems: "center",
-    gap: 4,
-    flexShrink: 0,
-  },
-  statTiles: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 },
-  statTile: {
-    background: "var(--surface)",
-    borderRadius: 16,
-    padding: "14px 10px",
-    textAlign: "center",
-    boxShadow: "0 1px 3px rgba(32,22,22,0.04)",
-    border: "1px solid var(--border)",
-  },
-  statIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    margin: "0 auto 8px auto",
-  },
-  statValue: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "var(--text)" },
-  statLabel: { fontSize: 11, color: "var(--muted)", marginTop: 1 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", padding: "10px 12px", color: "var(--muted)", fontWeight: 600, fontSize: 12, borderBottom: "1px solid var(--border)" },
   td: { padding: "10px 12px", borderBottom: "1px solid var(--divider)" },
@@ -3132,7 +3011,18 @@ const styles = {
     marginTop: 16,
     boxShadow: "0 -8px 12px -8px rgba(0,0,0,0.15)",
   },
-  secondaryBtn: { background: "#7A1310", color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", height: 40, fontSize: 14, fontWeight: 600, cursor: "pointer" },
+  secondaryBtn: {
+    background: "var(--header-grad-btn)",
+    color: "#fff",
+    border: "none",
+    borderRadius: 12,
+    padding: "0 18px",
+    height: 40,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    boxShadow: "0 6px 14px -6px rgba(168,28,27,0.55)",
+  },
   linkBtn: {
     background: "transparent",
     border: "none",
