@@ -41,6 +41,11 @@
     --win-bg: #E8F5E9; --loss-bg: #FBDDDD; --draw-bg: #EFEFEF;
     --warn-bg: #FFF3D6; --warn-text: #7A5A00; --info-bg: #E8F0FE; --info-text: #1A3D6D;
     --focus: #1C2B22;
+    --gold: #F2A93B; --gold-2: #E08C1E; --gold-text: #4A2E05;
+    --tan-bg: #F3ECE3; --tan-text: #8A5A16;
+    --lav-bg: #EFEAF3; --lav-text: #5B4FA8;
+    --header-grad: linear-gradient(135deg, #C4271F 0%, #8E1416 100%);
+    --header-grad-btn: linear-gradient(135deg, #D2271F, #96161A);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -51,6 +56,8 @@
       --win-bg: #1C3324; --loss-bg: #3E2022; --draw-bg: #2C2C2C;
       --warn-bg: #3D3218; --warn-text: #F2D27A; --info-bg: #1C2A40; --info-text: #A8C7FA;
       --focus: #F1EAE9;
+      --tan-bg: #3A2F1D; --tan-text: #F2C879;
+      --lav-bg: #2A2640; --lav-text: #B7ACE8;
     }
   }
   * { box-sizing: border-box; }
@@ -58,6 +65,18 @@
   input, select, textarea { color: var(--text); }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .app-header :focus-visible { outline-color: #FFFFFF; }
+  .app-header { position: relative; overflow: hidden; }
+  .app-header::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.14) 1.5px, transparent 1.5px);
+    background-size: 14px 14px; opacity: 0.6;
+  }
+  .app-header::after {
+    content: ""; position: absolute; top: -50px; right: -20px; width: 150px; height: 150px;
+    border-radius: 999px; pointer-events: none;
+    background: radial-gradient(circle, rgba(242,169,59,0.3), transparent 70%);
+  }
+  .app-header > * { position: relative; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
@@ -2006,7 +2025,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                     style={{ ...styles.teilnehmerChip, ...(dabei ? styles.teilnehmerChipActive : {}) }}
                   >
                     <span style={styles.teilnehmerChipAvatarWrap}>
-                      <Avatar name={p.name} size={28} photoUrl={p.photo_url} />
+                      <Avatar name={p.name} size={28} photoUrl={p.photo_url} ring={dabei ? "gold" : "white"} />
                       {dabei && (
                         <span style={styles.teilnehmerChipCheck}>
                           <CheckBadge />
@@ -2389,7 +2408,7 @@ function SpielerBereich({
                     <SettingsIcon size={15} />
                   </button>
                   <button
-                    style={styles.iconBtn}
+                    style={{ ...styles.iconBtn, ...styles.iconBtnLavender }}
                     title={p.active === false ? "Aktivieren" : "Deaktivieren"}
                     aria-label={p.active === false ? "Aktivieren" : "Deaktivieren"}
                     onClick={() => onToggleActive(p.id)}
@@ -2702,16 +2721,23 @@ function initialen(name) {
   if (teile.length === 1) return teile[0].slice(0, 2).toUpperCase();
   return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
 }
-function Avatar({ name, size = 32, photoUrl }) {
+function Avatar({ name, size = 32, photoUrl, ring }) {
+  const ringShadow =
+    ring === "gold"
+      ? "0 0 0 2.5px var(--gold)"
+      : ring === "white"
+      ? "0 0 0 2px var(--surface)"
+      : "none";
   if (photoUrl) {
     return (
       <img
         src={photoUrl}
         alt={name}
-        style={{ ...styles.avatar, width: size, height: size, objectFit: "cover", background: "var(--border)" }}
+        style={{ ...styles.avatar, width: size, height: size, objectFit: "cover", background: "var(--border)", boxShadow: ringShadow }}
       />
     );
   }
+  const farbe = avatarFarbe(name);
   return (
     <span
       style={{
@@ -2719,7 +2745,8 @@ function Avatar({ name, size = 32, photoUrl }) {
         width: size,
         height: size,
         fontSize: Math.max(11, Math.round(size * 0.38)),
-        background: avatarFarbe(name),
+        background: `linear-gradient(135deg, ${farbe}, ${farbe}cc)`,
+        boxShadow: ringShadow,
       }}
     >
       {initialen(name)}
@@ -2786,7 +2813,7 @@ const styles = {
     width: "100%",
     marginTop: 4,
   },
-  header: { background: "linear-gradient(180deg, #A81C1B 0%, #93191A 100%)", color: "#F8FAF8", padding: "20px 20px 0 20px" },
+  header: { background: "var(--header-grad)", color: "#F8FAF8", padding: "20px 20px 0 20px" },
   headerTop: { display: "flex", alignItems: "center", gap: 12, paddingBottom: 16 },
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 6, padding: 3 },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1, letterSpacing: "-0.01em" },
@@ -2887,7 +2914,7 @@ const styles = {
     textDecorationColor: "var(--border-strong)",
     cursor: "pointer",
   },
-  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 14, boxShadow: "0 1px 3px rgba(28,20,20,0.04)" },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardActions: { display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", WebkitOverflowScrolling: "touch", maxWidth: "100%" },
   iconBtn: {
@@ -2896,14 +2923,15 @@ const styles = {
     minWidth: 32,
     borderRadius: 999,
     border: "none",
-    background: "var(--surface-2)",
-    color: "var(--muted)",
+    background: "var(--tan-bg)",
+    color: "var(--tan-text)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
     flexShrink: 0,
   },
+  iconBtnLavender: { background: "var(--lav-bg)", color: "var(--lav-text)" },
   iconBtnDanger: { background: "var(--accent-soft)", color: "var(--danger-text)" },
   teilnehmerChip: {
     display: "flex",
@@ -2919,7 +2947,12 @@ const styles = {
     fontWeight: 600,
     color: "var(--text)",
   },
-  teilnehmerChipActive: { background: "var(--accent-soft)", borderColor: "#AE1E1D", color: "var(--danger-text)" },
+  teilnehmerChipActive: {
+    background: "linear-gradient(135deg, var(--accent-soft), var(--accent-soft))",
+    borderColor: "#AE1E1D",
+    color: "var(--danger-text)",
+    boxShadow: "0 4px 10px -6px rgba(196,39,31,0.5)",
+  },
   teilnehmerChipAvatarWrap: { position: "relative", flexShrink: 0, display: "flex" },
   teilnehmerChipCheck: {
     position: "absolute",
@@ -2946,17 +2979,17 @@ const styles = {
   chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   primaryBtn: {
-    background: "#AE1E1D",
+    background: "var(--header-grad-btn)",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "12px 18px",
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
     width: "100%",
-    boxShadow: "0 2px 8px rgba(174,30,29,0.25)",
-    transition: "background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease",
+    boxShadow: "0 8px 18px -6px rgba(168,28,27,0.6)",
+    transition: "box-shadow 150ms ease, transform 100ms ease",
   },
   stickyBar: {
     position: "sticky",
