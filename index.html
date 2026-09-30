@@ -1823,6 +1823,32 @@ function TrashIcon({ size = 16 }) {
   );
 }
 
+function SettingsIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+function PowerIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2v9" />
+      <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
+    </svg>
+  );
+}
+
+function CheckBadge({ size = 9 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M3 8.2 6.4 11.6 13 4.4" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
@@ -1977,8 +2003,16 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                   <button
                     key={p.id}
                     onClick={() => onToggleTeilnehmer(p.id, dabei)}
-                    style={{ ...styles.chip, ...(dabei ? styles.chipActive : {}) }}
+                    style={{ ...styles.teilnehmerChip, ...(dabei ? styles.teilnehmerChipActive : {}) }}
                   >
+                    <span style={styles.teilnehmerChipAvatarWrap}>
+                      <Avatar name={p.name} size={28} photoUrl={p.photo_url} />
+                      {dabei && (
+                        <span style={styles.teilnehmerChipCheck}>
+                          <CheckBadge />
+                        </span>
+                      )}
+                    </span>
                     {p.name}
                   </button>
                 );
@@ -2346,14 +2380,26 @@ function SpielerBereich({
                   {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
                 </span>
                 <div style={styles.cardActions}>
-                  <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => setOpenId(open ? null : p.id)}>
-                    {open ? "Schließen" : "Einstellungen"}
-                  </button>
-                  <button style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={() => onToggleActive(p.id)}>
-                    {p.active === false ? "Aktivieren" : "Deaktivieren"}
+                  <button
+                    style={styles.iconBtn}
+                    title={open ? "Schließen" : "Einstellungen"}
+                    aria-label={open ? "Schließen" : "Einstellungen"}
+                    onClick={() => setOpenId(open ? null : p.id)}
+                  >
+                    <SettingsIcon size={15} />
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+                    style={styles.iconBtn}
+                    title={p.active === false ? "Aktivieren" : "Deaktivieren"}
+                    aria-label={p.active === false ? "Aktivieren" : "Deaktivieren"}
+                    onClick={() => onToggleActive(p.id)}
+                  >
+                    <PowerIcon size={15} />
+                  </button>
+                  <button
+                    style={{ ...styles.iconBtn, ...styles.iconBtnDanger }}
+                    title="Entfernen"
+                    aria-label="Entfernen"
                     onClick={() =>
                       confirmAnd(
                         `${p.name} in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`,
@@ -2361,7 +2407,7 @@ function SpielerBereich({
                       )
                     }
                   >
-                    <TrashIcon size={14} /> Entfernen
+                    <TrashIcon size={15} />
                   </button>
                 </div>
               </div>
@@ -2740,7 +2786,7 @@ const styles = {
     width: "100%",
     marginTop: 4,
   },
-  header: { background: "#AE1E1D", color: "#F8FAF8", padding: "20px 20px 0 20px" },
+  header: { background: "linear-gradient(180deg, #A81C1B 0%, #93191A 100%)", color: "#F8FAF8", padding: "20px 20px 0 20px" },
   headerTop: { display: "flex", alignItems: "center", gap: 12, paddingBottom: 16 },
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 6, padding: 3 },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1, letterSpacing: "-0.01em" },
@@ -2763,18 +2809,26 @@ const styles = {
     minHeight: 40,
   },
   navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
-  subNav: { display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" },
+  subNav: {
+    display: "flex",
+    gap: 20,
+    marginBottom: 20,
+    overflowX: "auto",
+    borderBottom: "1px solid var(--divider)",
+  },
   subNavBtn: {
-    border: "1px solid var(--border-strong)",
-    background: "var(--surface)",
+    border: "none",
+    background: "transparent",
     color: "var(--muted)",
-    padding: "8px 14px",
-    borderRadius: 8,
-    fontSize: 13,
+    padding: "0 0 10px 0",
+    fontSize: 13.5,
     fontWeight: 600,
     cursor: "pointer",
+    whiteSpace: "nowrap",
+    borderBottom: "2px solid transparent",
+    marginBottom: -1,
   },
-  subNavBtnActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
+  subNavBtnActive: { color: "#AE1E1D", borderBottom: "2px solid #AE1E1D" },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
@@ -2833,9 +2887,53 @@ const styles = {
     textDecorationColor: "var(--border-strong)",
     cursor: "pointer",
   },
-  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardActions: { display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", WebkitOverflowScrolling: "touch", maxWidth: "100%" },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    minWidth: 32,
+    borderRadius: 999,
+    border: "none",
+    background: "var(--surface-2)",
+    color: "var(--muted)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  iconBtnDanger: { background: "var(--accent-soft)", color: "var(--danger-text)" },
+  teilnehmerChip: {
+    display: "flex",
+    alignItems: "center",
+    gap: 9,
+    padding: "8px 11px 8px 8px",
+    borderRadius: 14,
+    border: "1.5px solid var(--border)",
+    background: "var(--surface)",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    fontSize: 13.5,
+    fontWeight: 600,
+    color: "var(--text)",
+  },
+  teilnehmerChipActive: { background: "var(--accent-soft)", borderColor: "#AE1E1D", color: "var(--danger-text)" },
+  teilnehmerChipAvatarWrap: { position: "relative", flexShrink: 0, display: "flex" },
+  teilnehmerChipCheck: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 15,
+    height: 15,
+    borderRadius: 999,
+    background: "#AE1E1D",
+    border: "2px solid var(--surface)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cardName: { fontWeight: 600, fontSize: 15 },
   mutedTag: { color: "var(--muted-2)", fontWeight: 400, fontSize: 13 },
   pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
