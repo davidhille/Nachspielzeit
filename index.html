@@ -542,7 +542,21 @@ function App() {
             players={players}
             gegner={gegner}
             spieltage={spieltage}
-            onAddSpieltag={(date) => wrapAction(() => dbInsert("spieltage", { id: uid(), date }))}
+            onAddSpieltag={(date) =>
+              wrapAction(async () => {
+                const newId = uid();
+                await dbInsert("spieltage", { id: newId, date });
+                const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
+                const activeIds = new Set(players.map((p) => p.id));
+                const uebernommeneTeilnehmer = (letzterSpieltag?.teilnehmer || []).filter((id) => activeIds.has(id));
+                if (uebernommeneTeilnehmer.length > 0) {
+                  await dbInsert(
+                    "spieltag_teilnehmer",
+                    uebernommeneTeilnehmer.map((playerId) => ({ spieltag_id: newId, player_id: playerId }))
+                  );
+                }
+              })
+            }
             onRemoveSpieltag={(id) => softDelete("spieltage", id, "Spieltag")}
             onAddSpiel={(spieltagId, spiel) =>
               wrapAction(async () => {
@@ -1788,7 +1802,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
           </button>
           <button
             style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
-            onClick={() => confirmAnd("Diesen Spieltag inklusive aller Spiele und Torschützen wirklich entfernen?", onRemoveSpieltag)}
+            onClick={() => confirmAnd("Diesen Spieltag in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.", onRemoveSpieltag)}
           >
             <TrashIcon size={14} /> Entfernen
           </button>
@@ -2238,7 +2252,7 @@ function SpielerBereich({
                     style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                     onClick={() =>
                       confirmAnd(
-                        `${p.name} wirklich entfernen? Alle Bewertungen, Entwicklungsdaten und Torschützen-Einträge dieses Spielers gehen dabei verloren.`,
+                        `${p.name} in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`,
                         () => onRemove(p.id)
                       )
                     }
@@ -2482,7 +2496,11 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggl
                   </button>
                   <button
                     style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
-                    onClick={() => confirmAnd(`Gegner "${g.name}" wirklich entfernen?`, () => onRemoveGegner(g.id))}
+                    onClick={() =>
+                      confirmAnd(`Gegner "${g.name}" in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`, () =>
+                        onRemoveGegner(g.id)
+                      )
+                    }
                   >
                     <TrashIcon size={14} /> Entfernen
                   </button>
