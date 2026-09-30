@@ -196,9 +196,25 @@ const toLocalISODate = (d) => {
 };
 const todayISO = () => toLocalISODate(new Date());
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+let _confirmHandler = null;
+function registerConfirmHandler(fn) {
+  _confirmHandler = fn;
+}
 const confirmAnd = (message, fn) => {
-  if (window.confirm(message)) fn();
+  if (_confirmHandler) {
+    _confirmHandler(message, fn);
+  } else if (window.confirm(message)) {
+    fn();
+  }
 };
+function friendlyError(e) {
+  const raw = (e && e.message) || "";
+  const trimmed = raw.trim();
+  if (!raw || raw.length > 160 || trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return "Etwas ist schiefgelaufen. Bitte versuch es erneut.";
+  }
+  return raw;
+}
 
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const monthLabel = (key) => {
@@ -330,12 +346,19 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
   const toastTimerRef = useRef(null);
 
-  const showToast = (msg, undo) => {
+  useEffect(() => {
+    registerConfirmHandler((message, onConfirm) => setConfirmState({ message, onConfirm }));
+    return () => registerConfirmHandler(null);
+  }, []);
+
+  const showToast = (msg, undo, type = "info") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message: msg, undo: undo || null });
-    toastTimerRef.current = setTimeout(() => setToast(null), undo ? 6000 : 2200);
+    setToast({ message: msg, undo: undo || null, type });
+    const duration = undo ? 6000 : type === "error" ? 5000 : 2200;
+    toastTimerRef.current = setTimeout(() => setToast(null), duration);
   };
 
   const refreshAll = useCallback(async () => {
@@ -419,7 +442,7 @@ function App() {
       if (successMsg) showToast(successMsg, undo);
     } catch (e) {
       console.error(e);
-      window.alert(e.message || "Etwas ist schiefgelaufen.");
+      showToast(friendlyError(e), null, "error");
     } finally {
       setBusy(false);
     }
@@ -636,8 +659,11 @@ function App() {
       </main>
       {busy && <div style={styles.progressBar} />}
       {toast && (
-        <div style={styles.toast}>
-          <span>{toast.message}</span>
+        <div style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "#AE1E1D" }}>
+          <span>
+            {toast.type === "error" ? "⚠ " : ""}
+            {toast.message}
+          </span>
           {toast.undo && (
             <button
               style={styles.toastUndoBtn}
@@ -649,6 +675,27 @@ function App() {
               Rückgängig
             </button>
           )}
+        </div>
+      )}
+      {confirmState && (
+        <div style={styles.modalOverlay} onClick={() => setConfirmState(null)}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <p style={styles.modalText}>{confirmState.message}</p>
+            <div style={styles.modalActions}>
+              <button style={styles.secondaryBtnOutline} onClick={() => setConfirmState(null)}>
+                Abbrechen
+              </button>
+              <button
+                style={{ ...styles.secondaryBtn, background: "#9B2226" }}
+                onClick={() => {
+                  confirmState.onConfirm();
+                  setConfirmState(null);
+                }}
+              >
+                Bestätigen
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -833,21 +880,27 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
         <h2 style={styles.h2}>Punktestand</h2>
         <div style={{ display: "flex", gap: 8 }}>
           {seasons.length > 1 && (
-            <select style={styles.select} value={season || ""} onChange={(e) => setSeason(e.target.value)}>
-              {seasons.map((s) => (
-                <option key={s} value={s}>
-                  Saison {s.replace("-", "/")}
+            <div style={styles.selectGroup}>
+              <label style={styles.selectGroupLabel}>Saison</label>
+              <select style={styles.select} value={season || ""} onChange={(e) => setSeason(e.target.value)}>
+                {seasons.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace("-", "/")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div style={styles.selectGroup}>
+            <label style={styles.selectGroupLabel}>Monat</label>
+            <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
+              {monateDerSaison.map((m) => (
+                <option key={m} value={m}>
+                  {monthLabel(m)}
                 </option>
               ))}
             </select>
-          )}
-          <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
-            {monateDerSaison.map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
+          </div>
         </div>
       </div>
 
@@ -861,7 +914,9 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
                 {spalten.map(([key, label]) => (
                   <th key={key} style={{ ...styles.th, cursor: "pointer", userSelect: "none" }} onClick={() => sortiereNach(key)}>
                     {label}
-                    {sortKey === key && <span style={{ marginLeft: 4 }}>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                    <span style={{ marginLeft: 4, opacity: sortKey === key ? 1 : 0.35 }}>
+                      {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -1374,6 +1429,16 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
 
   const aktuellBewertet = bewerteteDaten.has(date);
 
+  const alleAnwesend = () => {
+    setRows((r) => {
+      const next = { ...r };
+      players.forEach((p) => {
+        next[p.id] = { ...getRow(p.id), teilnahme: "anwesend" };
+      });
+      return next;
+    });
+  };
+
   const deleteBewertung = () => {
     if (!date || !onDelete) return;
     confirmAnd(
@@ -1410,6 +1475,13 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
       )}
       {geplanteTermine.length > 0 && players.length === 0 && (
         <EmptyState text="Noch keine aktiven Spieler vorhanden." />
+      )}
+      {geplanteTermine.length > 0 && players.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <button style={styles.linkBtn} onClick={alleAnwesend}>
+            Alle auf „Anwesend" setzen
+          </button>
+        </div>
       )}
       {aktuellBewertet && (
         <div style={{ ...styles.editBanner, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -1620,17 +1692,27 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
   );
 }
 
-function EditIcon() {
+function EditIcon({ size = 16 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
     </svg>
   );
 }
 
-function TrashIcon() {
+function TrashIcon({ size = 16 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: "-3px" }}
+    >
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6" />
@@ -1722,10 +1804,10 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             {open ? "Schließen" : "Öffnen"}
           </button>
           <button
-            style={{ ...styles.linkBtn, color: "#9B2226" }}
+            style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
             onClick={() => confirmAnd("Diesen Spieltag inklusive aller Spiele und Torschützen wirklich entfernen?", onRemoveSpieltag)}
           >
-            Entfernen
+            <TrashIcon size={14} /> Entfernen
           </button>
         </div>
       </div>
@@ -2006,14 +2088,14 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                       onClick={() =>
                         confirmAnd(`Spieler "${p.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("players", p.id, "Spieler")
                         )
                       }
                     >
-                      Endgültig löschen
+                      <TrashIcon size={14} /> Endgültig löschen
                     </button>
                   </div>
                 </div>
@@ -2036,14 +2118,14 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                       onClick={() =>
                         confirmAnd(`Gegner "${g.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("gegner", g.id, "Gegner")
                         )
                       }
                     >
-                      Endgültig löschen
+                      <TrashIcon size={14} /> Endgültig löschen
                     </button>
                   </div>
                 </div>
@@ -2066,7 +2148,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "#9B2226" }}
+                      style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                       onClick={() =>
                         confirmAnd(
                           `Spieltag vom ${formatTerminLabel(s.date)} endgültig löschen? Das kann nicht rückgängig gemacht werden.`,
@@ -2074,7 +2156,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                         )
                       }
                     >
-                      Endgültig löschen
+                      <TrashIcon size={14} /> Endgültig löschen
                     </button>
                   </div>
                 </div>
@@ -2170,7 +2252,7 @@ function SpielerBereich({
                     {p.active === false ? "Aktivieren" : "Deaktivieren"}
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "#9B2226" }}
+                    style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                     onClick={() =>
                       confirmAnd(
                         `${p.name} wirklich entfernen? Alle Bewertungen, Entwicklungsdaten und Torschützen-Einträge dieses Spielers gehen dabei verloren.`,
@@ -2178,7 +2260,7 @@ function SpielerBereich({
                       )
                     }
                   >
-                    Entfernen
+                    <TrashIcon size={14} /> Entfernen
                   </button>
                 </div>
               </div>
@@ -2199,7 +2281,16 @@ function SpielerBereich({
                     <span style={styles.rangeValue}>{wert.toFixed(1)}</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Avatar name={p.name} size={40} photoUrl={p.photo_url} />
+                    <button
+                      style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
+                      title="Profilbild ändern"
+                      onClick={() => {
+                        setUploadTargetId(p.id);
+                        fileInputRef.current && fileInputRef.current.click();
+                      }}
+                    >
+                      <Avatar name={p.name} size={40} photoUrl={p.photo_url} />
+                    </button>
                     <button
                       style={styles.linkBtn}
                       onClick={() => {
@@ -2211,10 +2302,10 @@ function SpielerBereich({
                     </button>
                     {p.photo_url && (
                       <button
-                        style={{ ...styles.linkBtn, color: "#9B2226" }}
+                        style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                         onClick={() => confirmAnd("Profilbild entfernen?", () => onRemovePhoto(p.id))}
                       >
-                        Entfernen
+                        <TrashIcon size={14} /> Entfernen
                       </button>
                     )}
                   </div>
@@ -2349,10 +2440,10 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
           {abgesagt ? "Wieder aktivieren" : "Absagen"}
         </button>
         <button
-          style={{ ...styles.linkBtn, color: "#9B2226" }}
+          style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
           onClick={() => confirmAnd("Diesen Trainingstermin wirklich entfernen?", () => onRemoveTermin(termin.id))}
         >
-          Entfernen
+          <TrashIcon size={14} /> Entfernen
         </button>
       </div>
     </div>
@@ -2407,10 +2498,10 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggl
                     {open ? "Schließen" : "Spieltage zuordnen"}
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "#9B2226" }}
+                    style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
                     onClick={() => confirmAnd(`Gegner "${g.name}" wirklich entfernen?`, () => onRemoveGegner(g.id))}
                   >
-                    Entfernen
+                    <TrashIcon size={14} /> Entfernen
                   </button>
                 </div>
               </div>
@@ -2549,7 +2640,13 @@ const styles = {
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 6, padding: 3 },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1 },
   subtitle: { fontSize: 13, color: "#F3D2D1", marginTop: 2 },
-  nav: { display: "flex", gap: 4, overflowX: "auto" },
+  nav: {
+    display: "flex",
+    gap: 4,
+    overflowX: "auto",
+    WebkitMaskImage: "linear-gradient(to right, black 92%, transparent 100%)",
+    maskImage: "linear-gradient(to right, black 92%, transparent 100%)",
+  },
   navBtn: {
     background: "transparent",
     border: "none",
@@ -2580,6 +2677,8 @@ const styles = {
   subheading: { fontSize: 13, fontWeight: 600, color: "#8A6F6F", margin: "16px 0 8px 0" },
   rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 6 },
   select: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "8px 10px", fontSize: 14, color: "#1C2B22" },
+  selectGroup: { display: "flex", flexDirection: "column", gap: 2 },
+  selectGroupLabel: { fontSize: 11, fontWeight: 600, color: "#8A6F6F", textTransform: "uppercase", letterSpacing: "0.03em" },
   input: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "10px 12px", fontSize: 14, flex: 1 },
   textarea: {
     border: "1px solid #E4D2D2",
@@ -2738,6 +2837,37 @@ const styles = {
     justifyContent: "space-between",
     gap: 12,
     marginBottom: 14,
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(28,20,20,0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 80,
+  },
+  modalCard: {
+    background: "#fff",
+    borderRadius: 14,
+    padding: 20,
+    maxWidth: 380,
+    width: "100%",
+    boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
+  },
+  modalText: { fontSize: 14, color: "#1C2B22", margin: "0 0 18px 0", lineHeight: 1.5 },
+  modalActions: { display: "flex", justifyContent: "flex-end", gap: 10 },
+  secondaryBtnOutline: {
+    background: "transparent",
+    color: "#5B4747",
+    border: "1px solid #E4D2D2",
+    borderRadius: 8,
+    padding: "0 16px",
+    height: 40,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
   },
 };
 
