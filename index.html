@@ -32,8 +32,35 @@
   });
 </script>
 <style>
+  :root {
+    color-scheme: light dark;
+    --bg: #F7F4F3; --surface: #fff; --surface-2: #FBF5F5; --divider: #F3E9E9; --border: #EADADA; --border-strong: #E4D2D2;
+    --text: #1C2B22; --text-2: #5B4747; --muted: #76595A; --muted-2: #B08A8A;
+    --accent-text: #AE1E1D; --accent-soft: #FBEAEA; --danger-text: #9B2226; --success-text: #2E7D32; --loss-text: #C62828;
+    --pos-bg: #DCEFE3; --pos-text: #1B4332; --neg-bg: #FBE0E0;
+    --win-bg: #E8F5E9; --loss-bg: #FBDDDD; --draw-bg: #EFEFEF;
+    --warn-bg: #FFF3D6; --warn-text: #7A5A00; --info-bg: #E8F0FE; --info-text: #1A3D6D;
+    --focus: #1C2B22;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161112; --surface: #221A1B; --surface-2: #2A2122; --divider: #332829; --border: #3D3132; --border-strong: #4A3B3C;
+      --text: #F1EAE9; --text-2: #D6C6C6; --muted: #BFA9A9; --muted-2: #A48C8C;
+      --accent-text: #FF8F87; --accent-soft: #3A2224; --danger-text: #F28B82; --success-text: #81C995; --loss-text: #F28B82;
+      --pos-bg: #1E3A2A; --pos-text: #A7E3BC; --neg-bg: #4A2224;
+      --win-bg: #1C3324; --loss-bg: #3E2022; --draw-bg: #2C2C2C;
+      --warn-bg: #3D3218; --warn-text: #F2D27A; --info-bg: #1C2A40; --info-text: #A8C7FA;
+      --focus: #F1EAE9;
+    }
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #F7F4F3; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  input, select, textarea { color: var(--text); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .app-header :focus-visible { outline-color: #FFFFFF; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
   #root { min-height: 100vh; }
 </style>
 </head>
@@ -354,6 +381,37 @@ function App() {
     return () => registerConfirmHandler(null);
   }, []);
 
+  const confirmCardRef = useRef(null);
+  useEffect(() => {
+    if (!confirmState) return;
+    const previousFocus = document.activeElement;
+    const card = confirmCardRef.current;
+    const focusables = () => (card ? Array.from(card.querySelectorAll("button")) : []);
+    if (focusables()[0]) focusables()[0].focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setConfirmState(null);
+      } else if (e.key === "Tab") {
+        const items = focusables();
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (previousFocus && previousFocus.focus) previousFocus.focus();
+    };
+  }, [confirmState]);
+
   const showToast = (msg, undo, type = "info") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message: msg, undo: undo || null, type });
@@ -467,8 +525,8 @@ function App() {
   if (error) {
     return (
       <div style={styles.loadingScreen}>
-        <span style={{ color: "#9B2226", fontWeight: 600 }}>Verbindung fehlgeschlagen</span>
-        <span style={{ fontSize: 13, color: "#76595A", textAlign: "center", padding: "0 24px" }}>{error}</span>
+        <span style={{ color: "var(--danger-text)", fontWeight: 600 }}>Verbindung fehlgeschlagen</span>
+        <span style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", padding: "0 24px" }}>{error}</span>
         <button style={styles.primaryBtn} onClick={refreshAll}>
           Erneut versuchen
         </button>
@@ -693,8 +751,15 @@ function App() {
       )}
       {confirmState && (
         <div style={styles.modalOverlay} onClick={() => setConfirmState(null)}>
-          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-            <p style={styles.modalText}>{confirmState.message}</p>
+          <div
+            ref={confirmCardRef}
+            role="alertdialog"
+            aria-modal="true"
+            aria-describedby="confirm-message"
+            style={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="confirm-message" style={styles.modalText}>{confirmState.message}</p>
             <div style={styles.modalActions}>
               <button style={styles.secondaryBtnOutline} onClick={() => setConfirmState(null)}>
                 Abbrechen
@@ -727,7 +792,7 @@ function Header({ tab, setTab }) {
     ["verwaltung", "Verwaltung"],
   ];
   return (
-    <header style={styles.header}>
+    <header className="app-header" style={styles.header}>
       <div style={styles.headerTop}>
         <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
         <div style={{ flex: 1 }}>
@@ -947,9 +1012,9 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
                   </td>
                   <td style={styles.td}>{r.basisAktuell.toFixed(2)}</td>
                   <td style={styles.td}>{r.monatsPunkte.toFixed(2)}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: "#AE1E1D" }}>{r.gesamtMonat.toFixed(2)}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.gesamtMonat.toFixed(2)}</td>
                   <td style={styles.td}>{r.saisonPunkte.toFixed(2)}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: "#AE1E1D" }}>{r.gesamtSaison.toFixed(2)}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.gesamtSaison.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1010,7 +1075,7 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
                   <td style={styles.td}>{r.verspaetet}</td>
                   <td style={styles.td}>{r.unentschuldigt}</td>
                   <td style={styles.td}>{r.abgemeldet}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: "#AE1E1D" }}>{r.quote.toFixed(0)}%</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.quote.toFixed(0)}%</td>
                 </tr>
               ))}
             </tbody>
@@ -1040,7 +1105,7 @@ function TrainerNotizen({ trainings, players, month }) {
               <span style={styles.cardName}>{spielerName(n.playerId)}</span>
               <span style={styles.mutedTag}>{formatTerminLabel(n.date)}</span>
             </div>
-            <div style={{ fontSize: 13, color: "#1C2B22" }}>{n.kommentar}</div>
+            <div style={{ fontSize: 13, color: "var(--text)" }}>{n.kommentar}</div>
           </div>
         ))}
       </div>
@@ -1135,15 +1200,15 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                 <span
                   style={{
                     ...styles.pill,
-                    background: trainingPunkte(t) >= 0 ? "#DCEFE3" : "#FBE0E0",
-                    color: trainingPunkte(t) >= 0 ? "#1B4332" : "#9B2226",
+                    background: trainingPunkte(t) >= 0 ? "var(--pos-bg)" : "var(--neg-bg)",
+                    color: trainingPunkte(t) >= 0 ? "var(--pos-text)" : "var(--danger-text)",
                   }}
                 >
                   {trainingPunkte(t) >= 0 ? "+" : ""}
                   {trainingPunkte(t).toFixed(2)} Pkt.
                 </span>
               </div>
-              <div style={{ fontSize: 13, color: "#76595A" }}>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>
                 {TEILNAHME_LABEL[t.teilnahme]}
                 {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
               </div>
@@ -1320,7 +1385,7 @@ function GegnerBilanzTabelle({ spieltage, gegner }) {
                     <td style={{ ...styles.td, textAlign: "right" }}>
                       {b.toreFuer}:{b.toreGegen}
                     </td>
-                    <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: diff > 0 ? "#2E7D32" : diff < 0 ? "#C62828" : "#5B4747" }}>
+                    <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: diff > 0 ? "var(--success-text)" : diff < 0 ? "var(--loss-text)" : "var(--text-2)" }}>
                       {diff > 0 ? "+" : ""}
                       {diff}
                     </td>
@@ -1383,8 +1448,8 @@ function Sparkline({ values, width = 220, height = 46 }) {
   const lastY = height - ((values[values.length - 1] - min) / range) * (height - 6) - 3;
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      <polyline points={points} fill="none" stroke="#AE1E1D" strokeWidth="2" />
-      <circle cx={lastX} cy={lastY} r="3" fill="#AE1E1D" />
+      <polyline points={points} fill="none" strokeWidth="2" style={{ stroke: "var(--accent-text)" }} />
+      <circle cx={lastX} cy={lastY} r="3" style={{ fill: "var(--accent-text)" }} />
     </svg>
   );
 }
@@ -1483,7 +1548,7 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
       {aktuellBewertet && (
         <div style={{ ...styles.editBanner, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <span>Dieser Termin wurde bereits bewertet — Änderungen überschreiben die bestehende Bewertung.</span>
-          <button style={{ ...styles.linkBtn, color: "#9B2226", whiteSpace: "nowrap" }} onClick={deleteBewertung}>
+          <button style={{ ...styles.linkBtn, color: "var(--danger-text)", whiteSpace: "nowrap" }} onClick={deleteBewertung}>
             Bewertung löschen
           </button>
         </div>
@@ -1503,8 +1568,8 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
                 <span
                   style={{
                     ...styles.pill,
-                    background: punkte >= 0 ? "#DCEFE3" : "#FBE0E0",
-                    color: punkte >= 0 ? "#1B4332" : "#9B2226",
+                    background: punkte >= 0 ? "var(--pos-bg)" : "var(--neg-bg)",
+                    color: punkte >= 0 ? "var(--pos-text)" : "var(--danger-text)",
                   }}
                 >
                   {punkte >= 0 ? "+" : ""}
@@ -1801,7 +1866,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             {open ? "Schließen" : "Öffnen"}
           </button>
           <button
-            style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+            style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
             onClick={() => confirmAnd("Diesen Spieltag in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.", onRemoveSpieltag)}
           >
             <TrashIcon size={14} /> Entfernen
@@ -1817,9 +1882,9 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                 const ergebnis =
                   sp.ourGoals > sp.theirGoals ? "sieg" : sp.ourGoals < sp.theirGoals ? "niederlage" : "unentschieden";
                 const ergebnisStyle = {
-                  sieg: { borderLeft: "4px solid #2E7D32", background: "#E8F5E9" },
-                  niederlage: { borderLeft: "4px solid #C62828", background: "#FBDDDD" },
-                  unentschieden: { borderLeft: "4px solid #8A8A8A", background: "#EFEFEF" },
+                  sieg: { borderLeft: "4px solid #2E7D32", background: "var(--win-bg)" },
+                  niederlage: { borderLeft: "4px solid #C62828", background: "var(--loss-bg)" },
+                  unentschieden: { borderLeft: "4px solid #8A8A8A", background: "var(--draw-bg)" },
                 }[ergebnis];
                 return (
                   <div key={sp.id} style={{ ...styles.spielRow, ...ergebnisStyle }}>
@@ -1832,7 +1897,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                           <span>Tore: </span>
                           {sp.scorers.map((sc, i) => (
                             <React.Fragment key={sc.id}>
-                              <strong style={{ color: "#1C2B22" }}>{spielerName(sc.playerId)}</strong> ({sc.tore})
+                              <strong style={{ color: "var(--text)" }}>{spielerName(sc.playerId)}</strong> ({sc.tore})
                               {i < sp.scorers.length - 1 ? ", " : ""}
                             </React.Fragment>
                           ))}
@@ -1849,7 +1914,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
                         <EditIcon />
                       </button>
                       <button
-                        style={{ ...styles.linkBtn, color: "#9B2226", display: "flex", alignItems: "center" }}
+                        style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "flex", alignItems: "center" }}
                         onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => onRemoveSpiel(sp.id))}
                         title="Entfernen"
                         aria-label="Entfernen"
@@ -2085,7 +2150,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
                       onClick={() =>
                         confirmAnd(`Spieler "${p.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("players", p.id, "Spieler")
@@ -2115,7 +2180,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
                       onClick={() =>
                         confirmAnd(`Gegner "${g.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("gegner", g.id, "Gegner")
@@ -2145,7 +2210,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
                       onClick={() =>
                         confirmAnd(
                           `Spieltag vom ${formatTerminLabel(s.date)} endgültig löschen? Das kann nicht rückgängig gemacht werden.`,
@@ -2249,7 +2314,7 @@ function SpielerBereich({
                     {p.active === false ? "Aktivieren" : "Deaktivieren"}
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
                     onClick={() =>
                       confirmAnd(
                         `${p.name} in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`,
@@ -2299,7 +2364,7 @@ function SpielerBereich({
                     </button>
                     {p.photo_url && (
                       <button
-                        style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
                         onClick={() => confirmAnd("Profilbild entfernen?", () => onRemovePhoto(p.id))}
                       >
                         <TrashIcon size={14} /> Entfernen
@@ -2430,14 +2495,14 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
     <div style={styles.spielRow}>
       <div>
         {formatTerminLabel(termin.date)}
-        {abgesagt && <span style={{ ...styles.mutedTag, color: "#9B2226" }}> · abgesagt</span>}
+        {abgesagt && <span style={{ ...styles.mutedTag, color: "var(--danger-text)" }}> · abgesagt</span>}
       </div>
       <div style={{ display: "flex", gap: 10 }}>
         <button style={styles.linkBtn} onClick={() => onToggleAbsage(termin.id)}>
           {abgesagt ? "Wieder aktivieren" : "Absagen"}
         </button>
         <button
-          style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+          style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
           onClick={() => confirmAnd("Diesen Trainingstermin wirklich entfernen?", () => onRemoveTermin(termin.id))}
         >
           <TrashIcon size={14} /> Entfernen
@@ -2495,7 +2560,7 @@ function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggl
                     {open ? "Schließen" : "Spieltage zuordnen"}
                   </button>
                   <button
-                    style={{ ...styles.linkBtn, color: "#9B2226", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
                     onClick={() =>
                       confirmAnd(`Gegner "${g.name}" in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`, () =>
                         onRemoveGegner(g.id)
@@ -2558,7 +2623,7 @@ function Avatar({ name, size = 32, photoUrl }) {
       <img
         src={photoUrl}
         alt={name}
-        style={{ ...styles.avatar, width: size, height: size, objectFit: "cover", background: "#EADADA" }}
+        style={{ ...styles.avatar, width: size, height: size, objectFit: "cover", background: "var(--border)" }}
       />
     );
   }
@@ -2580,7 +2645,7 @@ function Avatar({ name, size = 32, photoUrl }) {
 /* ---------- Styles ---------- */
 
 const styles = {
-  app: { fontFamily: "'Inter', system-ui, sans-serif", background: "#F7F4F3", minHeight: "100vh", color: "#1C2B22" },
+  app: { fontFamily: "'Inter', system-ui, sans-serif", background: "var(--bg)", minHeight: "100vh", color: "var(--text)" },
   loadingScreen: {
     display: "flex",
     flexDirection: "column",
@@ -2588,14 +2653,14 @@ const styles = {
     justifyContent: "center",
     height: "100vh",
     gap: 12,
-    color: "#76595A",
+    color: "var(--muted)",
     fontFamily: "'Inter', system-ui, sans-serif",
   },
   loadingBall: {
     width: 28,
     height: 28,
     borderRadius: "50%",
-    border: "3px solid #EADADA",
+    border: "3px solid var(--border)",
     borderTopColor: "#AE1E1D",
     animation: "spin 0.8s linear infinite",
   },
@@ -2604,26 +2669,26 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     gap: 10,
-    background: "#fff",
-    border: "1px solid #EADADA",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
     borderRadius: 16,
     padding: "32px 28px",
     width: 260,
     boxShadow: "0 8px 24px rgba(174,30,29,0.10), 0 2px 6px rgba(28,20,20,0.04)",
   },
   loginLogo: { width: 56, height: "auto", objectFit: "contain", marginBottom: 4 },
-  loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "#1C2B22", letterSpacing: "-0.01em" },
-  loginSubtitle: { fontSize: 12, color: "#76595A", marginTop: -8, marginBottom: 6 },
+  loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em" },
+  loginSubtitle: { fontSize: 12, color: "var(--muted)", marginTop: -8, marginBottom: 6 },
   loginInput: {
-    border: "1px solid #E4D2D2",
-    background: "#fff",
+    border: "1px solid var(--border-strong)",
+    background: "var(--surface)",
     borderRadius: 8,
     padding: "10px 12px",
     fontSize: 14,
     textAlign: "center",
     width: "100%",
   },
-  loginError: { color: "#9B2226", fontSize: 12, textAlign: "center" },
+  loginError: { color: "var(--danger-text)", fontSize: 12, textAlign: "center" },
   loginBtn: {
     background: "#AE1E1D",
     color: "#fff",
@@ -2662,9 +2727,9 @@ const styles = {
   navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
   subNav: { display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" },
   subNavBtn: {
-    border: "1px solid #E4D2D2",
-    background: "#fff",
-    color: "#76595A",
+    border: "1px solid var(--border-strong)",
+    background: "var(--surface)",
+    color: "var(--muted)",
     padding: "8px 14px",
     borderRadius: 999,
     fontSize: 13,
@@ -2675,15 +2740,15 @@ const styles = {
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
-  subheading: { fontSize: 13, fontWeight: 600, color: "#76595A", margin: "16px 0 8px 0" },
+  subheading: { fontSize: 13, fontWeight: 600, color: "var(--muted)", margin: "16px 0 8px 0" },
   rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 6 },
-  select: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "8px 10px", fontSize: 14, color: "#1C2B22" },
+  select: { border: "1px solid var(--border-strong)", background: "var(--surface)", borderRadius: 8, padding: "8px 10px", fontSize: 14, color: "var(--text)" },
   selectGroup: { display: "flex", flexDirection: "column", gap: 2 },
-  selectGroupLabel: { fontSize: 12, fontWeight: 600, color: "#76595A", textTransform: "uppercase", letterSpacing: "0.03em" },
-  input: { border: "1px solid #E4D2D2", background: "#fff", borderRadius: 8, padding: "10px 12px", fontSize: 14, flex: 1 },
+  selectGroupLabel: { fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.03em" },
+  input: { border: "1px solid var(--border-strong)", background: "var(--surface)", borderRadius: 8, padding: "10px 12px", fontSize: 14, flex: 1 },
   textarea: {
-    border: "1px solid #E4D2D2",
-    background: "#fff",
+    border: "1px solid var(--border-strong)",
+    background: "var(--surface)",
     borderRadius: 8,
     padding: "8px 10px",
     fontSize: 13,
@@ -2693,17 +2758,17 @@ const styles = {
     resize: "vertical",
   },
   addRow: { display: "flex", gap: 8, marginBottom: 16 },
-  tableWrap: { overflowX: "auto", background: "#fff", borderRadius: 12, border: "1px solid #EADADA", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  tableWrap: { overflowX: "auto", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
-  th: { textAlign: "left", padding: "10px 12px", color: "#76595A", fontWeight: 600, fontSize: 12, borderBottom: "1px solid #EADADA" },
-  td: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9" },
-  tdName: { padding: "10px 12px", borderBottom: "1px solid #F3E9E9", display: "flex", alignItems: "center", gap: 8, fontWeight: 500 },
+  th: { textAlign: "left", padding: "10px 12px", color: "var(--muted)", fontWeight: 600, fontSize: 12, borderBottom: "1px solid var(--border)" },
+  td: { padding: "10px 12px", borderBottom: "1px solid var(--divider)" },
+  tdName: { padding: "10px 12px", borderBottom: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 8, fontWeight: 500 },
   rank: {
     width: 20,
     height: 20,
     borderRadius: 6,
-    background: "#F3E9E9",
-    color: "#76595A",
+    background: "var(--divider)",
+    color: "var(--muted)",
     fontSize: 12,
     display: "inline-flex",
     alignItems: "center",
@@ -2717,24 +2782,24 @@ const styles = {
     padding: 0,
     font: "inherit",
     fontWeight: 500,
-    color: "#1C2B22",
+    color: "var(--text)",
     textDecoration: "underline",
-    textDecorationColor: "#E4D2D2",
+    textDecorationColor: "var(--border-strong)",
     cursor: "pointer",
   },
-  card: { background: "#fff", border: "1px solid #EADADA", borderRadius: 12, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardName: { fontWeight: 600, fontSize: 15 },
-  mutedTag: { color: "#B08A8A", fontWeight: 400, fontSize: 13 },
+  mutedTag: { color: "var(--muted-2)", fontWeight: 400, fontSize: 13 },
   pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
   fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
-  label: { fontSize: 13, color: "#76595A", minWidth: 130 },
+  label: { fontSize: 13, color: "var(--muted)", minWidth: 130 },
   range: { flex: 1, accentColor: "#AE1E1D", minWidth: 100 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
-  chip: { border: "1px solid #E4D2D2", background: "#fff", color: "#76595A", minHeight: 44, padding: "10px 16px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
+  chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 16px", borderRadius: 999, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "#AE1E1D", color: "#fff", borderColor: "#AE1E1D" },
-  chipRemove: { background: "transparent", border: "none", color: "#9B2226", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
+  chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   primaryBtn: {
     background: "#AE1E1D",
     color: "#fff",
@@ -2751,18 +2816,18 @@ const styles = {
   stickyBar: {
     position: "sticky",
     bottom: 0,
-    background: "#F7F4F3",
+    background: "var(--bg)",
     paddingTop: 12,
     paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
     marginTop: 16,
     boxShadow: "0 -8px 12px -8px rgba(0,0,0,0.15)",
   },
   secondaryBtn: { background: "#7A1310", color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", height: 40, fontSize: 14, fontWeight: 600, cursor: "pointer" },
-  linkBtn: { background: "transparent", border: "none", color: "#AE1E1D", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 },
-  basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3E9E9", display: "flex", flexDirection: "column", gap: 8 },
+  linkBtn: { background: "transparent", border: "none", color: "var(--accent-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 },
+  basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
-  empty: { background: "#fff", border: "1px dashed #E4D2D2", borderRadius: 12, padding: 24, textAlign: "center", color: "#76595A", fontSize: 14 },
-  hint: { fontSize: 13, color: "#76595A", marginTop: -4, marginBottom: 6 },
+  empty: { background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 14 },
+  hint: { fontSize: 13, color: "var(--muted)", marginTop: -4, marginBottom: 6 },
   toast: {
     position: "fixed",
     bottom: 20,
@@ -2813,35 +2878,35 @@ const styles = {
     zIndex: 70,
   },
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
-  statBox: { flex: "1 1 90px", background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
-  statValue: { fontSize: 18, fontWeight: 700, color: "#AE1E1D", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
-  statLabel: { fontSize: 12, color: "#76595A", marginTop: 2 },
+  statBox: { flex: "1 1 90px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  statValue: { fontSize: 18, fontWeight: 700, color: "var(--accent-text)", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
+  statLabel: { fontSize: 12, color: "var(--muted)", marginTop: 2 },
   sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
-  sparkCard: { background: "#fff", border: "1px solid #EADADA", borderRadius: 10, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  sparkCard: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-  sparkValue: { fontSize: 14, fontWeight: 700, color: "#AE1E1D", fontVariantNumeric: "tabular-nums" },
+  sparkValue: { fontSize: 14, fontWeight: 700, color: "var(--accent-text)", fontVariantNumeric: "tabular-nums" },
   spielRow: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
-    background: "#FBF5F5",
-    border: "1px solid #F3E9E9",
+    background: "var(--surface-2)",
+    border: "1px solid var(--divider)",
     borderRadius: 8,
     padding: "8px 10px",
     fontSize: 13,
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
-  scorerTile: { border: "1px solid #EADADA", borderRadius: 10, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
-  scorerTileActive: { borderColor: "#AE1E1D", background: "#FBEAEA" },
-  scorerName: { background: "transparent", border: "none", padding: 0, minHeight: 44, textAlign: "left", fontSize: 14, fontWeight: 600, color: "#1C2B22", cursor: "pointer" },
+  scorerTile: { border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  scorerTileActive: { borderColor: "#AE1E1D", background: "var(--accent-soft)" },
+  scorerName: { background: "transparent", border: "none", padding: 0, minHeight: 44, textAlign: "left", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" },
   scorerStepper: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  stepBtn: { width: 44, height: 44, borderRadius: 8, border: "1px solid #E4D2D2", background: "#fff", color: "#AE1E1D", fontSize: 20, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
+  stepBtn: { width: 44, height: 44, borderRadius: 8, border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--accent-text)", fontSize: 20, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
   stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center", fontVariantNumeric: "tabular-nums" },
-  editBanner: { background: "#FFF3D6", color: "#7A5A00", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
+  editBanner: { background: "var(--warn-bg)", color: "var(--warn-text)", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
   seasonHint: {
-    background: "#E8F0FE",
-    color: "#1A3D6D",
+    background: "var(--info-bg)",
+    color: "var(--info-text)",
     borderRadius: 8,
     padding: "10px 14px",
     fontSize: 13,
@@ -2862,19 +2927,19 @@ const styles = {
     zIndex: 80,
   },
   modalCard: {
-    background: "#fff",
+    background: "var(--surface)",
     borderRadius: 14,
     padding: 20,
     maxWidth: 380,
     width: "100%",
     boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
   },
-  modalText: { fontSize: 14, color: "#1C2B22", margin: "0 0 18px 0", lineHeight: 1.5 },
+  modalText: { fontSize: 14, color: "var(--text)", margin: "0 0 18px 0", lineHeight: 1.5 },
   modalActions: { display: "flex", justifyContent: "flex-end", gap: 10 },
   secondaryBtnOutline: {
     background: "transparent",
-    color: "#5B4747",
-    border: "1px solid #E4D2D2",
+    color: "var(--text-2)",
+    border: "1px solid var(--border-strong)",
     borderRadius: 8,
     padding: "0 16px",
     height: 40,
