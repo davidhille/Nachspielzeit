@@ -320,6 +320,12 @@ function App() {
   const [trashGegner, setTrashGegner] = useState([]);
   const [trashSpieltage, setTrashSpieltage] = useState([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [settingsPlayerId, setSettingsPlayerId] = useState(null);
+  const openPlayerSettings = (id) => {
+    setSelectedPlayerId(null);
+    setSettingsPlayerId(id);
+    setTab("verwaltung");
+  };
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -461,6 +467,7 @@ function App() {
             gegner={gegner}
             selectedPlayerId={selectedPlayerId}
             onSelectPlayer={setSelectedPlayerId}
+            onOpenSettings={openPlayerSettings}
           />
         )}
         {tab === "training" && (
@@ -623,6 +630,7 @@ function App() {
               setSelectedPlayerId(id);
               setTab("dashboard");
             }}
+            settingsPlayerId={settingsPlayerId}
           />
         )}
       </main>
@@ -731,7 +739,7 @@ function SaisonwechselHinweis({ seasons }) {
 
 /* ---------- Dashboard ---------- */
 
-function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner, selectedPlayerId, onSelectPlayer }) {
+function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner, selectedPlayerId, onSelectPlayer, onOpenSettings }) {
   const months = useMemo(() => {
     const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
     set.add(monthKey(new Date()));
@@ -813,6 +821,7 @@ function Dashboard({ players, basis, trainings, entwicklungen, spieltage, gegner
         spieltage={spieltage}
         month={month}
         onClose={() => onSelectPlayer(null)}
+        onOpenSettings={onOpenSettings}
       />
     );
   }
@@ -970,7 +979,7 @@ function TrainerNotizen({ trainings, players, month }) {
   );
 }
 
-function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose }) {
+function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings }) {
   if (!player) {
     return (
       <section>
@@ -1007,9 +1016,16 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
 
   return (
     <section>
-      <button style={styles.linkBtn} onClick={onClose}>
-        ← Zurück zur Übersicht
-      </button>
+      <div style={styles.rowBetween}>
+        <button style={styles.linkBtn} onClick={onClose}>
+          ← Zurück zur Übersicht
+        </button>
+        {onOpenSettings && (
+          <button style={styles.linkBtn} onClick={() => onOpenSettings(player.id)}>
+            Einstellungen
+          </button>
+        )}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
         <Avatar name={player.name} size={48} photoUrl={player.photo_url} />
         <h2 style={{ ...styles.h2, margin: 0 }}>{player.name}</h2>
@@ -1895,6 +1911,7 @@ function Verwaltung({
   onRestore,
   onHardDelete,
   onOpenPlayer,
+  settingsPlayerId,
 }) {
   const [subTab, setSubTab] = useState("spieler");
   const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
@@ -1932,6 +1949,7 @@ function Verwaltung({
           onUploadPhoto={onUploadPhoto}
           onRemovePhoto={onRemovePhoto}
           onOpenPlayer={onOpenPlayer}
+          initialOpenId={settingsPlayerId}
         />
       )}
       {subTab === "trainingsplan" && (
@@ -2069,9 +2087,20 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
   );
 }
 
-function SpielerBereich({ players, basis, onAdd, onToggleActive, onRemove, onBasisChange, onUploadPhoto, onRemovePhoto, onOpenPlayer }) {
+function SpielerBereich({
+  players,
+  basis,
+  onAdd,
+  onToggleActive,
+  onRemove,
+  onBasisChange,
+  onUploadPhoto,
+  onRemovePhoto,
+  onOpenPlayer,
+  initialOpenId,
+}) {
   const [name, setName] = useState("");
-  const [openId, setOpenId] = useState(null);
+  const [openId, setOpenId] = useState(initialOpenId || null);
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const fileInputRef = useRef(null);
 
