@@ -2536,6 +2536,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
   const [wochentage, setWochentage] = useState([2, 4]);
   const [wochen, setWochen] = useState(8);
   const [startDatum, setStartDatum] = useState(todayISO());
+  const [terminTab, setTerminTab] = useState("kommende");
 
   const toggleWochentag = (idx) => {
     setWochentage((w) => (w.includes(idx) ? w.filter((x) => x !== idx) : [...w, idx].sort()));
@@ -2615,25 +2616,44 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
         </div>
       )}
 
-      {kommende.length > 0 && (
+      {sortiert.length > 0 && (
         <>
-          <div style={styles.subheading}>Kommende Termine</div>
-          <div style={styles.cardList}>
-            {kommende.map((t) => (
-              <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
-            ))}
+          <div style={{ ...styles.subNav, marginTop: 16 }}>
+            <button
+              onClick={() => setTerminTab("kommende")}
+              style={{ ...styles.subNavBtn, ...(terminTab === "kommende" ? styles.subNavBtnActive : {}) }}
+            >
+              Kommende Termine{kommende.length > 0 ? ` (${kommende.length})` : ""}
+            </button>
+            <button
+              onClick={() => setTerminTab("vergangene")}
+              style={{ ...styles.subNavBtn, ...(terminTab === "vergangene" ? styles.subNavBtnActive : {}) }}
+            >
+              Vergangene Termine{vergangene.length > 0 ? ` (${vergangene.length})` : ""}
+            </button>
           </div>
-        </>
-      )}
 
-      {vergangene.length > 0 && (
-        <>
-          <div style={styles.subheading}>Vergangene Termine</div>
-          <div style={styles.cardList}>
-            {vergangene.map((t) => (
-              <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+          {terminTab === "kommende" &&
+            (kommende.length > 0 ? (
+              <div style={styles.cardList}>
+                {kommende.map((t) => (
+                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="Keine kommenden Termine." />
             ))}
-          </div>
+
+          {terminTab === "vergangene" &&
+            (vergangene.length > 0 ? (
+              <div style={styles.cardList}>
+                {vergangene.map((t) => (
+                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="Keine vergangenen Termine." />
+            ))}
         </>
       )}
     </div>
@@ -3168,11 +3188,12 @@ const styles = {
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
-    background: "var(--surface-2)",
-    border: "1px solid var(--divider)",
-    borderRadius: 8,
-    padding: "8px 10px",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 12,
+    padding: "10px 12px",
     fontSize: 13,
+    boxShadow: "0 1px 3px rgba(32,22,22,0.04)",
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
   scorerTile: { border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
