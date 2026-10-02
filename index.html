@@ -283,10 +283,12 @@ function trainingPunkte(entry) {
   return (Number(entry.vorkommnis) || 0) + KARTEN[entry.karte] + TEILNAHME[entry.teilnahme];
 }
 
-function basisNachMonat(playerId, basis, entwicklungen, monatKeyInklusiv) {
+function basisNachMonat(playerId, basis, entwicklungen, monatKey) {
+  // Eine Monatsentwicklung wirkt laut UI-Hinweis "ab dem Folgemonat" — also
+  // dieselbe exklusive Grenze wie aktuelleBasis, nicht inklusive des eigenen Monats.
   const grund = Number(basis[playerId]) || 0;
   const bonus = entwicklungen
-    .filter((e) => e.playerId === playerId && e.month <= monatKeyInklusiv)
+    .filter((e) => e.playerId === playerId && e.month < monatKey)
     .reduce((sum, e) => sum + Number(e.punkte || 0), 0);
   return grund + bonus;
 }
@@ -470,7 +472,6 @@ function App() {
           kommentar: t.kommentar || "",
         }))
       );
-      console.log("DEBUG entwicklungen (roh aus DB):", entwRaw);
       setEntwicklungen(
         entwRaw.map((e) => ({ id: e.id, month: String(e.month).slice(0, 7), playerId: e.player_id, punkte: Number(e.punkte) }))
       );
