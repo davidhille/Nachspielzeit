@@ -2496,7 +2496,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
   return (
     <div style={{ marginTop: 4 }}>
       <h3 style={styles.h3}>Material</h3>
-      <p style={styles.hint}>
+      <p style={{ ...styles.hint, marginBottom: 16 }}>
         Trage zu einem Datum die gezählte Menge ein. So lässt sich im Verlauf erkennen, in welchem Zeitraum etwas
         weniger wurde.
       </p>
