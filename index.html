@@ -2565,10 +2565,12 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
                     </button>
                   </div>
 
-                  {verlauf.length === 0 && <EmptyState text="Noch keine Erfassung für dieses Material." />}
+                  <div style={{ marginTop: 16 }}>
+                    {verlauf.length === 0 && <EmptyState text="Noch keine Erfassung für dieses Material." />}
+                  </div>
 
                   {verlauf.length > 0 && (
-                    <div style={{ marginTop: 10 }}>
+                    <div style={{ marginTop: 16 }}>
                       <div style={styles.subheading}>Verlauf</div>
                       {verlauf.map((eintrag, idx) => {
                         const vorheriger = verlauf[idx + 1];
