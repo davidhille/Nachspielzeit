@@ -233,6 +233,30 @@ const TEILNAHME_LABEL = {
 };
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
+const MATERIAL_GRUPPEN = [
+  {
+    label: "Trainingsequipment",
+    items: [
+      ["baelle", "Bälle"],
+      ["huetchen", "Hütchen"],
+      ["floormarker", "Floormarker"],
+      ["getraenkehalter", "Getränkehalter"],
+      ["spruehflaschen", "Sprühflaschen"],
+      ["verbandsmaterial", "Verbandsmaterial"],
+    ],
+  },
+  {
+    label: "Trikots",
+    items: [
+      ["trikots", "Trikots"],
+      ["hosen", "Hosen"],
+      ["stutzen", "Stutzen"],
+    ],
+  },
+];
+const MATERIAL_TYPEN = MATERIAL_GRUPPEN.flatMap((g) => g.items);
+const MATERIAL_LABEL = Object.fromEntries(MATERIAL_TYPEN);
+
 const toLocalISODate = (d) => {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -379,6 +403,7 @@ function App() {
   const [gegner, setGegner] = useState([]);
   const [spieltage, setSpieltage] = useState([]);
   const [termine, setTermine] = useState([]);
+  const [material, setMaterial] = useState([]);
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
   const [trashSpieltage, setTrashSpieltage] = useState([]);
@@ -441,7 +466,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -454,6 +479,7 @@ function App() {
           dbSelect("torschuetzen"),
           dbSelect("spieltag_gegner"),
           dbSelect("spieltag_teilnehmer"),
+          dbSelect("material_bestand"),
         ]);
       setPlayers(playersRaw.filter((p) => !p.deleted_at));
       setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
@@ -497,6 +523,14 @@ function App() {
       }));
       setSpieltage(spieltageFull.filter((s) => !s.deletedAt));
       setTrashSpieltage(spieltageFull.filter((s) => s.deletedAt));
+      setMaterial(
+        materialRaw.map((m) => ({
+          id: m.id,
+          date: String(m.date).slice(0, 10),
+          material: m.material,
+          menge: Number(m.menge),
+        }))
+      );
       setError("");
     } catch (e) {
       console.error(e);
@@ -746,6 +780,11 @@ function App() {
               setTab("dashboard");
             }}
             settingsPlayerId={settingsPlayerId}
+            material={material}
+            onSaveBestand={(materialKey, date, menge) =>
+              wrapAction(() => dbUpsert("material_bestand", { date, material: materialKey, menge }, "date,material"))
+            }
+            onDeleteMaterialEintrag={(id) => wrapAction(() => dbDelete("material_bestand", id))}
           />
         )}
       </main>
@@ -2236,6 +2275,9 @@ function Verwaltung({
   onHardDelete,
   onOpenPlayer,
   settingsPlayerId,
+  material,
+  onSaveBestand,
+  onDeleteMaterialEintrag,
 }) {
   const [subTab, setSubTab] = useState("spieler");
   const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
@@ -2243,6 +2285,7 @@ function Verwaltung({
     ["spieler", "Spieler"],
     ["trainingsplan", "Trainingsplan"],
     ["gegner", "Gegner"],
+    ["material", "Material"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ];
 
@@ -2291,6 +2334,13 @@ function Verwaltung({
           onRemoveGegner={onRemoveGegner}
           spieltage={spieltage}
           onToggleGegnerZuordnung={onToggleGegnerZuordnung}
+        />
+      )}
+      {subTab === "material" && (
+        <MaterialBereich
+          material={material}
+          onSaveBestand={onSaveBestand}
+          onDeleteMaterialEintrag={onDeleteMaterialEintrag}
         />
       )}
       {subTab === "papierkorb" && (
@@ -2416,6 +2466,160 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
+  const [gruppe, setGruppe] = useState(MATERIAL_GRUPPEN[0].label);
+  const [openKey, setOpenKey] = useState(null);
+  const [formDate, setFormDate] = useState(todayISO());
+  const [formMenge, setFormMenge] = useState("");
+
+  const aktuelleGruppe = MATERIAL_GRUPPEN.find((g) => g.label === gruppe) || MATERIAL_GRUPPEN[0];
+
+  const verlaufFuer = (key) =>
+    material.filter((m) => m.material === key).sort((a, b) => b.date.localeCompare(a.date));
+
+  const aktuellerBestand = (key) => {
+    const eintraege = verlaufFuer(key);
+    return eintraege.length > 0 ? eintraege[0].menge : null;
+  };
+
+  const speichern = (key) => {
+    const menge = Number(formMenge);
+    if (!formDate || formMenge === "" || Number.isNaN(menge) || menge < 0) return;
+    onSaveBestand(key, formDate, menge);
+    setFormMenge("");
+  };
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <h3 style={styles.h3}>Material</h3>
+      <p style={styles.hint}>
+        Trage zu einem Datum die gezählte Menge ein. So lässt sich im Verlauf erkennen, in welchem Zeitraum etwas
+        weniger wurde.
+      </p>
+
+      <div style={styles.subNav}>
+        {MATERIAL_GRUPPEN.map((g) => (
+          <button
+            key={g.label}
+            onClick={() => setGruppe(g.label)}
+            style={{ ...styles.subNavBtn, ...(gruppe === g.label ? styles.subNavBtnActive : {}) }}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={styles.cardList}>
+        {aktuelleGruppe.items.map(([key, label]) => {
+          const bestand = aktuellerBestand(key);
+          const offen = openKey === key;
+          const verlauf = verlaufFuer(key);
+          return (
+            <div key={key} style={styles.card}>
+              <div style={styles.cardHead}>
+                <span style={styles.cardName}>
+                  {label}
+                  <span style={styles.mutedTag}> · {bestand !== null ? `${bestand} Stück` : "noch nicht erfasst"}</span>
+                </span>
+                <div style={styles.cardActions}>
+                  <button
+                    style={styles.iconBtn}
+                    title={offen ? "Schließen" : "Verlauf & erfassen"}
+                    aria-label={offen ? "Schließen" : "Verlauf & erfassen"}
+                    onClick={() => {
+                      setOpenKey(offen ? null : key);
+                      setFormDate(todayISO());
+                      setFormMenge("");
+                    }}
+                  >
+                    <SettingsIcon size={15} />
+                  </button>
+                </div>
+              </div>
+
+              {offen && (
+                <div>
+                  <div style={styles.fieldRow}>
+                    <label style={styles.label}>Datum</label>
+                    <input
+                      type="date"
+                      style={{ ...styles.input, flex: "none", width: 160 }}
+                      value={formDate}
+                      onChange={(e) => setFormDate(e.target.value)}
+                    />
+                    <label style={styles.label}>Menge</label>
+                    <input
+                      type="number"
+                      min={0}
+                      style={{ ...styles.input, flex: "none", width: 90 }}
+                      value={formMenge}
+                      onChange={(e) => setFormMenge(e.target.value)}
+                      placeholder={bestand !== null ? String(bestand) : "0"}
+                    />
+                    <button style={styles.secondaryBtn} onClick={() => speichern(key)}>
+                      Speichern
+                    </button>
+                  </div>
+
+                  {verlauf.length === 0 && <EmptyState text="Noch keine Erfassung für dieses Material." />}
+
+                  {verlauf.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={styles.subheading}>Verlauf</div>
+                      {verlauf.map((eintrag, idx) => {
+                        const vorheriger = verlauf[idx + 1];
+                        const delta = vorheriger ? eintrag.menge - vorheriger.menge : null;
+                        return (
+                          <div
+                            key={eintrag.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "6px 0",
+                              borderBottom: "1px solid var(--border)",
+                              fontSize: 13,
+                            }}
+                          >
+                            <span>
+                              {new Date(eintrag.date + "T00:00:00").toLocaleDateString("de-DE", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })}
+                              {" · "}
+                              <strong>{eintrag.menge}</strong> Stück
+                              {delta !== null && delta !== 0 && (
+                                <span style={{ color: delta < 0 ? "var(--danger-text)" : "var(--muted)", marginLeft: 6 }}>
+                                  {delta > 0 ? `+${delta}` : delta}
+                                </span>
+                              )}
+                            </span>
+                            <button
+                              style={{ ...styles.iconBtn, ...styles.iconBtnDanger }}
+                              title="Eintrag löschen"
+                              aria-label="Eintrag löschen"
+                              onClick={() =>
+                                confirmAnd("Diesen Eintrag löschen?", () => onDeleteMaterialEintrag(eintrag.id))
+                              }
+                            >
+                              <TrashIcon size={13} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
