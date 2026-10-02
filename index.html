@@ -471,7 +471,7 @@ function App() {
         }))
       );
       setEntwicklungen(
-        entwRaw.map((e) => ({ id: e.id, month: e.month, playerId: e.player_id, punkte: Number(e.punkte) }))
+        entwRaw.map((e) => ({ id: e.id, month: String(e.month).slice(0, 7), playerId: e.player_id, punkte: Number(e.punkte) }))
       );
       setGegner(gegnerRaw.filter((g) => !g.deleted_at));
       setTrashGegner(gegnerRaw.filter((g) => g.deleted_at));
