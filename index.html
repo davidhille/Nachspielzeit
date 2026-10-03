@@ -235,6 +235,7 @@ const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 const MATERIAL_GRUPPEN = [
   {
+    id: "trainingsequipment",
     label: "Trainingsequipment",
     items: [
       ["baelle", "Bälle"],
@@ -246,6 +247,7 @@ const MATERIAL_GRUPPEN = [
     ],
   },
   {
+    id: "trikots",
     label: "Trikots",
     items: [
       ["trikots", "Trikots"],
@@ -530,6 +532,7 @@ function App() {
           date: String(m.date).slice(0, 10),
           material: m.material,
           menge: Number(m.menge),
+          gruppe: m.gruppe || null,
         }))
       );
       setError("");
@@ -790,8 +793,10 @@ function App() {
             }}
             settingsPlayerId={settingsPlayerId}
             material={material}
-            onSaveBestand={(materialKey, date, menge) =>
-              wrapAction(() => dbUpsert("material_bestand", { date, material: materialKey, menge }, "date,material"))
+            onSaveBestand={(materialKey, date, menge, gruppe) =>
+              wrapAction(() =>
+                dbUpsert("material_bestand", { date, material: materialKey, menge, gruppe }, "date,material")
+              )
             }
             onDeleteMaterialEintrag={(id) => wrapAction(() => dbDelete("material_bestand", id))}
           />
@@ -2703,12 +2708,14 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
 }
 
 function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
-  const [gruppe, setGruppe] = useState(MATERIAL_GRUPPEN[0].label);
+  const [gruppeId, setGruppeId] = useState(MATERIAL_GRUPPEN[0].id);
   const [openKey, setOpenKey] = useState(null);
   const [formDate, setFormDate] = useState(todayISO());
   const [formMenge, setFormMenge] = useState("");
+  const [customDrafts, setCustomDrafts] = useState([]);
+  const [neuesMaterial, setNeuesMaterial] = useState("");
 
-  const aktuelleGruppe = MATERIAL_GRUPPEN.find((g) => g.label === gruppe) || MATERIAL_GRUPPEN[0];
+  const aktuelleGruppe = MATERIAL_GRUPPEN.find((g) => g.id === gruppeId) || MATERIAL_GRUPPEN[0];
 
   const verlaufFuer = (key) =>
     material.filter((m) => m.material === key).sort((a, b) => b.date.localeCompare(a.date));
@@ -2718,10 +2725,39 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
     return eintraege.length > 0 ? eintraege[0].menge : null;
   };
 
+  const bekannteKeys = new Set(MATERIAL_TYPEN.map(([k]) => k));
+  const eigeneAusDaten = Array.from(
+    new Set(
+      material.filter((m) => !bekannteKeys.has(m.material) && m.gruppe === aktuelleGruppe.id).map((m) => m.material)
+    )
+  );
+  const eigeneEntwuerfe = customDrafts
+    .filter((d) => d.gruppeId === aktuelleGruppe.id && !eigeneAusDaten.includes(d.name))
+    .map((d) => d.name);
+  const items = [
+    ...aktuelleGruppe.items,
+    ...[...eigeneAusDaten, ...eigeneEntwuerfe].map((name) => [name, name]),
+  ];
+
   const speichern = (key) => {
     const menge = Number(formMenge);
     if (!formDate || formMenge === "" || Number.isNaN(menge) || menge < 0) return;
-    onSaveBestand(key, formDate, menge);
+    onSaveBestand(key, formDate, menge, aktuelleGruppe.id);
+    setFormMenge("");
+  };
+
+  const materialHinzufuegen = () => {
+    const name = neuesMaterial.trim();
+    if (!name) return;
+    const existiertSchon = items.some(([, label]) => label.toLowerCase() === name.toLowerCase());
+    setNeuesMaterial("");
+    if (existiertSchon) {
+      setOpenKey(items.find(([, label]) => label.toLowerCase() === name.toLowerCase())[0]);
+      return;
+    }
+    setCustomDrafts((d) => [...d, { name, gruppeId: aktuelleGruppe.id }]);
+    setOpenKey(name);
+    setFormDate(todayISO());
     setFormMenge("");
   };
 
@@ -2736,9 +2772,9 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
       <div style={styles.subNav}>
         {MATERIAL_GRUPPEN.map((g) => (
           <button
-            key={g.label}
-            onClick={() => setGruppe(g.label)}
-            style={{ ...styles.subNavBtn, ...(gruppe === g.label ? styles.subNavBtnActive : {}) }}
+            key={g.id}
+            onClick={() => setGruppeId(g.id)}
+            style={{ ...styles.subNavBtn, ...(gruppeId === g.id ? styles.subNavBtnActive : {}) }}
           >
             {g.label}
           </button>
@@ -2746,7 +2782,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
       </div>
 
       <div style={styles.cardList}>
-        {aktuelleGruppe.items.map(([key, label]) => {
+        {items.map(([key, label]) => {
           const bestand = aktuellerBestand(key);
           const offen = openKey === key;
           const verlauf = verlaufFuer(key);
@@ -2853,6 +2889,21 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
             </div>
           );
         })}
+      </div>
+
+      <div style={{ ...styles.addRow, marginTop: 4 }}>
+        <input
+          style={styles.input}
+          placeholder={`Weiteres Material bei "${aktuelleGruppe.label}" hinzufügen`}
+          value={neuesMaterial}
+          onChange={(e) => setNeuesMaterial(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && neuesMaterial.trim()) materialHinzufuegen();
+          }}
+        />
+        <button style={styles.secondaryBtn} onClick={materialHinzufuegen} disabled={!neuesMaterial.trim()}>
+          Hinzufügen
+        </button>
       </div>
     </div>
   );
