@@ -2299,7 +2299,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
               <TrashIcon size={14} /> Entfernen
             </button>
           </div>
-          {spieltag.date < todayISO() && (
+          {spieltag.spiele.length > 0 && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#2E7D32" }}>
               <span
                 style={{
