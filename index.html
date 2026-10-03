@@ -718,6 +718,10 @@ function App() {
               })
             }
             onUpdateNotizen={(spieltagId, notizen) => wrapAction(() => dbUpdate("spieltage", spieltagId, { notizen }))}
+            onOpenPlayer={(id) => {
+              setSelectedPlayerId(id);
+              setTab("dashboard");
+            }}
           />
         )}
         {tab === "verwaltung" && (
@@ -1816,7 +1820,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen }) {
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onOpenPlayer }) {
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const [subTab, setSubTab] = useState("liste");
@@ -1902,10 +1906,17 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
           {uebersicht.length === 0 && <EmptyState text="Noch keine Daten vorhanden." />}
           {uebersicht.length > 0 && (
             <div style={styles.cardList}>
-              {uebersicht.map((p) => (
+              {uebersicht.map((p) => {
+                const player = players.find((pl) => pl.id === p.id);
+                return (
                 <div key={p.id} style={styles.card}>
                   <div style={styles.cardHead}>
-                    <span style={styles.cardName}>{p.name}</span>
+                    <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
+                      <Avatar name={p.name} size={26} photoUrl={player?.photo_url} />
+                      <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
+                        {p.name}
+                      </button>
+                    </span>
                     <div style={{ display: "flex", gap: 16, fontSize: 13, color: "var(--muted)", flexShrink: 0 }}>
                       <span>
                         <strong style={{ color: "var(--text)" }}>{p.spiele}</strong> Spiele
@@ -1919,7 +1930,8 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
