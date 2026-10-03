@@ -2205,11 +2205,13 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
               </div>
             </div>
 
-            <div style={styles.fieldRow}>
+            <div style={{ marginTop: 8 }}>
               <label style={styles.label}>Ergebnis (Wir : Gegner)</label>
-              <GoalStepper value={ourGoals} onChange={setOurGoals} />
-              <span>:</span>
-              <GoalStepper value={theirGoals} onChange={setTheirGoals} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                <GoalStepper value={ourGoals} onChange={setOurGoals} />
+                <span>:</span>
+                <GoalStepper value={theirGoals} onChange={setTheirGoals} />
+              </div>
             </div>
 
             <div style={{ marginTop: 4 }}>
