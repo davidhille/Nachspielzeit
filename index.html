@@ -506,6 +506,7 @@ function App() {
       const spieltageFull = spieltageRaw.map((s) => ({
         id: s.id,
         date: s.date,
+        notizen: s.notizen || "",
         deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
         teilnehmer: stRaw.filter((t) => t.spieltag_id === s.id).map((t) => t.player_id),
@@ -716,6 +717,7 @@ function App() {
                 }
               })
             }
+            onUpdateNotizen={(spieltagId, notizen) => wrapAction(() => dbUpdate("spieltage", spieltagId, { notizen }))}
           />
         )}
         {tab === "verwaltung" && (
@@ -1814,7 +1816,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen }) {
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const [subTab, setSubTab] = useState("liste");
@@ -1885,6 +1887,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
                 onUpdateSpiel={(spiel) => onUpdateSpiel(s.id, spiel)}
                 onRemoveSpiel={(spielId) => onRemoveSpiel(s.id, spielId)}
                 onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
+                onUpdateNotizen={(notizen) => onUpdateNotizen(s.id, notizen)}
               />
             ))}
           </div>
@@ -2077,7 +2080,60 @@ function SpieltagZusammenfassung({ spiele }) {
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer }) {
+function SpieltagNotizen({ value, onSave }) {
+  const [text, setText] = useState(value || "");
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    setText(value || "");
+  }, [value]);
+
+  const dirty = text !== (value || "");
+
+  const insertBullet = () => {
+    const el = textareaRef.current;
+    const start = el ? el.selectionStart : text.length;
+    const end = el ? el.selectionEnd : text.length;
+    const before = text.slice(0, start);
+    const after = text.slice(end);
+    const needsNewline = before.length > 0 && !before.endsWith("\n");
+    const insertion = (needsNewline ? "\n" : "") + "• ";
+    const next = before + insertion + after;
+    setText(next);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = (before + insertion).length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <label style={styles.label}>Notizen</label>
+        <button type="button" style={{ ...styles.linkBtn, flexShrink: 0 }} onClick={insertBullet}>
+          • Aufzählung
+        </button>
+      </div>
+      <textarea
+        ref={textareaRef}
+        style={{ ...styles.textarea, marginTop: 6 }}
+        rows={4}
+        placeholder="Beobachtungen zu diesem Spieltag …"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      {dirty && (
+        <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={() => onSave(text)}>
+          Speichern
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -2222,6 +2278,8 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
               })}
             </div>
           )}
+
+          <SpieltagNotizen value={spieltag.notizen} onSave={onUpdateNotizen} />
 
           <div style={{ marginBottom: 14 }}>
             <label style={styles.label}>Kader an diesem Spieltag</label>
