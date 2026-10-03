@@ -1268,7 +1268,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
         <Avatar name={player.name} size={48} photoUrl={player.photo_url} />
         <h2 style={{ ...styles.h2, margin: 0 }}>{player.name}</h2>
-        <JerseyBadge number={player.trikotnummer} size={34} />
+        <JerseyBadge number={player.trikotnummer} size={42} />
       </div>
 
       <div style={{ ...styles.statsRow, marginTop: 14 }}>
@@ -2940,7 +2940,7 @@ function SpielerBereich({
                   <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
                     {p.name}
                   </button>
-                  <JerseyBadge number={p.trikotnummer} size={30} />
+                  <JerseyBadge number={p.trikotnummer} size={36} />
                   {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
                 </span>
                 <div style={styles.cardActions}>
@@ -3003,7 +3003,7 @@ function SpielerBereich({
                         onTrikotnummerChange(p.id, e.target.value === "" ? null : Number(e.target.value))
                       }
                     />
-                    <JerseyBadge number={p.trikotnummer} size={36} />
+                    <JerseyBadge number={p.trikotnummer} size={42} />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <button
