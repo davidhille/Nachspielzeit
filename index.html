@@ -1824,6 +1824,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const [subTab, setSubTab] = useState("liste");
+  const [uebersichtSort, setUebersichtSort] = useState("spiele");
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
 
   const uebersicht = useMemo(() => {
@@ -1842,10 +1843,13 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
         });
       });
     });
-    return Object.values(stats)
-      .map((p) => ({ ...p, quote: p.spiele > 0 ? p.tore / p.spiele : 0 }))
-      .sort((a, b) => b.spiele - a.spiele || b.tore - a.tore || a.name.localeCompare(b.name));
-  }, [players, spieltage]);
+    const mitQuote = Object.values(stats).map((p) => ({ ...p, quote: p.spiele > 0 ? p.tore / p.spiele : 0 }));
+    return mitQuote.sort((a, b) =>
+      uebersichtSort === "quote"
+        ? b.quote - a.quote || b.spiele - a.spiele || a.name.localeCompare(b.name)
+        : b.spiele - a.spiele || b.tore - a.tore || a.name.localeCompare(b.name)
+    );
+  }, [players, spieltage, uebersichtSort]);
 
   return (
     <section>
@@ -1900,9 +1904,24 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
 
       {subTab === "uebersicht" && (
         <div style={{ marginTop: 4 }}>
-          <p style={{ ...styles.hint, marginBottom: 16 }}>
+          <p style={{ ...styles.hint, marginBottom: 10 }}>
             Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
           </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <span style={styles.label}>Sortieren nach</span>
+            <button
+              onClick={() => setUebersichtSort("spiele")}
+              style={{ ...styles.chip, ...(uebersichtSort === "spiele" ? styles.chipActive : {}) }}
+            >
+              Spiele
+            </button>
+            <button
+              onClick={() => setUebersichtSort("quote")}
+              style={{ ...styles.chip, ...(uebersichtSort === "quote" ? styles.chipActive : {}) }}
+            >
+              Tore/Spiel
+            </button>
+          </div>
           {uebersicht.length === 0 && <EmptyState text="Noch keine Daten vorhanden." />}
           {uebersicht.length > 0 && (
             <div style={styles.cardList}>
