@@ -1217,6 +1217,8 @@ function TrainerNotizen({ trainings, players, month }) {
 }
 
 function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings }) {
+  const [historieTab, setHistorieTab] = useState("training");
+
   if (!player) {
     return (
       <section>
@@ -1292,55 +1294,70 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         </div>
       </div>
 
-      <div style={styles.subheading}>Trainingshistorie {saison ? saison.replace("-", "/") : ""}</div>
-      {saisonTrainings.length === 0 ? (
-        <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison." />
-      ) : (
-        <div style={styles.cardList}>
-          {saisonTrainings.map((t) => (
-            <div key={t.id} style={styles.card}>
-              <div style={styles.cardHead}>
-                <span style={styles.cardName}>{formatTerminLabel(t.date)}</span>
-                <span
-                  style={{
-                    ...styles.pill,
-                    background: trainingPunkte(t) >= 0 ? "var(--pos-bg)" : "var(--neg-bg)",
-                    color: trainingPunkte(t) >= 0 ? "var(--pos-text)" : "var(--danger-text)",
-                  }}
-                >
-                  {trainingPunkte(t) >= 0 ? "+" : ""}
-                  {trainingPunkte(t).toFixed(2)} Pkt.
-                </span>
-              </div>
-              <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                {TEILNAHME_LABEL[t.teilnahme]}
-                {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
-              </div>
-              {t.kommentar && <div style={{ marginTop: 6, fontSize: 13 }}>{t.kommentar}</div>}
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ ...styles.subNav, marginTop: 16 }}>
+        <button
+          onClick={() => setHistorieTab("training")}
+          style={{ ...styles.subNavBtn, ...(historieTab === "training" ? styles.subNavBtnActive : {}) }}
+        >
+          Training {saison ? saison.replace("-", "/") : ""}
+        </button>
+        <button
+          onClick={() => setHistorieTab("spieltage")}
+          style={{ ...styles.subNavBtn, ...(historieTab === "spieltage" ? styles.subNavBtnActive : {}) }}
+        >
+          Spieltag-Teilnahmen
+        </button>
+      </div>
 
-      <div style={styles.subheading}>Spieltag-Teilnahmen</div>
-      {spieltageDabei.length === 0 ? (
-        <EmptyState text="Noch an keinem Spieltag teilgenommen." />
-      ) : (
-        <div style={styles.cardList}>
-          {spieltageDabei.map((s) => {
-            const toreAnDiesemTag = s.spiele
-              .flatMap((sp) => sp.scorers)
-              .filter((sc) => sc.playerId === player.id)
-              .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
-            return (
-              <div key={s.id} style={styles.spielRow}>
-                <div>{formatTerminLabel(s.date)}</div>
-                <div>{toreAnDiesemTag > 0 ? `${toreAnDiesemTag} Tor(e)` : ""}</div>
+      {historieTab === "training" &&
+        (saisonTrainings.length === 0 ? (
+          <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison." />
+        ) : (
+          <div style={styles.cardList}>
+            {saisonTrainings.map((t) => (
+              <div key={t.id} style={styles.card}>
+                <div style={styles.cardHead}>
+                  <span style={styles.cardName}>{formatTerminLabel(t.date)}</span>
+                  <span
+                    style={{
+                      ...styles.pill,
+                      background: trainingPunkte(t) >= 0 ? "var(--pos-bg)" : "var(--neg-bg)",
+                      color: trainingPunkte(t) >= 0 ? "var(--pos-text)" : "var(--danger-text)",
+                    }}
+                  >
+                    {trainingPunkte(t) >= 0 ? "+" : ""}
+                    {trainingPunkte(t).toFixed(2)} Pkt.
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                  {TEILNAHME_LABEL[t.teilnahme]}
+                  {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
+                </div>
+                {t.kommentar && <div style={{ marginTop: 6, fontSize: 13 }}>{t.kommentar}</div>}
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        ))}
+
+      {historieTab === "spieltage" &&
+        (spieltageDabei.length === 0 ? (
+          <EmptyState text="Noch an keinem Spieltag teilgenommen." />
+        ) : (
+          <div style={styles.cardList}>
+            {spieltageDabei.map((s) => {
+              const toreAnDiesemTag = s.spiele
+                .flatMap((sp) => sp.scorers)
+                .filter((sc) => sc.playerId === player.id)
+                .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
+              return (
+                <div key={s.id} style={styles.spielRow}>
+                  <div>{formatTerminLabel(s.date)}</div>
+                  <div>{toreAnDiesemTag > 0 ? `${toreAnDiesemTag} Tor(e)` : ""}</div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
     </section>
   );
 }
