@@ -397,7 +397,13 @@ function Root() {
 /* ---------- App ---------- */
 
 function App() {
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem("nsz_tab") || "dashboard";
+    } catch {
+      return "dashboard";
+    }
+  });
   const [players, setPlayers] = useState([]);
   const [basis, setBasis] = useState({});
   const [trainings, setTrainings] = useState([]);
@@ -409,8 +415,27 @@ function App() {
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
   const [trashSpieltage, setTrashSpieltage] = useState([]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState(() => {
+    try {
+      return localStorage.getItem("nsz_selected_player_id") || null;
+    } catch {
+      return null;
+    }
+  });
   const [settingsPlayerId, setSettingsPlayerId] = useState(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("nsz_tab", tab);
+    } catch {}
+  }, [tab]);
+
+  useEffect(() => {
+    try {
+      if (selectedPlayerId) localStorage.setItem("nsz_selected_player_id", selectedPlayerId);
+      else localStorage.removeItem("nsz_selected_player_id");
+    } catch {}
+  }, [selectedPlayerId]);
   const openPlayerSettings = (id) => {
     setSelectedPlayerId(null);
     setSettingsPlayerId(id);
