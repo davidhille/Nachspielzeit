@@ -1836,7 +1836,9 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
         });
       });
     });
-    return Object.values(stats).sort((a, b) => b.spiele - a.spiele || b.tore - a.tore || a.name.localeCompare(b.name));
+    return Object.values(stats)
+      .map((p) => ({ ...p, quote: p.spiele > 0 ? p.tore / p.spiele : 0 }))
+      .sort((a, b) => b.spiele - a.spiele || b.tore - a.tore || a.name.localeCompare(b.name));
   }, [players, spieltage]);
 
   return (
@@ -1907,6 +1909,9 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
                       </span>
                       <span>
                         <strong style={{ color: "var(--text)" }}>{p.tore}</strong> Tore
+                      </span>
+                      <span>
+                        <strong style={{ color: "var(--text)" }}>{p.quote.toFixed(2)}</strong> Tore/Spiel
                       </span>
                     </div>
                   </div>
