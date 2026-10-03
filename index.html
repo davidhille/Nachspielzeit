@@ -1847,11 +1847,11 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
       });
     });
     const mitQuote = Object.values(stats).map((p) => ({ ...p, quote: p.spiele > 0 ? p.tore / p.spiele : 0 }));
-    return mitQuote.sort((a, b) =>
-      uebersichtSort === "quote"
-        ? b.quote - a.quote || b.spiele - a.spiele || a.name.localeCompare(b.name)
-        : b.spiele - a.spiele || b.tore - a.tore || a.name.localeCompare(b.name)
-    );
+    return mitQuote.sort((a, b) => {
+      if (uebersichtSort === "quote") return b.quote - a.quote || b.spiele - a.spiele || a.name.localeCompare(b.name);
+      if (uebersichtSort === "tore") return b.tore - a.tore || b.spiele - a.spiele || a.name.localeCompare(b.name);
+      return b.spiele - a.spiele || b.tore - a.tore || a.name.localeCompare(b.name);
+    });
   }, [players, spieltage, uebersichtSort]);
 
   return (
@@ -1917,6 +1917,12 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
               style={{ ...styles.chip, ...(uebersichtSort === "spiele" ? styles.chipActive : {}) }}
             >
               Spiele
+            </button>
+            <button
+              onClick={() => setUebersichtSort("tore")}
+              style={{ ...styles.chip, ...(uebersichtSort === "tore" ? styles.chipActive : {}) }}
+            >
+              Tore
             </button>
             <button
               onClick={() => setUebersichtSort("quote")}
