@@ -748,6 +748,9 @@ function App() {
             onRemovePhoto={(playerId) =>
               wrapAction(() => dbUpdate("players", playerId, { photo_url: null }), "Profilbild entfernt")
             }
+            onTrikotnummerChange={(playerId, trikotnummer) =>
+              wrapAction(() => dbUpdate("players", playerId, { trikotnummer }))
+            }
             onGenerateTermine={(neueTermine) =>
               wrapAction(async () => {
                 const bestehendeDaten = new Set(termine.map((t) => t.date));
@@ -2457,6 +2460,7 @@ function Verwaltung({
   onHardDelete,
   onOpenPlayer,
   settingsPlayerId,
+  onTrikotnummerChange,
   material,
   onSaveBestand,
   onDeleteMaterialEintrag,
@@ -2498,6 +2502,7 @@ function Verwaltung({
           onUploadPhoto={onUploadPhoto}
           onRemovePhoto={onRemovePhoto}
           onOpenPlayer={onOpenPlayer}
+          onTrikotnummerChange={onTrikotnummerChange}
           initialOpenId={settingsPlayerId}
         />
       )}
@@ -2808,6 +2813,33 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
   );
 }
 
+function JerseyBadge({ number, size = 20 }) {
+  if (number === null || number === undefined || number === "") return null;
+  return (
+    <span style={{ position: "relative", display: "inline-flex", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="#AE1E1D">
+        <path d="M16 3l-2.2 1.8a2.2 2.2 0 0 1-3.6 0L8 3 2 7.5 4.3 11H7v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9h2.7L22 7.5 16 3z" />
+      </svg>
+      <span
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingTop: Math.round(size * 0.18),
+          fontSize: Math.round(size * 0.42),
+          fontWeight: 700,
+          color: "#fff",
+          lineHeight: 1,
+        }}
+      >
+        {number}
+      </span>
+    </span>
+  );
+}
+
 function SpielerBereich({
   players,
   basis,
@@ -2818,6 +2850,7 @@ function SpielerBereich({
   onUploadPhoto,
   onRemovePhoto,
   onOpenPlayer,
+  onTrikotnummerChange,
   initialOpenId,
 }) {
   const [name, setName] = useState("");
@@ -2881,6 +2914,7 @@ function SpielerBereich({
                   <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
                     {p.name}
                   </button>
+                  <JerseyBadge number={p.trikotnummer} size={20} />
                   {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
                 </span>
                 <div style={styles.cardActions}>
@@ -2930,6 +2964,20 @@ function SpielerBereich({
                       style={styles.range}
                     />
                     <span style={styles.rangeValue}>{wert.toFixed(1)}</span>
+                  </div>
+                  <div style={styles.basisItem}>
+                    <label style={styles.label}>Trikotnummer</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={99}
+                      style={{ ...styles.input, flex: "none", width: 90 }}
+                      value={p.trikotnummer ?? ""}
+                      onChange={(e) =>
+                        onTrikotnummerChange(p.id, e.target.value === "" ? null : Number(e.target.value))
+                      }
+                    />
+                    <JerseyBadge number={p.trikotnummer} size={24} />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <button
