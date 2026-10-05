@@ -5185,8 +5185,10 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
         .filter((e) => e.uebung),
     [eintraege, uebungen]
   );
-  const gefiltert = useMemo(() => filterUebungen(uebungen, suche, filter), [uebungen, suche, filter]);
   const dabei = new Set(liste.map((e) => e.uebungId));
+  // Bereits geplante Übungen erscheinen in der Auswahl nicht mehr
+  const verfuegbar = useMemo(() => uebungen.filter((u) => !dabei.has(u.id)), [uebungen, eintraege]);
+  const gefiltert = useMemo(() => filterUebungen(verfuegbar, suche, filter), [verfuegbar, suche, filter]);
 
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
@@ -5244,7 +5246,11 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                 <>
                   <UebungFilterLeiste uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {gefiltert.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Keine Übung passt zu Suche und Filter.</div>}
+                    {gefiltert.length === 0 && (
+                      <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                        {verfuegbar.length === 0 ? "Alle Übungen der Bibliothek sind schon in diesem Training." : "Keine Übung passt zu Suche und Filter."}
+                      </div>
+                    )}
                     {gefiltert.map((u) => (
                       <div key={u.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -5266,10 +5272,10 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                             )}
                           </div>
                           <button
-                            style={{ ...(dabei.has(u.id) ? styles.secondaryBtn : { ...styles.primaryBtn, padding: "0 16px", height: 40 }), width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
+                            style={{ ...styles.primaryBtn, padding: "0 16px", height: 40, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
                             onClick={() => onAdd(termin.id, u.id)}
                           >
-                            {dabei.has(u.id) ? "Nochmal" : "Hinzufügen"}
+                            Hinzufügen
                           </button>
                         </div>
                         {pickerAblaufId === u.id && <FormatierterText text={u.beschreibung} style={{ marginTop: 8 }} />}
