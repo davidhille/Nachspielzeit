@@ -821,6 +821,9 @@ function App() {
               return wrapAction(() => dbUpdate("trainingstermine", id, { status: neuerStatus }));
             }}
             onRemoveTermin={(id) => wrapAction(() => dbDelete("trainingstermine", id))}
+            onUpdateZeit={(id, startZeit, endZeit) =>
+              wrapAction(() => dbUpdate("trainingstermine", id, { start_zeit: startZeit, end_zeit: endZeit }), "Uhrzeit aktualisiert")
+            }
             onAddGegner={(name) => wrapAction(() => dbInsert("gegner", { id: uid(), name }))}
             onRemoveGegner={(id) => softDelete("gegner", id, "Gegner")}
             spieltage={spieltage}
@@ -1131,7 +1134,13 @@ function TermineLeiste({ termine, spieltage }) {
   const kommende = useMemo(() => {
     const trainingsEintraege = (termine || [])
       .filter((t) => t.status !== "abgesagt" && t.date >= heute)
-      .map((t) => ({ id: `t-${t.id}`, date: t.date, typ: t.typ === "hallentraining" ? "hallentraining" : "training" }));
+      .map((t) => ({
+        id: `t-${t.id}`,
+        date: t.date,
+        typ: t.typ === "hallentraining" ? "hallentraining" : "training",
+        startZeit: t.start_zeit || null,
+        endZeit: t.end_zeit || null,
+      }));
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
       .map((s) => ({ id: `s-${s.id}`, date: s.date, typ: "spieltag" }));
@@ -1213,6 +1222,11 @@ function TermineLeiste({ termine, spieltage }) {
                   {info.icon}
                 </div>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>{info.label}</div>
+                {eintrag.startZeit && eintrag.endZeit && (
+                  <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
+                    {eintrag.startZeit}–{eintrag.endZeit}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2972,6 +2986,7 @@ function Verwaltung({
   onGenerateTermine,
   onToggleAbsage,
   onRemoveTermin,
+  onUpdateZeit,
   onAddGegner,
   onRemoveGegner,
   spieltage,
@@ -3035,6 +3050,7 @@ function Verwaltung({
           onGenerateTermine={onGenerateTermine}
           onToggleAbsage={onToggleAbsage}
           onRemoveTermin={onRemoveTermin}
+          onUpdateZeit={onUpdateZeit}
         />
       )}
       {subTab === "gegner" && (
@@ -3589,15 +3605,28 @@ function SpielerBereich({
   );
 }
 
-function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRemoveTermin }) {
+function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
   const [wochentage, setWochentage] = useState([2, 4]);
   const [wochen, setWochen] = useState(8);
   const [startDatum, setStartDatum] = useState(todayISO());
   const [terminTab, setTerminTab] = useState("kommende");
   const [terminTyp, setTerminTyp] = useState("training");
+  const [vonZeit, setVonZeit] = useState("16:30");
+  const [bisZeit, setBisZeit] = useState("17:45");
 
   const toggleWochentag = (idx) => {
     setWochentage((w) => (w.includes(idx) ? w.filter((x) => x !== idx) : [...w, idx].sort()));
+  };
+
+  const waehleTyp = (typ) => {
+    setTerminTyp(typ);
+    if (typ === "training") {
+      setVonZeit("16:30");
+      setBisZeit("17:45");
+    } else {
+      setVonZeit("");
+      setBisZeit("");
+    }
   };
 
   const generieren = () => {
@@ -3610,7 +3639,14 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       if (wochentage.includes(d.getDay())) {
-        neue.push({ id: uid(), date: toLocalISODate(d), status: "geplant", typ: terminTyp });
+        neue.push({
+          id: uid(),
+          date: toLocalISODate(d),
+          status: "geplant",
+          typ: terminTyp,
+          start_zeit: vonZeit || null,
+          end_zeit: bisZeit || null,
+        });
       }
     }
     onGenerateTermine(neue);
@@ -3642,17 +3678,35 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
           <label style={styles.label}>Art</label>
           <div style={styles.chipGroup}>
             <button
-              onClick={(e) => { setTerminTyp("training"); e.currentTarget.blur(); }}
+              onClick={(e) => { waehleTyp("training"); e.currentTarget.blur(); }}
               style={{ ...styles.chip, ...(terminTyp === "training" ? styles.chipActive : {}) }}
             >
               Training
             </button>
             <button
-              onClick={(e) => { setTerminTyp("hallentraining"); e.currentTarget.blur(); }}
+              onClick={(e) => { waehleTyp("hallentraining"); e.currentTarget.blur(); }}
               style={{ ...styles.chip, ...(terminTyp === "hallentraining" ? styles.chipActive : {}) }}
             >
               Hallentraining
             </button>
+          </div>
+        </div>
+        <div style={styles.fieldRow}>
+          <label style={styles.label}>Uhrzeit</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="time"
+              style={{ ...styles.input, flex: "none", width: 100 }}
+              value={vonZeit}
+              onChange={(e) => setVonZeit(e.target.value)}
+            />
+            <span style={{ color: "var(--muted)" }}>bis</span>
+            <input
+              type="time"
+              style={{ ...styles.input, flex: "none", width: 100 }}
+              value={bisZeit}
+              onChange={(e) => setBisZeit(e.target.value)}
+            />
           </div>
         </div>
         <div style={styles.fieldRow}>
@@ -3712,7 +3766,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             (kommende.length > 0 ? (
               <div style={styles.cardList}>
                 {kommende.map((t) => (
-                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} />
                 ))}
               </div>
             ) : (
@@ -3723,7 +3777,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             (vergangene.length > 0 ? (
               <div style={styles.cardList}>
                 {vergangene.map((t) => (
-                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} />
+                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} />
                 ))}
               </div>
             ) : (
@@ -3735,11 +3789,20 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
   );
 }
 
-function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
+function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
   const abgesagt = termin.status === "abgesagt";
   const istHalle = termin.typ === "hallentraining";
+  const [bearbeiten, setBearbeiten] = useState(false);
+  const [vonZeit, setVonZeit] = useState(termin.start_zeit || "");
+  const [bisZeit, setBisZeit] = useState(termin.end_zeit || "");
+
+  const speichern = () => {
+    onUpdateZeit(termin.id, vonZeit || null, bisZeit || null);
+    setBearbeiten(false);
+  };
+
   return (
-    <div style={styles.spielRow}>
+    <div style={{ ...styles.spielRow, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <span style={{ display: "flex", alignItems: "center", color: istHalle ? "var(--gold-2)" : "var(--accent-text)", flexShrink: 0 }}>
           {istHalle ? (
@@ -3759,22 +3822,59 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
           {formatTerminLabel(termin.date)}
           {istHalle && <span style={{ ...styles.mutedTag, color: "var(--gold-2)" }}> · Hallentraining</span>}
           {abgesagt && <span style={{ ...styles.mutedTag, color: "var(--danger-text)" }}> · abgesagt</span>}
+          {!bearbeiten && termin.start_zeit && termin.end_zeit && (
+            <span style={styles.mutedTag}> · {termin.start_zeit}–{termin.end_zeit} Uhr</span>
+          )}
+          {!bearbeiten && !(termin.start_zeit && termin.end_zeit) && (
+            <span style={{ ...styles.mutedTag, color: "var(--muted-2)" }}> · keine Uhrzeit</span>
+          )}
         </span>
       </div>
-      <div style={{ display: "flex", gap: 10 }}>
-        <button
-          style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
-          onClick={() => onToggleAbsage(termin.id)}
-        >
-          {abgesagt ? <RestoreIcon size={14} /> : <PowerIcon size={14} />} {abgesagt ? "Wieder aktivieren" : "Absagen"}
-        </button>
-        <button
-          style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
-          onClick={() => confirmAnd("Diesen Trainingstermin wirklich entfernen?", () => onRemoveTermin(termin.id))}
-        >
-          <TrashIcon size={14} /> Entfernen
-        </button>
-      </div>
+
+      {bearbeiten ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="time"
+            style={{ ...styles.input, flex: "none", width: 95 }}
+            value={vonZeit}
+            onChange={(e) => setVonZeit(e.target.value)}
+          />
+          <span style={{ color: "var(--muted)" }}>bis</span>
+          <input
+            type="time"
+            style={{ ...styles.input, flex: "none", width: 95 }}
+            value={bisZeit}
+            onChange={(e) => setBisZeit(e.target.value)}
+          />
+          <button style={styles.linkBtn} onClick={speichern}>
+            Speichern
+          </button>
+          <button style={styles.linkBtn} onClick={() => setBearbeiten(false)}>
+            Abbrechen
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
+            onClick={() => setBearbeiten(true)}
+          >
+            <EditIcon size={14} /> Uhrzeit
+          </button>
+          <button
+            style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
+            onClick={() => onToggleAbsage(termin.id)}
+          >
+            {abgesagt ? <RestoreIcon size={14} /> : <PowerIcon size={14} />} {abgesagt ? "Wieder aktivieren" : "Absagen"}
+          </button>
+          <button
+            style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+            onClick={() => confirmAnd("Diesen Trainingstermin wirklich entfernen?", () => onRemoveTermin(termin.id))}
+          >
+            <TrashIcon size={14} /> Entfernen
+          </button>
+        </div>
+      )}
     </div>
   );
 }
