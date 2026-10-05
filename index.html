@@ -3737,12 +3737,29 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
 
 function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
   const abgesagt = termin.status === "abgesagt";
+  const istHalle = termin.typ === "hallentraining";
   return (
     <div style={styles.spielRow}>
-      <div>
-        {formatTerminLabel(termin.date)}
-        {termin.typ === "hallentraining" && <span style={{ ...styles.mutedTag, color: "var(--gold-2)" }}> · Hallentraining</span>}
-        {abgesagt && <span style={{ ...styles.mutedTag, color: "var(--danger-text)" }}> · abgesagt</span>}
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <span style={{ display: "flex", alignItems: "center", color: istHalle ? "var(--gold-2)" : "var(--accent-text)", flexShrink: 0 }}>
+          {istHalle ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M3 11l9-6 9 6" />
+              <path d="M5 10v9h14v-9" />
+              <path d="M9 19v-5h6v5" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7l4 3-1.5 4.5h-5L8 10z" />
+            </svg>
+          )}
+        </span>
+        <span>
+          {formatTerminLabel(termin.date)}
+          {istHalle && <span style={{ ...styles.mutedTag, color: "var(--gold-2)" }}> · Hallentraining</span>}
+          {abgesagt && <span style={{ ...styles.mutedTag, color: "var(--danger-text)" }}> · abgesagt</span>}
+        </span>
       </div>
       <div style={{ display: "flex", gap: 10 }}>
         <button
