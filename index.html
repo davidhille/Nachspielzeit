@@ -1077,7 +1077,7 @@ function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
 
   useEffect(() => {
     const update = () => {
-      const w = Math.min(360, window.innerWidth - 56);
+      const w = Math.min(360, window.innerWidth - 80);
       setFrameSize({ w, h: w / aspect });
     };
     update();
