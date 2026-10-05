@@ -1177,24 +1177,28 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
   ctx.fillStyle = verlauf;
   ctx.fillRect(0, photoH - 250, W, 250);
 
-  const badgeSize = 68;
-  const badgeX = padding;
-  const badgeY = 40;
-  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX + badgeSize, badgeY + badgeSize);
-  badgeGrad.addColorStop(0, "#C4271F");
-  badgeGrad.addColorStop(1, "#8E1416");
-  roundRectPath(ctx, badgeX, badgeY, badgeSize, badgeSize, 16);
-  ctx.fillStyle = badgeGrad;
-  ctx.fill();
+  // Vereinslogo (Data-URI, daher kein CORS-Problem) + "U8"
+  const logoH = 120;
+  const logoX = padding;
+  const logoY = 32;
+  let logoW = Math.round(logoH * 198 / 240);
+  try {
+    const logoImg = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = LOGO_DATA_URI;
+    });
+    logoW = Math.round(logoH * (logoImg.naturalWidth / logoImg.naturalHeight));
+    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+  } catch (e) {
+    // Ohne Logo weiter, nur "U8" anzeigen
+  }
   ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "800 30px 'Space Grotesk', sans-serif";
-  ctx.fillText("SV", badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 2);
-
   ctx.textAlign = "left";
-  ctx.font = "700 32px 'Space Grotesk', sans-serif";
-  ctx.fillText("SV Heimstetten U8", badgeX + badgeSize + 20, badgeY + badgeSize / 2 + 2);
+  ctx.textBaseline = "middle";
+  ctx.font = "800 56px 'Space Grotesk', sans-serif";
+  ctx.fillText("U8", logoX + logoW + 20, logoY + logoH / 2 + 2);
 
   const bezeichnung = spieltagLabel(spieltag, nummer);
   const datumFormatiert = new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", {
