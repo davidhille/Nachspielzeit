@@ -2486,6 +2486,45 @@ function EditIcon({ size = 16 }) {
   );
 }
 
+function ZeitSelect({ value, onChange }) {
+  const [h, m] = (value || "").split(":");
+  const stunden = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const minuten = ["00", "15", "30", "45"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+      <select
+        style={{ ...styles.select, width: 62 }}
+        value={h || ""}
+        onChange={(e) => onChange(`${e.target.value}:${m || "00"}`)}
+      >
+        <option value="" disabled>
+          --
+        </option>
+        {stunden.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      <span style={{ color: "var(--muted)" }}>:</span>
+      <select
+        style={{ ...styles.select, width: 62 }}
+        value={m || ""}
+        onChange={(e) => onChange(`${h || "00"}:${e.target.value}`)}
+      >
+        <option value="" disabled>
+          --
+        </option>
+        {minuten.map((mn) => (
+          <option key={mn} value={mn}>
+            {mn}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function CameraIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "-3px" }}>
@@ -3697,21 +3736,9 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
         <div style={styles.fieldRow}>
           <label style={styles.label}>Uhrzeit</label>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="time"
-              step="900"
-              style={{ ...styles.input, flex: "none", width: 100 }}
-              value={vonZeit}
-              onChange={(e) => setVonZeit(e.target.value)}
-            />
+            <ZeitSelect value={vonZeit} onChange={setVonZeit} />
             <span style={{ color: "var(--muted)" }}>bis</span>
-            <input
-              type="time"
-              step="900"
-              style={{ ...styles.input, flex: "none", width: 100 }}
-              value={bisZeit}
-              onChange={(e) => setBisZeit(e.target.value)}
-            />
+            <ZeitSelect value={bisZeit} onChange={setBisZeit} />
           </div>
         </div>
         <div style={styles.fieldRow}>
@@ -3855,21 +3882,9 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
 
       {bearbeiten ? (
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input
-            type="time"
-            step="900"
-            style={{ ...styles.input, flex: "none", width: 95 }}
-            value={vonZeit}
-            onChange={(e) => setVonZeit(e.target.value)}
-          />
+          <ZeitSelect value={vonZeit} onChange={setVonZeit} />
           <span style={{ color: "var(--muted)" }}>bis</span>
-          <input
-            type="time"
-            step="900"
-            style={{ ...styles.input, flex: "none", width: 95 }}
-            value={bisZeit}
-            onChange={(e) => setBisZeit(e.target.value)}
-          />
+          <ZeitSelect value={bisZeit} onChange={setBisZeit} />
           <button style={styles.linkBtn} onClick={speichern}>
             Speichern
           </button>
