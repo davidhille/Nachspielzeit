@@ -220,6 +220,24 @@ async function uploadTeamFoto(file) {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}?t=${Date.now()}`;
 }
 
+async function uploadUebungBild(uebungId, file) {
+  const blob = await resizeImageFile(file, 900, 0.85);
+  const path = `uebungen/${uebungId}.jpg`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "x-access-code": ACCESS_CODE,
+      "x-upsert": "true",
+      "Content-Type": "image/jpeg",
+    },
+    body: blob,
+  });
+  if (!res.ok) throw new Error(`Hochladen des Übungsbilds fehlgeschlagen: ${await res.text()}`);
+  return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}?t=${Date.now()}`;
+}
+
 async function uploadSpieltagFoto(spieltagId, file) {
   const blob = await resizeImageFile(file, 1200, 0.85);
   const path = `spieltage/${spieltagId}.jpg`;
@@ -464,6 +482,8 @@ function App() {
   const [spieltage, setSpieltage] = useState([]);
   const [termine, setTermine] = useState([]);
   const [material, setMaterial] = useState([]);
+  const [uebungen, setUebungen] = useState([]);
+  const [trainingUebungen, setTrainingUebungen] = useState([]);
   const [teamSettings, setTeamSettings] = useState({});
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
@@ -546,7 +566,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -561,6 +581,9 @@ function App() {
           dbSelect("spieltag_teilnehmer"),
           dbSelect("material_bestand"),
           dbSelect("team_settings"),
+          // Übungsbibliothek: falls die Tabellen noch nicht angelegt sind, bleibt die App trotzdem nutzbar
+          dbSelect("uebungen").catch(() => []),
+          dbSelect("training_uebungen").catch(() => []),
         ]);
       setPlayers(playersRaw.filter((p) => !p.deleted_at));
       setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
@@ -619,6 +642,29 @@ function App() {
         }))
       );
       setTeamSettings(teamSettingsRaw[0] || {});
+      setUebungen(
+        uebungenRaw
+          .filter((u) => !u.deleted_at)
+          .map((u) => ({
+            id: u.id,
+            titel: u.titel || "",
+            beschreibung: u.beschreibung || "",
+            dauer: u.dauer != null ? Number(u.dauer) : null,
+            kinder: u.kinder || "",
+            keywords: Array.isArray(u.keywords) ? u.keywords : [],
+            material: Array.isArray(u.material) ? u.material : [],
+            bildUrl: u.bild_url || null,
+          }))
+          .sort((a, b) => a.titel.localeCompare(b.titel, "de"))
+      );
+      setTrainingUebungen(
+        trainingUebungenRaw.map((t) => ({
+          id: t.id,
+          terminId: t.termin_id,
+          uebungId: t.uebung_id,
+          position: Number(t.position) || 0,
+        }))
+      );
       setError("");
     } catch (e) {
       console.error(e);
@@ -685,6 +731,44 @@ function App() {
       } else {
         await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
       }
+    });
+
+  const saveUebung = (u, file) =>
+    wrapAction(async () => {
+      let bildUrl = u.bildUrl || null;
+      if (file) bildUrl = await uploadUebungBild(u.id, file);
+      await dbUpsert(
+        "uebungen",
+        {
+          id: u.id,
+          titel: u.titel,
+          beschreibung: u.beschreibung || null,
+          dauer: u.dauer ? Number(u.dauer) : null,
+          kinder: u.kinder || null,
+          keywords: u.keywords,
+          material: u.material,
+          bild_url: bildUrl,
+          deleted_at: null,
+        },
+        "id"
+      );
+    }, "Übung gespeichert");
+
+  const addTrainingUebung = (terminId, uebungId) =>
+    wrapAction(async () => {
+      const vorhandene = trainingUebungen.filter((t) => t.terminId === terminId);
+      const position = vorhandene.reduce((m, t) => Math.max(m, t.position), 0) + 1;
+      await dbInsert("training_uebungen", { id: uid(), termin_id: terminId, uebung_id: uebungId, position });
+    });
+
+  const moveTrainingUebung = (terminId, id, richtung) =>
+    wrapAction(async () => {
+      const liste = trainingUebungen.filter((t) => t.terminId === terminId).sort((a, b) => a.position - b.position);
+      const i = liste.findIndex((t) => t.id === id);
+      const j = i + richtung;
+      if (i < 0 || j < 0 || j >= liste.length) return;
+      await dbUpdate("training_uebungen", liste[i].id, { position: liste[j].position });
+      await dbUpdate("training_uebungen", liste[j].id, { position: liste[i].position });
     });
 
   if (loading) {
@@ -891,6 +975,13 @@ function App() {
             onAddSpieltag={addSpieltag}
             onRemoveSpieltag={removeSpieltag}
             onToggleGegnerZuordnung={toggleGegnerZuordnung}
+            uebungen={uebungen}
+            trainingUebungen={trainingUebungen}
+            onSaveUebung={saveUebung}
+            onRemoveUebung={(id) => softDelete("uebungen", id, "Übung")}
+            onAddTrainingUebung={addTrainingUebung}
+            onRemoveTrainingUebung={(id) => wrapAction(() => dbDelete("training_uebungen", id))}
+            onMoveTrainingUebung={moveTrainingUebung}
             trashPlayers={trashPlayers}
             trashGegner={trashGegner}
             trashSpieltage={trashSpieltage}
@@ -3699,6 +3790,13 @@ function Verwaltung({
   onAddSpieltag,
   onRemoveSpieltag,
   onToggleGegnerZuordnung,
+  uebungen,
+  trainingUebungen,
+  onSaveUebung,
+  onRemoveUebung,
+  onAddTrainingUebung,
+  onRemoveTrainingUebung,
+  onMoveTrainingUebung,
   trashPlayers,
   trashGegner,
   trashSpieltage,
@@ -3716,6 +3814,7 @@ function Verwaltung({
   const items = [
     ["spieler", "Spieler"],
     ["trainingsplan", "Trainingsplan"],
+    ["uebungen", "Übungen"],
     ["spieltage", "Spieltage"],
     ["material", "Material"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
@@ -3759,8 +3858,14 @@ function Verwaltung({
           onToggleAbsage={onToggleAbsage}
           onRemoveTermin={onRemoveTermin}
           onUpdateZeit={onUpdateZeit}
+          uebungen={uebungen}
+          trainingUebungen={trainingUebungen}
+          onAddTrainingUebung={onAddTrainingUebung}
+          onRemoveTrainingUebung={onRemoveTrainingUebung}
+          onMoveTrainingUebung={onMoveTrainingUebung}
         />
       )}
+      {subTab === "uebungen" && <UebungenBereich uebungen={uebungen} onSave={onSaveUebung} onRemove={onRemoveUebung} />}
       {subTab === "spieltage" && (
         <SpieltageVerwaltungBereich
           gegner={gegner}
@@ -4315,7 +4420,19 @@ function SpielerBereich({
   );
 }
 
-function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
+function TrainingsplanBereich({
+  termine,
+  onGenerateTermine,
+  onToggleAbsage,
+  onRemoveTermin,
+  onUpdateZeit,
+  uebungen,
+  trainingUebungen,
+  onAddTrainingUebung,
+  onRemoveTrainingUebung,
+  onMoveTrainingUebung,
+}) {
+  const uebungProps = { uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung };
   const [wochentage, setWochentage] = useState([2, 4]);
   const [wochen, setWochen] = useState(8);
   const [startDatum, setStartDatum] = useState(todayISO());
@@ -4486,7 +4603,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             (kommende.length > 0 ? (
               <div style={styles.cardList}>
                 {kommende.map((t) => (
-                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} />
+                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} {...uebungProps} />
                 ))}
               </div>
             ) : (
@@ -4497,7 +4614,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             (vergangene.length > 0 ? (
               <div style={styles.cardList}>
                 {vergangene.map((t) => (
-                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} />
+                  <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} {...uebungProps} />
                 ))}
               </div>
             ) : (
@@ -4509,7 +4626,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
   );
 }
 
-function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
+function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung }) {
   const abgesagt = termin.status === "abgesagt";
   const istHalle = termin.typ === "hallentraining";
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -4583,6 +4700,420 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
           >
             <TrashIcon size={14} /> Entfernen
           </button>
+        </div>
+      )}
+
+      {!abgesagt && (
+        <div style={{ flexBasis: "100%" }}>
+          <TerminUebungen
+            termin={termin}
+            uebungen={uebungen || []}
+            eintraege={(trainingUebungen || []).filter((t) => t.terminId === termin.id)}
+            onAdd={onAddTrainingUebung}
+            onRemove={onRemoveTrainingUebung}
+            onMove={onMoveTrainingUebung}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Übungsbibliothek ---------- */
+
+function UebungBild({ url, size = 64, titel = "" }) {
+  const box = { width: size, height: size, borderRadius: 10, flexShrink: 0, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" };
+  if (url) return <div style={box}><img src={url} alt={titel} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>;
+  return (
+    <div style={box} aria-hidden="true">
+      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3l4 18H8z" />
+        <ellipse cx="12" cy="19.5" rx="6" ry="1.5" />
+      </svg>
+    </div>
+  );
+}
+
+function filterUebungen(uebungen, suche, filter) {
+  const q = suche.trim().toLowerCase();
+  return uebungen.filter((u) => {
+    if (filter.length > 0 && !filter.every((k) => u.keywords.includes(k))) return false;
+    if (!q) return true;
+    return (u.titel + " " + u.beschreibung + " " + u.keywords.join(" ")).toLowerCase().includes(q);
+  });
+}
+
+function alleKeywordsVon(uebungen) {
+  return [...new Set(uebungen.flatMap((u) => u.keywords))].sort((a, b) => a.localeCompare(b, "de"));
+}
+
+function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter }) {
+  const alle = useMemo(() => alleKeywordsVon(uebungen), [uebungen]);
+  const toggle = (k) => setFilter(filter.includes(k) ? filter.filter((x) => x !== k) : [...filter, k]);
+  return (
+    <>
+      <input
+        style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 10 }}
+        placeholder="Übung suchen …"
+        aria-label="Übung suchen"
+        value={suche}
+        onChange={(e) => setSuche(e.target.value)}
+      />
+      {alle.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          <button
+            onClick={() => setFilter([])}
+            style={{ ...styles.chip, ...(filter.length === 0 ? styles.chipActive : {}) }}
+          >
+            Alle
+          </button>
+          {alle.map((k) => (
+            <button
+              key={k}
+              onClick={(e) => { toggle(k); e.currentTarget.blur(); }}
+              style={{ ...styles.chip, ...(filter.includes(k) ? styles.chipActive : {}) }}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+const tagStyle = { background: "var(--surface-2, #F2EAE9)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 11, fontWeight: 600 };
+
+function UebungenBereich({ uebungen, onSave, onRemove }) {
+  const [suche, setSuche] = useState("");
+  const [filter, setFilter] = useState([]);
+  const [edit, setEdit] = useState(null);
+
+  const gefiltert = useMemo(() => filterUebungen(uebungen, suche, filter), [uebungen, suche, filter]);
+
+  if (edit) {
+    return (
+      <UebungForm
+        key={edit === "neu" ? "neu" : edit.id}
+        start={edit === "neu" ? null : edit}
+        alleKeywords={alleKeywordsVon(uebungen)}
+        onSave={(u, file) => {
+          onSave(u, file);
+          setEdit(null);
+        }}
+        onCancel={() => setEdit(null)}
+        onRemove={
+          edit === "neu"
+            ? null
+            : () => confirmAnd(`Übung „${edit.titel}“ wirklich löschen?`, () => { onRemove(edit.id); setEdit(null); })
+        }
+      />
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <h3 style={{ ...styles.h3, margin: 0 }}>Übungen</h3>
+        <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
+      </div>
+      <p style={styles.hint}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</p>
+
+      {uebungen.length === 0 ? (
+        <EmptyState text="Noch keine Übungen angelegt." />
+      ) : (
+        <>
+          <UebungFilterLeiste uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
+          <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, marginBottom: 10 }}>
+            {gefiltert.length} {gefiltert.length === 1 ? "Übung" : "Übungen"}
+            {filter.length > 0 ? ` · Filter: ${filter.join(", ")}` : ""}
+          </div>
+          {gefiltert.length === 0 ? (
+            <EmptyState text="Keine Übung passt zu Suche und Filter." />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+              {gefiltert.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => setEdit(u)}
+                  style={{ ...styles.card, padding: 0, overflow: "hidden", textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" }}
+                >
+                  <div style={{ height: 110, background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {u.bildUrl ? (
+                      <img src={u.bildUrl} alt={u.titel} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <UebungBild url={null} size={64} />
+                    )}
+                  </div>
+                  <div style={{ padding: "10px 12px 12px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{u.titel}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+                      {[u.dauer ? `${u.dauer} Min` : null, u.kinder ? `${u.kinder} Kinder` : null].filter(Boolean).join(" · ") || "–"}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {u.keywords.map((k) => (
+                        <span key={k} style={tagStyle}>{k}</span>
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
+  const [titel, setTitel] = useState(start?.titel || "");
+  const [beschreibung, setBeschreibung] = useState(start?.beschreibung || "");
+  const [dauer, setDauer] = useState(start?.dauer ? String(start.dauer) : "");
+  const [kinder, setKinder] = useState(start?.kinder || "");
+  const [keywords, setKeywords] = useState(start?.keywords || []);
+  const [material, setMaterial] = useState(start?.material || []);
+  const [neuesKeyword, setNeuesKeyword] = useState("");
+  const [bildFile, setBildFile] = useState(null);
+  const [vorschau, setVorschau] = useState(start?.bildUrl || null);
+  const fileRef = useRef(null);
+
+  const addKeyword = (k) => {
+    const wert = k.trim();
+    if (!wert) return;
+    const vorhanden = [...alleKeywords, ...keywords].find((x) => x.toLowerCase() === wert.toLowerCase());
+    const final = vorhanden || wert;
+    if (!keywords.includes(final)) setKeywords([...keywords, final]);
+    setNeuesKeyword("");
+  };
+  const vorschlaege = alleKeywords.filter((k) => !keywords.includes(k));
+  const toggleMaterial = (key) => setMaterial(material.includes(key) ? material.filter((m) => m !== key) : [...material, key]);
+
+  const speichern = () => {
+    if (!titel.trim()) return;
+    const offen = neuesKeyword.trim();
+    const kw = offen && !keywords.some((x) => x.toLowerCase() === offen.toLowerCase()) ? [...keywords, offen] : keywords;
+    onSave(
+      {
+        id: start?.id || uid(),
+        titel: titel.trim(),
+        beschreibung: beschreibung.trim(),
+        dauer,
+        kinder: kinder.trim(),
+        keywords: kw,
+        material,
+        bildUrl: start?.bildUrl || null,
+      },
+      bildFile
+    );
+  };
+
+  const equipment = MATERIAL_GRUPPEN[0].items;
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <h3 style={styles.h3}>{start ? "Übung bearbeiten" : "Neue Übung"}</h3>
+      <div style={styles.card}>
+        <div style={{ ...styles.label, marginBottom: 6 }}>Bild</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{ width: 120, height: 90, borderRadius: 12, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {vorschau ? <img src={vorschau} alt="Vorschau" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UebungBild url={null} size={64} />}
+          </div>
+          <div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                setBildFile(f);
+                setVorschau(URL.createObjectURL(f));
+              }}
+            />
+            <button style={styles.secondaryBtn} onClick={() => fileRef.current && fileRef.current.click()}>
+              {vorschau ? "Bild ändern" : "Bild hochladen"}
+            </button>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>Foto, Skizze oder Screenshot – wird automatisch verkleinert.</div>
+          </div>
+        </div>
+
+        <div style={{ ...styles.label, marginBottom: 6 }}>Titel</div>
+        <input style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 14 }} value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Passdreieck" />
+
+        <div style={{ ...styles.label, marginBottom: 0 }}>Beschreibung</div>
+        <textarea style={{ ...styles.textarea, minHeight: 90, marginBottom: 14 }} value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} placeholder="Aufbau, Ablauf, Hinweise …" />
+
+        <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ ...styles.label, marginBottom: 6 }}>Dauer (Min)</div>
+            <input style={{ ...styles.input, width: "100%" }} inputMode="numeric" value={dauer} onChange={(e) => setDauer(e.target.value.replace(/\D/g, ""))} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ ...styles.label, marginBottom: 6 }}>Kinder</div>
+            <input style={{ ...styles.input, width: "100%" }} value={kinder} onChange={(e) => setKinder(e.target.value)} placeholder="z. B. 6–12" />
+          </div>
+        </div>
+
+        <div style={{ ...styles.label, marginBottom: 6 }}>Keywords</div>
+        {keywords.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+            {keywords.map((k) => (
+              <button key={k} onClick={() => setKeywords(keywords.filter((x) => x !== k))} style={{ ...styles.chip, ...styles.chipActive }} aria-label={`Keyword ${k} entfernen`}>
+                {k} ×
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ ...styles.addRow, marginBottom: 10 }}>
+          <input
+            style={styles.input}
+            placeholder="Keyword hinzufügen …"
+            aria-label="Keyword hinzufügen"
+            value={neuesKeyword}
+            onChange={(e) => setNeuesKeyword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") addKeyword(neuesKeyword); }}
+          />
+          <button style={styles.secondaryBtn} onClick={() => addKeyword(neuesKeyword)}>Hinzufügen</button>
+        </div>
+        {vorschlaege.length > 0 && (
+          <>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Vorhandene Keywords:</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {vorschlaege.map((k) => (
+                <button key={k} onClick={() => addKeyword(k)} style={styles.chip}>{k}</button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div style={{ ...styles.label, marginBottom: 6 }}>Material</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          {equipment.map(([key, label]) => (
+            <button key={key} onClick={(e) => { toggleMaterial(key); e.currentTarget.blur(); }} style={{ ...styles.chip, ...(material.includes(key) ? styles.chipActive : {}) }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button style={{ ...styles.primaryBtn, opacity: titel.trim() ? 1 : 0.5 }} disabled={!titel.trim()} onClick={speichern}>Speichern</button>
+          <button style={styles.secondaryBtn} onClick={onCancel}>Abbrechen</button>
+          {onRemove && (
+            <button style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }} onClick={onRemove}>
+              <TrashIcon size={14} /> Löschen
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }) {
+  const [offen, setOffen] = useState(false);
+  const [waehlen, setWaehlen] = useState(false);
+  const [suche, setSuche] = useState("");
+  const [filter, setFilter] = useState([]);
+
+  const liste = useMemo(
+    () =>
+      [...eintraege]
+        .sort((a, b) => a.position - b.position)
+        .map((e) => ({ ...e, uebung: uebungen.find((u) => u.id === e.uebungId) }))
+        .filter((e) => e.uebung),
+    [eintraege, uebungen]
+  );
+  const gesamtMin = liste.reduce((s, e) => s + (e.uebung.dauer || 0), 0);
+  const materialKeys = [...new Set(liste.flatMap((e) => e.uebung.material))];
+  const gefiltert = useMemo(() => filterUebungen(uebungen, suche, filter), [uebungen, suche, filter]);
+  const dabei = new Set(liste.map((e) => e.uebungId));
+
+  const terminMin = (() => {
+    if (!termin.start_zeit || !termin.end_zeit) return null;
+    const [h1, m1] = termin.start_zeit.split(":").map(Number);
+    const [h2, m2] = termin.end_zeit.split(":").map(Number);
+    const d = h2 * 60 + m2 - (h1 * 60 + m1);
+    return d > 0 ? d : null;
+  })();
+
+  return (
+    <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+      <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setOffen(!offen)}>
+        <ChevronIcon open={offen} /> Übungen{liste.length > 0 ? ` (${liste.length}) · ${gesamtMin} Min${terminMin ? ` von ${terminMin}` : ""}` : ""}
+      </button>
+
+      {offen && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+          {liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Übungen für dieses Training geplant.</div>}
+          {liste.map((e, i) => (
+            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
+              <UebungBild url={e.uebung.bildUrl} size={56} titel={e.uebung.titel} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-2)" }}>
+                  {i + 1}{e.uebung.dauer ? ` · ${e.uebung.dauer} MIN` : ""}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{e.uebung.titel}</div>
+                {e.uebung.keywords.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {e.uebung.keywords.map((k) => <span key={k} style={tagStyle}>{k}</span>)}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <button style={styles.linkBtn} disabled={i === 0} onClick={() => onMove(termin.id, e.id, -1)} aria-label="Nach oben">↑</button>
+                <button style={styles.linkBtn} disabled={i === liste.length - 1} onClick={() => onMove(termin.id, e.id, 1)} aria-label="Nach unten">↓</button>
+              </div>
+              <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => onRemove(e.id)} aria-label="Übung entfernen">
+                <TrashIcon size={14} />
+              </button>
+            </div>
+          ))}
+
+          {materialKeys.length > 0 && (
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              Material: {materialKeys.map((k) => MATERIAL_LABEL[k] || k).join(", ")}
+            </div>
+          )}
+
+          {!waehlen ? (
+            <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
+          ) : (
+            <div style={{ ...styles.card, background: "var(--bg, #F7F4F3)" }}>
+              <div style={{ ...styles.cardHead, marginBottom: 8 }}>
+                <span style={styles.cardName}>Übung hinzufügen</span>
+                <button style={styles.linkBtn} onClick={() => setWaehlen(false)}>Fertig</button>
+              </div>
+              {uebungen.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>Die Bibliothek ist noch leer – lege unter „Übungen“ die erste an.</div>
+              ) : (
+                <>
+                  <UebungFilterLeiste uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {gefiltert.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Keine Übung passt zu Suche und Filter.</div>}
+                    {gefiltert.map((u) => (
+                      <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
+                        <UebungBild url={u.bildUrl} size={48} titel={u.titel} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                            {[u.dauer ? `${u.dauer} Min` : null, u.kinder ? `${u.kinder} Kinder` : null].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+                        <button
+                          style={dabei.has(u.id) ? { ...styles.secondaryBtn, opacity: 0.8 } : styles.primaryBtn}
+                          onClick={() => onAdd(termin.id, u.id)}
+                        >
+                          {dabei.has(u.id) ? "Nochmal" : "Hinzufügen"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
