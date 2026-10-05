@@ -303,6 +303,12 @@ const toLocalISODate = (d) => {
 };
 const todayISO = () => toLocalISODate(new Date());
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+function spieltagNummern(spieltage) {
+  const chronologisch = [...spieltage].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const map = new Map();
+  chronologisch.forEach((s, i) => map.set(s.id, i + 1));
+  return map;
+}
 let _confirmHandler = null;
 function registerConfirmHandler(fn) {
   _confirmHandler = fn;
@@ -2585,6 +2591,7 @@ function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, o
   const [subTab, setSubTab] = useState("liste");
   const [uebersichtSort, setUebersichtSort] = useState("spiele");
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
+  const nummern = useMemo(() => spieltagNummern(spieltage), [spieltage]);
 
   const uebersicht = useMemo(() => {
     const stats = {};
@@ -2640,6 +2647,7 @@ function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, o
               <SpieltagCard
                 key={s.id}
                 spieltag={s}
+                nummer={nummern.get(s.id)}
                 players={players}
                 gegner={gegner}
                 open={openSpieltag === s.id}
@@ -2983,7 +2991,7 @@ function SpieltagNotizen({ value, onSave }) {
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto }) {
+function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -3108,6 +3116,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
     <div style={styles.card}>
       <div style={styles.cardHead}>
         <span style={styles.cardName}>
+          {nummer && <>Spieltag {nummer} · </>}
           {new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
           <span style={styles.mutedTag}>
             {" "}
@@ -3155,7 +3164,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
         <>
           <TeamHero
             photoUrl={spieltag.fotoUrl}
-            teamName={spieltag.zeit ? `${datumFormatiert} · ${spieltag.zeit} Uhr` : datumFormatiert}
+            teamName={`${nummer ? `Spieltag ${nummer} · ` : ""}${spieltag.zeit ? `${datumFormatiert} · ${spieltag.zeit} Uhr` : datumFormatiert}`}
             subtitle={spieltagSubtitle}
             onUploadFoto={(file) => onUploadFoto(file)}
             height={300}
@@ -4328,6 +4337,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
   const [neueZeit, setNeueZeit] = useState("");
 
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
+  const nummern = useMemo(() => spieltagNummern(spieltage), [spieltage]);
 
   return (
     <div style={{ marginTop: 4 }}>
@@ -4433,6 +4443,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                 }}
               >
                 <span style={styles.cardName}>
+                  {nummern.get(s.id) && <>Spieltag {nummern.get(s.id)} · </>}
                   {formatTerminLabel(s.date)}
                   {s.zeit && <span style={styles.mutedTag}> · {s.zeit} Uhr</span>}
                 </span>
