@@ -1133,8 +1133,8 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
   const gridY = photoH + 110;
   const anzahlSpiele = spieltag.spiele.length;
   const rows = anzahlSpiele > 0 ? Math.ceil(anzahlSpiele / 2) : 0;
-  const inhaltsEnde = anzahlSpiele > 0 ? gridY + rows * tileH + (rows - 1) * gap + 90 : photoH + 170;
-  const H = Math.max(1350, Math.round(inhaltsEnde + 50));
+  const inhaltsEnde = anzahlSpiele > 0 ? gridY + rows * tileH + (rows - 1) * gap : photoH + 170;
+  const H = Math.max(1300, Math.round(inhaltsEnde + 44));
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -1151,7 +1151,9 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
       const dw = img.naturalWidth * scale;
       const dh = img.naturalHeight * scale;
       const dx = (W - dw) / 2;
-      const dy = (photoH - dh) / 2;
+      // Beim Zuschneiden mehr vom oberen Rand (Himmel/Netz) statt von unten (Beine/Füße) abschneiden.
+      const ueberschuss = dh - photoH;
+      const dy = ueberschuss > 0 ? -(ueberschuss * 0.75) : (photoH - dh) / 2;
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, 0, W, photoH);
@@ -1246,11 +1248,6 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
     ctx.font = "600 24px 'Inter', sans-serif";
     ctx.fillText("Noch keine Ergebnisse erfasst", padding, photoH + 140);
   }
-
-  ctx.fillStyle = "#B08A8A";
-  ctx.font = "600 22px 'Inter', sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Nachspielzeit · SV Heimstetten", W / 2, H - 30);
 
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Bild konnte nicht erstellt werden."))), "image/png")
