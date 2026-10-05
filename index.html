@@ -1226,6 +1226,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
   return (
     <>
     <div
+      onClick={() => photoUrl && setLightboxOpen(true)}
       style={{
         position: "relative",
         width: "100%",
@@ -1234,14 +1235,14 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         overflow: "hidden",
         marginBottom,
         background: photoUrl ? `#000` : "var(--header-grad)",
+        cursor: photoUrl ? "zoom-in" : "default",
       }}
     >
       {photoUrl && (
         <img
           src={photoUrl}
           alt={teamName}
-          onClick={() => setLightboxOpen(true)}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       )}
       {!photoUrl && (
@@ -1297,7 +1298,10 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
             }}
           />
           <button
-            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current && fileInputRef.current.click();
+            }}
             style={{
               position: "absolute",
               top: 12,
