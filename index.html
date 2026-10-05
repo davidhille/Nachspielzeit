@@ -3074,6 +3074,7 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
           {new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
           <span style={styles.mutedTag}>
             {" "}
+            {spieltag.zeit && <>· {spieltag.zeit} Uhr </>}
             · {spieltag.spiele.length} {spieltag.spiele.length === 1 ? "Spiel" : "Spiele"}
           </span>
         </span>
