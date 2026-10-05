@@ -637,6 +637,32 @@ function App() {
       () => wrapAction(() => dbUpdate(table, id, { deleted_at: null }), "Wiederhergestellt")
     );
 
+  const addSpieltag = (date) =>
+    wrapAction(async () => {
+      const newId = uid();
+      await dbInsert("spieltage", { id: newId, date });
+      const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
+      const activeIds = new Set(players.map((p) => p.id));
+      const uebernommeneTeilnehmer = (letzterSpieltag?.teilnehmer || []).filter((id) => activeIds.has(id));
+      if (uebernommeneTeilnehmer.length > 0) {
+        await dbInsert(
+          "spieltag_teilnehmer",
+          uebernommeneTeilnehmer.map((playerId) => ({ spieltag_id: newId, player_id: playerId }))
+        );
+      }
+    });
+
+  const removeSpieltag = (id) => softDelete("spieltage", id, "Spieltag");
+
+  const toggleGegnerZuordnung = (spieltagId, opponentId, istZugeordnet) =>
+    wrapAction(async () => {
+      if (istZugeordnet) {
+        await dbDeleteWhere("spieltag_gegner", `spieltag_id=eq.${spieltagId}&opponent_id=eq.${opponentId}`);
+      } else {
+        await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
+      }
+    });
+
   if (loading) {
     return (
       <div style={styles.loadingScreen}>
@@ -732,22 +758,7 @@ function App() {
             players={players}
             gegner={gegner}
             spieltage={spieltage}
-            onAddSpieltag={(date) =>
-              wrapAction(async () => {
-                const newId = uid();
-                await dbInsert("spieltage", { id: newId, date });
-                const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
-                const activeIds = new Set(players.map((p) => p.id));
-                const uebernommeneTeilnehmer = (letzterSpieltag?.teilnehmer || []).filter((id) => activeIds.has(id));
-                if (uebernommeneTeilnehmer.length > 0) {
-                  await dbInsert(
-                    "spieltag_teilnehmer",
-                    uebernommeneTeilnehmer.map((playerId) => ({ spieltag_id: newId, player_id: playerId }))
-                  );
-                }
-              })
-            }
-            onRemoveSpieltag={(id) => softDelete("spieltage", id, "Spieltag")}
+            onRemoveSpieltag={removeSpieltag}
             onAddSpiel={(spieltagId, spiel) =>
               wrapAction(async () => {
                 await dbInsert("spiele", {
@@ -856,18 +867,9 @@ function App() {
             onAddGegner={(name) => wrapAction(() => dbInsert("gegner", { id: uid(), name }))}
             onRemoveGegner={(id) => softDelete("gegner", id, "Gegner")}
             spieltage={spieltage}
-            onToggleGegnerZuordnung={(spieltagId, opponentId, istZugeordnet) =>
-              wrapAction(async () => {
-                if (istZugeordnet) {
-                  await dbDeleteWhere(
-                    "spieltag_gegner",
-                    `spieltag_id=eq.${spieltagId}&opponent_id=eq.${opponentId}`
-                  );
-                } else {
-                  await dbInsert("spieltag_gegner", { spieltag_id: spieltagId, opponent_id: opponentId });
-                }
-              })
-            }
+            onAddSpieltag={addSpieltag}
+            onRemoveSpieltag={removeSpieltag}
+            onToggleGegnerZuordnung={toggleGegnerZuordnung}
             trashPlayers={trashPlayers}
             trashGegner={trashGegner}
             trashSpieltage={trashSpieltage}
@@ -2544,8 +2546,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onUpdateZeit, onOpenPlayer }) {
-  const [neuesDatum, setNeuesDatum] = useState(todayISO());
+function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onUpdateZeit, onOpenPlayer }) {
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const [subTab, setSubTab] = useState("liste");
   const [uebersichtSort, setUebersichtSort] = useState("spiele");
@@ -2596,14 +2597,9 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
 
       {subTab === "liste" && (
         <>
-          <div style={{ ...styles.addRow, marginTop: 4 }}>
-            <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
-            <button style={styles.secondaryBtn} onClick={() => onAddSpieltag(neuesDatum)}>
-              Spieltag anlegen
-            </button>
-          </div>
-
-          {sorted.length === 0 && <EmptyState text="Noch keine Spieltage angelegt." />}
+          {sorted.length === 0 && (
+            <EmptyState text="Noch keine Spieltage angelegt. Lege sie unter „Verwaltung → Spieltage“ an." />
+          )}
 
           <div style={styles.cardList}>
             {sorted.map((s) => (
@@ -3424,6 +3420,8 @@ function Verwaltung({
   onAddGegner,
   onRemoveGegner,
   spieltage,
+  onAddSpieltag,
+  onRemoveSpieltag,
   onToggleGegnerZuordnung,
   trashPlayers,
   trashGegner,
@@ -3442,7 +3440,7 @@ function Verwaltung({
   const items = [
     ["spieler", "Spieler"],
     ["trainingsplan", "Trainingsplan"],
-    ["gegner", "Gegner"],
+    ["spieltage", "Spieltage"],
     ["material", "Material"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ];
@@ -3487,12 +3485,14 @@ function Verwaltung({
           onUpdateZeit={onUpdateZeit}
         />
       )}
-      {subTab === "gegner" && (
-        <GegnerBereich
+      {subTab === "spieltage" && (
+        <SpieltageVerwaltungBereich
           gegner={gegner}
           onAddGegner={onAddGegner}
           onRemoveGegner={onRemoveGegner}
           spieltage={spieltage}
+          onAddSpieltag={onAddSpieltag}
+          onRemoveSpieltag={onRemoveSpieltag}
           onToggleGegnerZuordnung={onToggleGegnerZuordnung}
         />
       )}
@@ -4313,94 +4313,214 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
   );
 }
 
-function GegnerBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onToggleGegnerZuordnung }) {
+function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onAddSpieltag, onRemoveSpieltag, onToggleGegnerZuordnung }) {
   const [name, setName] = useState("");
-  const [openId, setOpenId] = useState(null);
-  const sortiereSpieltage = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
+  const [gegnerOffen, setGegnerOffen] = useState(true);
+  const [neuesDatum, setNeuesDatum] = useState(todayISO());
+  const [openSpieltagId, setOpenSpieltagId] = useState(null);
+  const [drag, setDrag] = useState(null); // { gegnerId, gegnerName, x, y, over }
+  const dragRef = useRef(null);
+
+  const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
+  const istZugeordnet = (spieltagId, gegnerId) => {
+    const s = spieltage.find((sp) => sp.id === spieltagId);
+    return s ? s.zugeordneteGegner.includes(gegnerId) : false;
+  };
+  const zuordnenToggeln = (spieltagId, gegnerId) => onToggleGegnerZuordnung(spieltagId, gegnerId, istZugeordnet(spieltagId, gegnerId));
+
+  const onChipPointerDown = (e, g) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY };
+    setDrag({ gegnerId: g.id, gegnerName: g.name, x: e.clientX, y: e.clientY, over: false });
+  };
+  const onChipPointerMove = (e) => {
+    if (!dragRef.current) return;
+    const overEl = document.elementFromPoint(e.clientX, e.clientY);
+    const over = !!(overEl && overEl.closest('[data-dropzone="true"]'));
+    setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over } : d));
+  };
+  const onChipPointerUp = (e, g) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    const bewegt = Math.hypot(dx, dy) > 6;
+    const traf = drag?.over;
+    dragRef.current = null;
+    setDrag(null);
+    if (openSpieltagId && (!bewegt || traf)) zuordnenToggeln(openSpieltagId, g.id);
+  };
+  const onChipPointerCancel = () => {
+    dragRef.current = null;
+    setDrag(null);
+  };
 
   return (
-    <div style={{ marginTop: 4 }}>
-      <h3 style={styles.h3}>Gegner</h3>
-      <div style={styles.addRow}>
-        <input
-          style={styles.input}
-          placeholder="Name des Gegners"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) {
-              onAddGegner(name.trim());
-              setName("");
-            }
-          }}
-        />
-        <button
-          style={styles.secondaryBtn}
-          onClick={() => {
-            if (name.trim()) {
-              onAddGegner(name.trim());
-              setName("");
-            }
-          }}
-        >
-          Hinzufügen
-        </button>
-      </div>
+    <div style={{ marginTop: 4, position: "relative" }}>
+      <h3 style={styles.h3}>Spieltage</h3>
 
-      {gegner.length === 0 && <EmptyState text="Noch keine Gegner hinterlegt." />}
+      {/* Gegner verwalten */}
+      <div style={{ ...styles.card, marginBottom: 18 }}>
+        <div style={{ ...styles.cardHead, cursor: "pointer" }} onClick={() => setGegnerOffen(!gegnerOffen)}>
+          <span style={styles.cardName}>Gegner</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
+            {gegnerOffen ? "Einklappen" : "Ausklappen"} <ChevronIcon open={gegnerOffen} />
+          </span>
+        </div>
 
-      <div style={styles.cardList}>
-        {gegner.map((g) => {
-          const open = openId === g.id;
-          return (
-            <div key={g.id} style={styles.card}>
-              <div style={styles.cardHead}>
-                <span style={styles.cardName}>{g.name}</span>
-                <div style={styles.cardActions}>
+        {gegnerOffen && (
+          <>
+            <div style={{ ...styles.addRow, marginTop: 10 }}>
+              <input
+                style={styles.input}
+                placeholder="Name des Gegners"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && name.trim()) {
+                    onAddGegner(name.trim());
+                    setName("");
+                  }
+                }}
+              />
+              <button
+                style={styles.secondaryBtn}
+                onClick={() => {
+                  if (name.trim()) {
+                    onAddGegner(name.trim());
+                    setName("");
+                  }
+                }}
+              >
+                Hinzufügen
+              </button>
+            </div>
+
+            {gegner.length === 0 && <EmptyState text="Noch keine Gegner hinterlegt." />}
+
+            <div style={{ ...styles.chipGroup, marginTop: 12 }}>
+              {gegner.map((g) => (
+                <span key={g.id} style={{ ...styles.chip, cursor: "default", gap: 6 }}>
+                  {g.name}
                   <button
-                    style={{ ...styles.linkBtn, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}
-                    onClick={() => setOpenId(open ? null : g.id)}
-                  >
-                    {open ? "Schließen" : "Spieltage zuordnen"} <ChevronIcon open={open} />
-                  </button>
-                  <button
-                    style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+                    aria-label={`${g.name} entfernen`}
                     onClick={() =>
                       confirmAnd(`Gegner "${g.name}" in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`, () =>
                         onRemoveGegner(g.id)
                       )
                     }
+                    style={{ border: "none", background: "transparent", color: "inherit", display: "inline-flex", padding: 0, cursor: "pointer" }}
                   >
-                    <TrashIcon size={14} /> Entfernen
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M6 6l12 12M18 6L6 18" /></svg>
                   </button>
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Spieltag anlegen */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={styles.subheading}>Neuen Spieltag anlegen</div>
+        <div style={styles.addRow}>
+          <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
+          <button style={styles.secondaryBtn} onClick={() => onAddSpieltag(neuesDatum)}>
+            Anlegen
+          </button>
+        </div>
+      </div>
+
+      {/* Spieltag-Liste mit Gegner-Zuordnung */}
+      <div style={styles.subheading}>Spieltage · antippen oder Gegner hierher ziehen</div>
+
+      {sorted.length === 0 && <EmptyState text="Noch keine Spieltage angelegt." />}
+
+      <div style={styles.cardList}>
+        {sorted.map((s) => {
+          const open = openSpieltagId === s.id;
+          const zugeordnet = gegner.filter((g) => s.zugeordneteGegner.includes(g.id));
+          const istDropziel = open && drag && drag.over;
+          return (
+            <div
+              key={s.id}
+              data-dropzone={open ? "true" : undefined}
+              style={{
+                ...styles.card,
+                ...(istDropziel ? { border: "2px dashed var(--accent-text)", background: "var(--accent-soft)" } : {}),
+              }}
+            >
+              <div style={{ ...styles.cardHead, cursor: "pointer" }} onClick={() => setOpenSpieltagId(open ? null : s.id)}>
+                <span style={styles.cardName}>{formatTerminLabel(s.date)}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {!open && zugeordnet.length === 0 && <span style={styles.hint}>kein Gegner</span>}
+                  {!open && zugeordnet.length > 0 && (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {zugeordnet.slice(0, 2).map((g) => (
+                        <span key={g.id} style={styles.tag}>{g.name}</span>
+                      ))}
+                      {zugeordnet.length > 2 && <span style={styles.tag}>+{zugeordnet.length - 2}</span>}
+                    </div>
+                  )}
+                  <button
+                    aria-label="Spieltag entfernen"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      confirmAnd(`Spieltag ${formatTerminLabel(s.date)} in den Papierkorb verschieben?`, () => onRemoveSpieltag(s.id));
+                    }}
+                    style={{ ...styles.linkBtn, color: "var(--danger-text)", padding: 0 }}
+                  >
+                    <TrashIcon size={14} />
+                  </button>
+                  <ChevronIcon open={open} />
                 </div>
               </div>
 
               {open && (
-                <div style={styles.basisGrid}>
-                  {sortiereSpieltage.length === 0 && (
-                    <span style={styles.hint}>Noch keine Spieltage unter „Spieltage“ angelegt.</span>
-                  )}
-                  <div style={styles.chipGroup}>
-                    {sortiereSpieltage.map((s) => {
-                      const zugeordnet = s.zugeordneteGegner.includes(g.id);
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={(e) => { onToggleGegnerZuordnung(s.id, g.id, zugeordnet); e.currentTarget.blur(); }}
-                          style={{ ...styles.chip, ...(zugeordnet ? styles.chipActive : {}) }}
-                        >
-                          {formatTerminLabel(s.date)}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div style={{ ...styles.chipGroup, marginTop: 12 }}>
+                  {gegner.length === 0 && <span style={styles.hint}>Noch keine Gegner hinterlegt.</span>}
+                  {gegner.map((g) => {
+                    const aktiv = s.zugeordneteGegner.includes(g.id);
+                    return (
+                      <button
+                        key={g.id}
+                        style={{ ...styles.chip, ...(aktiv ? styles.chipActive : {}), touchAction: "none", cursor: "grab" }}
+                        onPointerDown={(e) => onChipPointerDown(e, g)}
+                        onPointerMove={onChipPointerMove}
+                        onPointerUp={(e) => onChipPointerUp(e, g)}
+                        onPointerCancel={onChipPointerCancel}
+                      >
+                        {g.name}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+
+      <div style={{ marginTop: 16, fontSize: 11, color: "var(--muted-2)", lineHeight: 1.5 }}>
+        Eine Karte aufklappen, dann Gegner antippen oder auf die Karte ziehen – zum Entfernen nochmal antippen bzw. herausziehen.
+      </div>
+
+      {drag && (
+        <span
+          style={{
+            ...styles.chip,
+            ...styles.chipActive,
+            position: "fixed",
+            left: drag.x - 40,
+            top: drag.y - 18,
+            pointerEvents: "none",
+            zIndex: 999,
+            boxShadow: "0 6px 14px rgba(28,20,20,0.25)",
+            transform: "rotate(-3deg)",
+          }}
+        >
+          {drag.gegnerName}
+        </span>
+      )}
     </div>
   );
 }
@@ -4778,6 +4898,7 @@ const styles = {
   chip: { border: "1px solid var(--border-strong)", outline: "none", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "#AE1E1D", color: "#fff", border: "1px solid #AE1E1D" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
+  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 11, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
     background: "var(--header-grad-btn)",
     color: "#fff",
