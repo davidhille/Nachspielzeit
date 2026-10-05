@@ -3613,6 +3613,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
   const [terminTyp, setTerminTyp] = useState("training");
   const [vonZeit, setVonZeit] = useState("16:30");
   const [bisZeit, setBisZeit] = useState("17:45");
+  const [rhythmus, setRhythmus] = useState("woechentlich");
 
   const toggleWochentag = (idx) => {
     setWochentage((w) => (w.includes(idx) ? w.filter((x) => x !== idx) : [...w, idx].sort()));
@@ -3636,6 +3637,8 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
     const start = new Date(jahr, monat - 1, tag);
     start.setHours(0, 0, 0, 0);
     for (let i = 0; i < wochen * 7; i++) {
+      const wochenIndex = Math.floor(i / 7);
+      if (rhythmus === "zweiwoechentlich" && wochenIndex % 2 !== 0) continue;
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       if (wochentage.includes(d.getDay())) {
@@ -3721,6 +3724,23 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
                 {WOCHENTAGE[idx]}
               </button>
             ))}
+          </div>
+        </div>
+        <div style={styles.fieldRow}>
+          <label style={styles.label}>Rhythmus</label>
+          <div style={styles.chipGroup}>
+            <button
+              onClick={(e) => { setRhythmus("woechentlich"); e.currentTarget.blur(); }}
+              style={{ ...styles.chip, ...(rhythmus === "woechentlich" ? styles.chipActive : {}) }}
+            >
+              Wöchentlich
+            </button>
+            <button
+              onClick={(e) => { setRhythmus("zweiwoechentlich"); e.currentTarget.blur(); }}
+              style={{ ...styles.chip, ...(rhythmus === "zweiwoechentlich" ? styles.chipActive : {}) }}
+            >
+              Zweiwöchentlich
+            </button>
           </div>
         </div>
         <div style={styles.fieldRow}>
