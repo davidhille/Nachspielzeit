@@ -3699,6 +3699,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <input
               type="time"
+              step="900"
               style={{ ...styles.input, flex: "none", width: 100 }}
               value={vonZeit}
               onChange={(e) => setVonZeit(e.target.value)}
@@ -3706,6 +3707,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             <span style={{ color: "var(--muted)" }}>bis</span>
             <input
               type="time"
+              step="900"
               style={{ ...styles.input, flex: "none", width: 100 }}
               value={bisZeit}
               onChange={(e) => setBisZeit(e.target.value)}
@@ -3715,7 +3717,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
         <div style={styles.fieldRow}>
           <label style={styles.label}>Wochentage</label>
           <div style={styles.chipGroup}>
-            {[1, 2, 3, 4, 5].map((idx) => (
+            {[1, 2, 3, 4, 5, 6].map((idx) => (
               <button
                 key={idx}
                 onClick={(e) => { toggleWochentag(idx); e.currentTarget.blur(); }}
@@ -3855,6 +3857,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <input
             type="time"
+            step="900"
             style={{ ...styles.input, flex: "none", width: 95 }}
             value={vonZeit}
             onChange={(e) => setVonZeit(e.target.value)}
@@ -3862,6 +3865,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
           <span style={{ color: "var(--muted)" }}>bis</span>
           <input
             type="time"
+            step="900"
             style={{ ...styles.input, flex: "none", width: 95 }}
             value={bisZeit}
             onChange={(e) => setBisZeit(e.target.value)}
