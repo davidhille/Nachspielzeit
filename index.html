@@ -1215,7 +1215,7 @@ function truncateCanvasText(ctx, text, maxWidth) {
 
 // Erzeugt das WhatsApp-Teilen-Bild eines Spieltags (nur Mannschaftsfoto + Ergebnisse),
 // Hochformat 1080px breit, Höhe passt sich der Anzahl der Spiele an.
-async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
+async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players) {
   try {
     await Promise.all([
       document.fonts.load("800 46px 'Space Grotesk'"),
@@ -1237,7 +1237,43 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
   const gridY = photoH + 110;
   const anzahlSpiele = spieltag.spiele.length;
   const rows = anzahlSpiele > 0 ? Math.ceil(anzahlSpiele / 2) : 0;
-  const inhaltsEnde = anzahlSpiele > 0 ? gridY + rows * tileH + (rows - 1) * gap : photoH + 170;
+
+  // Torschützen je Spiel als umgebrochene Zeilen (Messung über temporäres Canvas)
+  const messCtx = document.createElement("canvas").getContext("2d");
+  messCtx.font = "600 22px 'Inter', sans-serif";
+  const scorerMaxW = tileW - 48;
+  const spielerNameFn = (id) => (players || []).find((p) => p.id === id)?.name || "Unbekannt";
+  const scorerLines = spieltag.spiele.map((sp) => {
+    const teile = (sp.scorers || []).map((sc) => (sc.tore > 1 ? `${spielerNameFn(sc.playerId)} (${sc.tore})` : spielerNameFn(sc.playerId)));
+    if (teile.length === 0) return [];
+    const woerter = teile.join(", ").split(" ");
+    const lines = [];
+    let cur = "";
+    woerter.forEach((w) => {
+      const test = cur ? cur + " " + w : w;
+      if (cur && messCtx.measureText(test).width > scorerMaxW) {
+        lines.push(cur);
+        cur = w;
+      } else {
+        cur = test;
+      }
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  });
+  const scorerLineH = 30;
+  const tileHeightOf = (i) => (scorerLines[i].length > 0 ? tileH + 4 + scorerLines[i].length * scorerLineH : tileH);
+  const rowHeights = [];
+  for (let r = 0; r < rows; r++) {
+    rowHeights.push(Math.max(tileHeightOf(r * 2), r * 2 + 1 < anzahlSpiele ? tileHeightOf(r * 2 + 1) : 0));
+  }
+  const rowYs = [];
+  let accY = gridY;
+  rowHeights.forEach((h) => {
+    rowYs.push(accY);
+    accY += h + gap;
+  });
+  const inhaltsEnde = anzahlSpiele > 0 ? accY - gap : photoH + 170;
   const H = Math.max(1300, Math.round(inhaltsEnde + 44));
 
   const canvas = document.createElement("canvas");
@@ -1325,7 +1361,8 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
       const col = i % 2;
       const row = Math.floor(i / 2);
       const x = padding + col * (tileW + gap);
-      const y = gridY + row * (tileH + gap);
+      const y = rowYs[row];
+      const tileHi = rowHeights[row];
       let bg, farbe;
       if (sp.ourGoals > sp.theirGoals) {
         bg = "#E8F3E8";
@@ -1337,7 +1374,7 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
         bg = "#F2EFE9";
         farbe = "#76595A";
       }
-      roundRectPath(ctx, x, y, tileW, tileH, 18);
+      roundRectPath(ctx, x, y, tileW, tileHi, 18);
       ctx.fillStyle = bg;
       ctx.fill();
 
@@ -1348,6 +1385,14 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
       ctx.fillStyle = farbe;
       ctx.font = "800 52px 'Space Grotesk', sans-serif";
       ctx.fillText(`${sp.ourGoals} : ${sp.theirGoals}`, x + 24, y + 112);
+
+      if (scorerLines[i].length > 0) {
+        ctx.fillStyle = "#5A4A4A";
+        ctx.font = "600 22px 'Inter', sans-serif";
+        scorerLines[i].forEach((line, li) => {
+          ctx.fillText(line, x + 24, y + 150 + li * scorerLineH);
+        });
+      }
     });
   } else {
     ctx.fillStyle = "#B08A8A";
@@ -3442,7 +3487,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setTeilenLaeuft(true);
     setTeilenFehler(null);
     try {
-      const blob = await generateSpieltagShareImage(spieltag, nummer, gegner);
+      const blob = await generateSpieltagShareImage(spieltag, nummer, gegner, players);
       const dateiname = `${spieltagLabel(spieltag, nummer).toLowerCase().replace(/\s+/g, "-")}-${spieltag.date}.png`;
       const file = new File([blob], dateiname, { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
