@@ -743,10 +743,7 @@ function App() {
           id: u.id,
           titel: u.titel,
           beschreibung: u.beschreibung || null,
-          dauer: u.dauer ? Number(u.dauer) : null,
-          kinder: u.kinder || null,
           keywords: u.keywords,
-          material: u.material,
           bild_url: bildUrl,
           deleted_at: null,
         },
@@ -4955,9 +4952,6 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
                   </div>
                   <div style={{ padding: "10px 12px 12px" }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{u.titel}</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
-                      {[u.dauer ? `${u.dauer} Min` : null, u.kinder ? `${u.kinder} Kinder` : null].filter(Boolean).join(" · ") || "–"}
-                    </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {u.keywords.map((k) => (
                         <span key={k} style={tagStyle}>{k}</span>
@@ -4977,10 +4971,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
 function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
   const [titel, setTitel] = useState(start?.titel || "");
   const [beschreibung, setBeschreibung] = useState(start?.beschreibung || "");
-  const [dauer, setDauer] = useState(start?.dauer ? String(start.dauer) : "");
-  const [kinder, setKinder] = useState(start?.kinder || "");
   const [keywords, setKeywords] = useState(start?.keywords || []);
-  const [material, setMaterial] = useState(start?.material || []);
   const [neuesKeyword, setNeuesKeyword] = useState("");
   const [bildFile, setBildFile] = useState(null);
   const [vorschau, setVorschau] = useState(start?.bildUrl || null);
@@ -4995,7 +4986,6 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
     setNeuesKeyword("");
   };
   const vorschlaege = alleKeywords.filter((k) => !keywords.includes(k));
-  const toggleMaterial = (key) => setMaterial(material.includes(key) ? material.filter((m) => m !== key) : [...material, key]);
 
   const speichern = () => {
     if (!titel.trim()) return;
@@ -5006,17 +4996,12 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
         id: start?.id || uid(),
         titel: titel.trim(),
         beschreibung: beschreibung.trim(),
-        dauer,
-        kinder: kinder.trim(),
         keywords: kw,
-        material,
         bildUrl: start?.bildUrl || null,
       },
       bildFile
     );
   };
-
-  const equipment = MATERIAL_GRUPPEN[0].items;
 
   return (
     <div style={{ marginTop: 4 }}>
@@ -5054,17 +5039,6 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
           <FormatTextarea label="Beschreibung" value={beschreibung} onChange={setBeschreibung} rows={6} placeholder="Aufbau, Ablauf, Hinweise …" />
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ ...styles.label, marginBottom: 6 }}>Dauer (Min)</div>
-            <input style={{ ...styles.input, width: "100%" }} inputMode="numeric" value={dauer} onChange={(e) => setDauer(e.target.value.replace(/\D/g, ""))} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ ...styles.label, marginBottom: 6 }}>Kinder</div>
-            <input style={{ ...styles.input, width: "100%" }} value={kinder} onChange={(e) => setKinder(e.target.value)} placeholder="z. B. 6–12" />
-          </div>
-        </div>
-
         <div style={{ ...styles.label, marginBottom: 6 }}>Keywords</div>
         {keywords.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
@@ -5097,15 +5071,6 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
           </>
         )}
 
-        <div style={{ ...styles.label, marginBottom: 6 }}>Material</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-          {equipment.map(([key, label]) => (
-            <button key={key} onClick={(e) => { toggleMaterial(key); e.currentTarget.blur(); }} style={{ ...styles.chip, ...(material.includes(key) ? styles.chipActive : {}) }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button style={{ ...styles.primaryBtn, opacity: titel.trim() ? 1 : 0.5 }} disabled={!titel.trim()} onClick={speichern}>Speichern</button>
           <button style={styles.secondaryBtn} onClick={onCancel}>Abbrechen</button>
@@ -5135,23 +5100,13 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
         .filter((e) => e.uebung),
     [eintraege, uebungen]
   );
-  const gesamtMin = liste.reduce((s, e) => s + (e.uebung.dauer || 0), 0);
-  const materialKeys = [...new Set(liste.flatMap((e) => e.uebung.material))];
   const gefiltert = useMemo(() => filterUebungen(uebungen, suche, filter), [uebungen, suche, filter]);
   const dabei = new Set(liste.map((e) => e.uebungId));
-
-  const terminMin = (() => {
-    if (!termin.start_zeit || !termin.end_zeit) return null;
-    const [h1, m1] = termin.start_zeit.split(":").map(Number);
-    const [h2, m2] = termin.end_zeit.split(":").map(Number);
-    const d = h2 * 60 + m2 - (h1 * 60 + m1);
-    return d > 0 ? d : null;
-  })();
 
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
       <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setOffen(!offen)}>
-        <ChevronIcon open={offen} /> Übungen{liste.length > 0 ? ` (${liste.length}) · ${gesamtMin} Min${terminMin ? ` von ${terminMin}` : ""}` : ""}
+        <ChevronIcon open={offen} /> Übungen{liste.length > 0 ? ` (${liste.length})` : ""}
       </button>
 
       {offen && (
@@ -5161,9 +5116,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
               <UebungBild url={e.uebung.bildUrl} size={56} titel={e.uebung.titel} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-2)" }}>
-                  {i + 1}{e.uebung.dauer ? ` · ${e.uebung.dauer} MIN` : ""}
-                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-2)" }}>{i + 1}</div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{e.uebung.titel}</div>
                 {e.uebung.keywords.length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
@@ -5192,12 +5145,6 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
             </div>
           ))}
 
-          {materialKeys.length > 0 && (
-            <div style={{ fontSize: 12, color: "var(--muted)" }}>
-              Material: {materialKeys.map((k) => MATERIAL_LABEL[k] || k).join(", ")}
-            </div>
-          )}
-
           {!waehlen ? (
             <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
           ) : (
@@ -5218,9 +5165,6 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                         <UebungBild url={u.bildUrl} size={48} titel={u.titel} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
-                          <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                            {[u.dauer ? `${u.dauer} Min` : null, u.kinder ? `${u.kinder} Kinder` : null].filter(Boolean).join(" · ")}
-                          </div>
                         </div>
                         <button
                           style={dabei.has(u.id) ? { ...styles.secondaryBtn, opacity: 0.8 } : styles.primaryBtn}
