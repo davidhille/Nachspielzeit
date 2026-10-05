@@ -1202,7 +1202,7 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
     month: "2-digit",
     year: "numeric",
   });
-  const zeile = `${bezeichnung} · ${datumFormatiert}${spieltag.zeit ? ` · ${spieltag.zeit} Uhr` : ""}`;
+  const zeile = `${bezeichnung} · ${datumFormatiert}${spieltag.zeit ? ` · ${spieltag.zeit} Uhr` : ""}${spieltag.ort ? ` · ${spieltag.ort}` : ""}`;
   ctx.fillStyle = "rgba(255,255,255,0.82)";
   ctx.textBaseline = "alphabetic";
   ctx.font = "700 24px 'Inter', sans-serif";
