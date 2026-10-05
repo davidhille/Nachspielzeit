@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Nachspielzeit" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1074,6 +1074,181 @@ function SaisonwechselHinweis({ seasons }) {
 }
 
 /* ---------- Dashboard ---------- */
+
+function loadImageCrossOrigin(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Foto konnte nicht geladen werden."));
+    img.src = url;
+  });
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function truncateCanvasText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxWidth) {
+    t = t.slice(0, -1);
+  }
+  return t + "…";
+}
+
+// Erzeugt das WhatsApp-Teilen-Bild eines Spieltags (nur Mannschaftsfoto + Ergebnisse),
+// Hochformat 1080px breit, Höhe passt sich der Anzahl der Spiele an.
+async function generateSpieltagShareImage(spieltag, nummer, gegnerListe) {
+  try {
+    await Promise.all([
+      document.fonts.load("800 46px 'Space Grotesk'"),
+      document.fonts.load("700 26px 'Inter'"),
+      document.fonts.load("600 22px 'Inter'"),
+    ]);
+  } catch (e) {
+    // Fallback-Fonts sind ok, falls das Laden fehlschlägt
+  }
+
+  const W = 1080;
+  const photoH = 620;
+  const padding = 44;
+  const gap = 20;
+  const tileW = (W - padding * 2 - gap) / 2;
+  const tileH = 150;
+  const gridY = photoH + 110;
+  const anzahlSpiele = spieltag.spiele.length;
+  const rows = anzahlSpiele > 0 ? Math.ceil(anzahlSpiele / 2) : 0;
+  const inhaltsEnde = anzahlSpiele > 0 ? gridY + rows * tileH + (rows - 1) * gap + 90 : photoH + 170;
+  const H = Math.max(1350, Math.round(inhaltsEnde + 50));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#F7F4F3";
+  ctx.fillRect(0, 0, W, H);
+
+  if (spieltag.fotoUrl) {
+    try {
+      const img = await loadImageCrossOrigin(spieltag.fotoUrl);
+      const scale = Math.max(W / img.naturalWidth, photoH / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      const dx = (W - dw) / 2;
+      const dy = (photoH - dh) / 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, W, photoH);
+      ctx.clip();
+      ctx.drawImage(img, dx, dy, dw, dh);
+      ctx.restore();
+    } catch (e) {
+      throw new Error("Mannschaftsfoto konnte nicht geladen werden (CORS). Bitte Foto neu hochladen oder Supabase-Storage-CORS prüfen.");
+    }
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, W, photoH);
+    grad.addColorStop(0, "#C4271F");
+    grad.addColorStop(1, "#8E1416");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, photoH);
+  }
+
+  const verlauf = ctx.createLinearGradient(0, photoH - 250, 0, photoH);
+  verlauf.addColorStop(0, "rgba(28,20,20,0)");
+  verlauf.addColorStop(1, "rgba(20,13,13,0.82)");
+  ctx.fillStyle = verlauf;
+  ctx.fillRect(0, photoH - 250, W, 250);
+
+  const badgeSize = 68;
+  const badgeX = padding;
+  const badgeY = 40;
+  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX + badgeSize, badgeY + badgeSize);
+  badgeGrad.addColorStop(0, "#C4271F");
+  badgeGrad.addColorStop(1, "#8E1416");
+  roundRectPath(ctx, badgeX, badgeY, badgeSize, badgeSize, 16);
+  ctx.fillStyle = badgeGrad;
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "800 30px 'Space Grotesk', sans-serif";
+  ctx.fillText("SV", badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 2);
+
+  ctx.textAlign = "left";
+  ctx.font = "700 32px 'Space Grotesk', sans-serif";
+  ctx.fillText("SV Heimstetten U8", badgeX + badgeSize + 20, badgeY + badgeSize / 2 + 2);
+
+  const bezeichnung = spieltagLabel(spieltag, nummer);
+  const datumFormatiert = new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const zeile = `${bezeichnung} · ${datumFormatiert}${spieltag.zeit ? ` · ${spieltag.zeit} Uhr` : ""}`;
+  ctx.fillStyle = "rgba(255,255,255,0.82)";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = "700 24px 'Inter', sans-serif";
+  ctx.fillText(zeile.toUpperCase(), padding, photoH - 40);
+
+  ctx.fillStyle = "#1C2B22";
+  ctx.font = "800 46px 'Space Grotesk', sans-serif";
+  ctx.fillText("Unsere Ergebnisse", padding, photoH + 80);
+
+  const gegnerName = (id) => (gegnerListe || []).find((g) => g.id === id)?.name || "Unbekannt";
+
+  if (anzahlSpiele > 0) {
+    spieltag.spiele.forEach((sp, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = padding + col * (tileW + gap);
+      const y = gridY + row * (tileH + gap);
+      let bg, farbe;
+      if (sp.ourGoals > sp.theirGoals) {
+        bg = "#E8F3E8";
+        farbe = "#2E7D32";
+      } else if (sp.ourGoals < sp.theirGoals) {
+        bg = "#FBEAEA";
+        farbe = "#C62828";
+      } else {
+        bg = "#F2EFE9";
+        farbe = "#76595A";
+      }
+      roundRectPath(ctx, x, y, tileW, tileH, 18);
+      ctx.fillStyle = bg;
+      ctx.fill();
+
+      ctx.fillStyle = "#1C2B22";
+      ctx.font = "700 26px 'Inter', sans-serif";
+      ctx.fillText(truncateCanvasText(ctx, gegnerName(sp.opponentId), tileW - 32), x + 24, y + 48);
+
+      ctx.fillStyle = farbe;
+      ctx.font = "800 52px 'Space Grotesk', sans-serif";
+      ctx.fillText(`${sp.ourGoals} : ${sp.theirGoals}`, x + 24, y + 112);
+    });
+  } else {
+    ctx.fillStyle = "#B08A8A";
+    ctx.font = "600 24px 'Inter', sans-serif";
+    ctx.fillText("Noch keine Ergebnisse erfasst", padding, photoH + 140);
+  }
+
+  ctx.fillStyle = "#B08A8A";
+  ctx.font = "600 22px 'Inter', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Nachspielzeit · SV Heimstetten", W / 2, H - 30);
+
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Bild konnte nicht erstellt werden."))), "image/png")
+  );
+}
 
 function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
   const [frameSize, setFrameSize] = useState({ w: 320, h: 320 / aspect });
@@ -2885,6 +3060,18 @@ function TrashIcon({ size = 16 }) {
   );
 }
 
+function ShareIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "-3px" }}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.6" y1="10.6" x2="15.4" y2="6.4" />
+      <line x1="8.6" y1="13.4" x2="15.4" y2="17.6" />
+    </svg>
+  );
+}
+
 function SettingsIcon({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3026,10 +3213,40 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
   const [spieltagTab, setSpieltagTab] = useState("spiele");
+  const [teilenLaeuft, setTeilenLaeuft] = useState(false);
+  const [teilenFehler, setTeilenFehler] = useState(null);
 
   useEffect(() => {
     if (!opponentId && gegner[0]) setOpponentId(gegner[0].id);
   }, [gegner]); // eslint-disable-line
+
+  const handleTeilen = async () => {
+    setTeilenLaeuft(true);
+    setTeilenFehler(null);
+    try {
+      const blob = await generateSpieltagShareImage(spieltag, nummer, gegner);
+      const dateiname = `${spieltagLabel(spieltag, nummer).toLowerCase().replace(/\s+/g, "-")}-${spieltag.date}.png`;
+      const file = new File([blob], dateiname, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: spieltagLabel(spieltag, nummer) });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = dateiname;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      }
+    } catch (e) {
+      if (!e || e.name !== "AbortError") {
+        setTeilenFehler((e && e.message) || "Bild konnte nicht erstellt werden.");
+      }
+    } finally {
+      setTeilenLaeuft(false);
+    }
+  };
 
   const inc = (playerId) => {
     setTally((t) => ({ ...t, [playerId]: (t[playerId] || 0) + 1 }));
@@ -3156,12 +3373,22 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
               {open ? "Schließen" : "Öffnen"} <ChevronIcon open={open} />
             </button>
             <button
+              style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4, opacity: teilenLaeuft ? 0.6 : 1 }}
+              onClick={handleTeilen}
+              disabled={teilenLaeuft}
+            >
+              <ShareIcon size={14} /> {teilenLaeuft ? "Erstelle Bild …" : "Teilen"}
+            </button>
+            <button
               style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => confirmAnd("Diesen Spieltag in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.", onRemoveSpieltag)}
             >
               <TrashIcon size={14} /> Entfernen
             </button>
           </div>
+          {teilenFehler && (
+            <span style={{ fontSize: 11.5, color: "var(--danger-text)", textAlign: "right", maxWidth: 220 }}>{teilenFehler}</span>
+          )}
           {spieltag.spiele.length > 0 && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#2E7D32" }}>
               <span
