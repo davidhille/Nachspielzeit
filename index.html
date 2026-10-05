@@ -2952,6 +2952,8 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
   const [theirGoals, setTheirGoals] = useState(0);
   const [tally, setTally] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [newOpponentId, setNewOpponentId] = useState(null);
+  const [addingFree, setAddingFree] = useState(false);
   const [spieltagTab, setSpieltagTab] = useState("spiele");
 
   useEffect(() => {
@@ -2975,13 +2977,17 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
 
   const resetForm = () => {
     setEditingId(null);
+    setNewOpponentId(null);
+    setAddingFree(false);
     setOpponentId(gegner[0]?.id || "");
     setOurGoals(0);
     setTheirGoals(0);
     setTally({});
   };
 
-  const startEdit = (sp) => {
+  const startEditSpiel = (sp) => {
+    setNewOpponentId(null);
+    setAddingFree(false);
     setEditingId(sp.id);
     setOpponentId(sp.opponentId);
     setOurGoals(sp.ourGoals);
@@ -2989,6 +2995,26 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
     const t = {};
     sp.scorers.forEach((sc) => (t[sc.playerId] = sc.tore));
     setTally(t);
+  };
+
+  const startNewForOpponent = (gegnerId) => {
+    setEditingId(null);
+    setAddingFree(false);
+    setNewOpponentId(gegnerId);
+    setOpponentId(gegnerId);
+    setOurGoals(0);
+    setTheirGoals(0);
+    setTally({});
+  };
+
+  const startNewFree = () => {
+    setEditingId(null);
+    setNewOpponentId(null);
+    setAddingFree(true);
+    setOpponentId(gegner[0]?.id || "");
+    setOurGoals(0);
+    setTheirGoals(0);
+    setTally({});
   };
 
   const saveSpiel = () => {
@@ -3013,6 +3039,15 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
   const spielerName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
   const torschuetzenOptionen =
     spieltag.teilnehmer.length > 0 ? players.filter((p) => spieltag.teilnehmer.includes(p.id)) : players;
+
+  const gespielteGegnerIds = new Set(spieltag.spiele.map((sp) => sp.opponentId));
+  const offeneZugeordneteGegner = spieltag.zugeordneteGegner
+    .filter((id) => !gespielteGegnerIds.has(id))
+    .map((id) => gegner.find((g) => g.id === id))
+    .filter(Boolean);
+
+  const editorOpen = Boolean(editingId || newOpponentId || addingFree);
+  const editorOpponentFixed = Boolean(editingId || newOpponentId);
 
   const datumFormatiert = new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", {
     day: "2-digit",
@@ -3113,124 +3148,186 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
 
           {spieltagTab === "spiele" && (
             <>
-              {spieltag.spiele.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                  {spieltag.spiele.map((sp) => {
-                    const ergebnis =
-                      sp.ourGoals > sp.theirGoals ? "sieg" : sp.ourGoals < sp.theirGoals ? "niederlage" : "unentschieden";
-                    const ergebnisStyle = {
-                      sieg: { borderLeft: "4px solid #2E7D32", background: "var(--win-bg)" },
-                      niederlage: { borderLeft: "4px solid #C62828", background: "var(--loss-bg)" },
-                      unentschieden: { borderLeft: "4px solid #8A8A8A", background: "var(--draw-bg)" },
-                    }[ergebnis];
-                    return (
-                      <div key={sp.id} style={{ ...styles.spielRow, ...ergebnisStyle }}>
-                        <div>
-                          <strong>
-                            SVH {sp.ourGoals}:{sp.theirGoals} {gegnerName(sp.opponentId)}
-                          </strong>
-                          {sp.scorers.length > 0 && (
-                            <div style={{ ...styles.hint, marginTop: 6 }}>
-                              <span>Tore: </span>
-                              {sp.scorers.map((sc, i) => (
-                                <React.Fragment key={sc.id}>
-                                  <strong style={{ color: "var(--text)" }}>{spielerName(sc.playerId)}</strong> ({sc.tore})
-                                  {i < sp.scorers.length - 1 ? ", " : ""}
-                                </React.Fragment>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                          <button
-                            style={{ ...styles.linkBtn, display: "flex", alignItems: "center" }}
-                            onClick={() => startEdit(sp)}
-                            title="Bearbeiten"
-                            aria-label="Bearbeiten"
-                          >
-                            <EditIcon />
-                          </button>
-                          <button
-                            style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "flex", alignItems: "center" }}
-                            onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => onRemoveSpiel(sp.id))}
-                            title="Entfernen"
-                            aria-label="Entfernen"
-                          >
-                            <TrashIcon />
-                          </button>
-                        </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                {spieltag.spiele.map((sp) => {
+                  const ergebnis =
+                    sp.ourGoals > sp.theirGoals ? "sieg" : sp.ourGoals < sp.theirGoals ? "niederlage" : "unentschieden";
+                  const ergebnisColor = {
+                    sieg: "var(--success-text)",
+                    niederlage: "var(--loss-text)",
+                    unentschieden: "var(--text-2)",
+                  }[ergebnis];
+                  return (
+                    <div
+                      key={sp.id}
+                      style={{
+                        position: "relative",
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        borderBottom: `4px solid ${ergebnisColor}`,
+                        borderRadius: 14,
+                        padding: 12,
+                      }}
+                    >
+                      <button
+                        style={{ ...styles.linkBtn, position: "absolute", top: 8, right: 8, display: "flex", padding: 4 }}
+                        onClick={() => startEditSpiel(sp)}
+                        title="Bearbeiten"
+                        aria-label="Bearbeiten"
+                      >
+                        <EditIcon size={14} />
+                      </button>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, paddingRight: 20 }}>{gegnerName(sp.opponentId)}</div>
+                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700, color: ergebnisColor, margin: "4px 0" }}>
+                        {sp.ourGoals}:{sp.theirGoals}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      {sp.scorers.length > 0 && (
+                        <div style={{ fontSize: 10.5, color: "var(--muted)", lineHeight: 1.4 }}>
+                          ⚽{" "}
+                          {sp.scorers.map((sc, i) => (
+                            <React.Fragment key={sc.id}>
+                              {spielerName(sc.playerId)} ({sc.tore})
+                              {i < sp.scorers.length - 1 ? ", " : ""}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
-              <div style={styles.basisGrid}>
-                {editingId && (
-                  <div style={styles.editBanner}>
-                    Spiel wird bearbeitet.{" "}
+                {offeneZugeordneteGegner.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => startNewForOpponent(g.id)}
+                    style={{
+                      background: "transparent",
+                      border: "1.5px dashed var(--muted-2)",
+                      borderRadius: 14,
+                      padding: 12,
+                      minHeight: 92,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      justifyContent: "center",
+                      gap: 8,
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>{g.name}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted-2)", fontSize: 11, fontWeight: 600 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Ergebnis eintragen
+                    </span>
+                  </button>
+                ))}
+
+                <button
+                  onClick={startNewFree}
+                  style={{
+                    background: "transparent",
+                    border: "1.5px dashed var(--border)",
+                    borderRadius: 14,
+                    padding: 12,
+                    minHeight: 92,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--muted-2)",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    textAlign: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  + weiteres Spiel{spieltag.zugeordneteGegner.length > 0 ? " (anderer Gegner)" : ""}
+                </button>
+              </div>
+
+              {editorOpen && (
+                <div style={styles.basisGrid}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>
+                      {editorOpponentFixed ? `vs. ${gegnerName(opponentId)}` : "Neues Spiel"}
+                    </span>
                     <button style={styles.linkBtn} onClick={resetForm}>
                       Abbrechen
                     </button>
                   </div>
-                )}
-                <div>
-                  <label style={styles.label}>Gegner</label>
-                  <div style={{ ...styles.chipGroup, marginTop: 6 }}>
-                    {spielGegnerOptionen.length === 0 && (
-                      <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>
-                    )}
-                    {spielGegnerOptionen.map((g) => (
-                      <button
-                        key={g.id}
-                        onClick={(e) => { setOpponentId(g.id); e.currentTarget.blur(); }}
-                        style={{ ...styles.chip, ...(opponentId === g.id ? styles.chipActive : {}) }}
-                      >
-                        {g.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                <div style={{ marginTop: 8 }}>
-                  <label style={styles.label}>Ergebnis (Wir : Gegner)</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-                    <GoalStepper value={ourGoals} onChange={setOurGoals} />
-                    <span>:</span>
-                    <GoalStepper value={theirGoals} onChange={setTheirGoals} />
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 4 }}>
-                  <label style={styles.label}>Torschützen — antippen zum Erfassen</label>
-                  <div style={styles.scorerGrid}>
-                    {torschuetzenOptionen.map((p) => {
-                      const count = tally[p.id] || 0;
-                      return (
-                        <div key={p.id} style={{ ...styles.scorerTile, ...(count > 0 ? styles.scorerTileActive : {}) }}>
-                          <button style={styles.scorerName} onClick={() => inc(p.id)}>
-                            {p.name}
+                  {!editorOpponentFixed && (
+                    <div>
+                      <label style={styles.label}>Gegner</label>
+                      <div style={{ ...styles.chipGroup, marginTop: 6 }}>
+                        {spielGegnerOptionen.length === 0 && (
+                          <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>
+                        )}
+                        {spielGegnerOptionen.map((g) => (
+                          <button
+                            key={g.id}
+                            onClick={(e) => { setOpponentId(g.id); e.currentTarget.blur(); }}
+                            style={{ ...styles.chip, ...(opponentId === g.id ? styles.chipActive : {}) }}
+                          >
+                            {g.name}
                           </button>
-                          <div style={styles.scorerStepper}>
-                            <button style={styles.stepBtn} onClick={() => dec(p.id)} disabled={count === 0} aria-label={`Tor von ${p.name} abziehen`}>
-                              −
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 8 }}>
+                    <label style={styles.label}>Ergebnis (Wir : Gegner)</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                      <GoalStepper value={ourGoals} onChange={setOurGoals} />
+                      <span>:</span>
+                      <GoalStepper value={theirGoals} onChange={setTheirGoals} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 4 }}>
+                    <label style={styles.label}>Torschützen — antippen zum Erfassen</label>
+                    <div style={styles.scorerGrid}>
+                      {torschuetzenOptionen.map((p) => {
+                        const count = tally[p.id] || 0;
+                        return (
+                          <div key={p.id} style={{ ...styles.scorerTile, ...(count > 0 ? styles.scorerTileActive : {}) }}>
+                            <button style={styles.scorerName} onClick={() => inc(p.id)}>
+                              {p.name}
                             </button>
-                            <span style={styles.stepCount} aria-live="polite">{count}</span>
-                            <button style={styles.stepBtn} onClick={() => inc(p.id)} aria-label={`Tor für ${p.name} hinzufügen`}>
-                              +
-                            </button>
+                            <div style={styles.scorerStepper}>
+                              <button style={styles.stepBtn} onClick={() => dec(p.id)} disabled={count === 0} aria-label={`Tor von ${p.name} abziehen`}>
+                                −
+                              </button>
+                              <span style={styles.stepCount} aria-live="polite">{count}</span>
+                              <button style={styles.stepBtn} onClick={() => inc(p.id)} aria-label={`Tor für ${p.name} hinzufügen`}>
+                                +
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                    {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
+                        );
+                      })}
+                      {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center" }}>
+                    <button style={{ ...styles.primaryBtn, flex: 1 }} onClick={saveSpiel} disabled={!opponentId}>
+                      {editingId ? "Änderungen speichern" : "Spiel speichern"}
+                    </button>
+                    {editingId && (
+                      <button
+                        style={{ ...styles.linkBtn, color: "var(--danger-text)", flexShrink: 0 }}
+                        onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => { onRemoveSpiel(editingId); resetForm(); })}
+                      >
+                        Löschen
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                <button style={{ ...styles.primaryBtn, marginTop: 10 }} onClick={saveSpiel} disabled={!opponentId}>
-                  {editingId ? "Änderungen speichern" : "Spiel speichern"}
-                </button>
-              </div>
+              )}
             </>
           )}
 
