@@ -1055,11 +1055,174 @@ function SaisonwechselHinweis({ seasons }) {
 
 /* ---------- Dashboard ---------- */
 
-function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, height = 360, marginBottom = 20, titleSize = 22 }) {
-  const fileInputRef = useRef(null);
+function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
+  const [frameSize, setFrameSize] = useState({ w: 320, h: 320 / aspect });
+  const [imgEl, setImgEl] = useState(null);
+  const [baseScale, setBaseScale] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [saving, setSaving] = useState(false);
+  const dragRef = useRef(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => setImgEl(img);
+    img.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  useEffect(() => {
+    const update = () => {
+      const w = Math.min(360, window.innerWidth - 56);
+      setFrameSize({ w, h: w / aspect });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [aspect]);
+
+  const clamp = (p, z, size) => {
+    if (!imgEl) return p;
+    const scale = baseScale * z;
+    const dw = imgEl.naturalWidth * scale;
+    const dh = imgEl.naturalHeight * scale;
+    const minX = size.w - dw;
+    const minY = size.h - dh;
+    return { x: Math.min(0, Math.max(minX, p.x)), y: Math.min(0, Math.max(minY, p.y)) };
+  };
+
+  useEffect(() => {
+    if (!imgEl) return;
+    const scale = Math.max(frameSize.w / imgEl.naturalWidth, frameSize.h / imgEl.naturalHeight);
+    setBaseScale(scale);
+    setZoom(1);
+    const dw = imgEl.naturalWidth * scale;
+    const dh = imgEl.naturalHeight * scale;
+    setPos({ x: (frameSize.w - dw) / 2, y: (frameSize.h - dh) / 2 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgEl, frameSize.w, frameSize.h]);
+
+  const onPointerDown = (e) => {
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    setPos(clamp({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy }, zoom, frameSize));
+  };
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
+
+  const onZoomChange = (z) => {
+    setZoom(z);
+    setPos((p) => clamp(p, z, frameSize));
+  };
+
+  const handleConfirm = async () => {
+    if (!imgEl) return;
+    setSaving(true);
+    try {
+      const scale = baseScale * zoom;
+      const srcX = -pos.x / scale;
+      const srcY = -pos.y / scale;
+      const srcW = frameSize.w / scale;
+      const srcH = frameSize.h / scale;
+      const outW = 1200;
+      const outH = Math.round(outW / aspect);
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(imgEl, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+      const blob = await new Promise((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Bild konnte nicht verarbeitet werden."))), "image/jpeg", 0.88)
+      );
+      await onConfirm(blob);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
+    <div style={styles.modalOverlay} onClick={onCancel}>
+      <div style={{ ...styles.modalCard, maxWidth: frameSize.w + 40 }} onClick={(e) => e.stopPropagation()}>
+        <p style={{ ...styles.modalText, marginBottom: 10 }}>
+          Bildausschnitt wählen — ziehen zum Verschieben, Regler zum Zoomen.
+        </p>
+        <div
+          style={{
+            position: "relative",
+            width: frameSize.w,
+            height: frameSize.h,
+            overflow: "hidden",
+            borderRadius: 12,
+            background: "#111",
+            touchAction: "none",
+            cursor: "grab",
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
+          {imgEl ? (
+            <img
+              src={imgEl.src}
+              draggable={false}
+              alt=""
+              style={{
+                position: "absolute",
+                left: pos.x,
+                top: pos.y,
+                width: imgEl.naturalWidth * baseScale * zoom,
+                height: imgEl.naturalHeight * baseScale * zoom,
+                userSelect: "none",
+                pointerEvents: "none",
+              }}
+            />
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#fff", fontSize: 13 }}>
+              Lädt …
+            </div>
+          )}
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={3}
+          step={0.01}
+          value={zoom}
+          onChange={(e) => onZoomChange(Number(e.target.value))}
+          style={{ ...styles.range, marginTop: 14, width: "100%" }}
+          disabled={!imgEl}
+        />
+        <div style={styles.modalActions}>
+          <button style={styles.secondaryBtnOutline} onClick={onCancel} disabled={saving}>
+            Abbrechen
+          </button>
+          <button style={styles.secondaryBtn} onClick={handleConfirm} disabled={!imgEl || saving}>
+            {saving ? "Speichert …" : "Übernehmen"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, height = 360, marginBottom = 20, titleSize = 22 }) {
+  const fileInputRef = useRef(null);
+  const heroRef = useRef(null);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [cropAspect, setCropAspect] = useState(null);
+
+  return (
+    <>
     <div
+      ref={heroRef}
       style={{
         position: "relative",
         width: "100%",
@@ -1122,7 +1285,11 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
             style={{ display: "none" }}
             onChange={(e) => {
               const file = e.target.files && e.target.files[0];
-              if (file) onUploadFoto(file);
+              if (file) {
+                const w = heroRef.current ? heroRef.current.offsetWidth : 390;
+                setCropAspect(w / height);
+                setPendingFile(file);
+              }
               e.target.value = "";
             }}
           />
@@ -1150,6 +1317,18 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         </>
       )}
     </div>
+    {pendingFile && (
+      <ImageCropModal
+        file={pendingFile}
+        aspect={cropAspect || 390 / height}
+        onCancel={() => setPendingFile(null)}
+        onConfirm={async (blob) => {
+          await onUploadFoto(blob);
+          setPendingFile(null);
+        }}
+      />
+    )}
+    </>
   );
 }
 
