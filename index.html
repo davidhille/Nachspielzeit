@@ -591,6 +591,7 @@ function App() {
         fotoUrl: s.foto_url || null,
         zeit: s.zeit || null,
         typ: s.typ || "spieltag",
+        ort: s.ort || "",
         deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
         teilnehmer: stRaw.filter((t) => t.spieltag_id === s.id).map((t) => t.player_id),
@@ -654,10 +655,16 @@ function App() {
       () => wrapAction(() => dbUpdate(table, id, { deleted_at: null }), "Wiederhergestellt")
     );
 
-  const addSpieltag = (date, zeit, typ) =>
+  const addSpieltag = (date, zeit, typ, ort) =>
     wrapAction(async () => {
       const newId = uid();
-      await dbInsert("spieltage", { id: newId, date, zeit: zeit || null, typ: typ === "turnier" ? "turnier" : "spieltag" });
+      await dbInsert("spieltage", {
+        id: newId,
+        date,
+        zeit: zeit || null,
+        typ: typ === "turnier" ? "turnier" : "spieltag",
+        ort: ort || null,
+      });
       const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
       const activeIds = new Set(players.map((p) => p.id));
       const uebernommeneTeilnehmer = (letzterSpieltag?.teilnehmer || []).filter((id) => activeIds.has(id));
@@ -3364,6 +3371,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
           <span style={styles.mutedTag}>
             {" "}
             {spieltag.zeit && <>· {spieltag.zeit} Uhr </>}
+            {spieltag.ort && <>· {spieltag.ort} </>}
             · {spieltag.spiele.length} {spieltag.spiele.length === 1 ? "Spiel" : "Spiele"}
           </span>
         </span>
@@ -3417,7 +3425,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
         <>
           <TeamHero
             photoUrl={spieltag.fotoUrl}
-            teamName={`${nummer ? `${spieltagLabel(spieltag, nummer)} · ` : ""}${spieltag.zeit ? `${datumFormatiert} · ${spieltag.zeit} Uhr` : datumFormatiert}`}
+            teamName={`${nummer ? `${spieltagLabel(spieltag, nummer)} · ` : ""}${spieltag.zeit ? `${datumFormatiert} · ${spieltag.zeit} Uhr` : datumFormatiert}${spieltag.ort ? ` · ${spieltag.ort}` : ""}`}
             subtitle={spieltagSubtitle}
             onUploadFoto={(file) => onUploadFoto(file)}
             height={300}
@@ -4589,6 +4597,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
   const [neuerGegnerId, setNeuerGegnerId] = useState("");
   const [neueZeit, setNeueZeit] = useState("");
   const [neuerTyp, setNeuerTyp] = useState("spieltag");
+  const [neuerOrt, setNeuerOrt] = useState("");
 
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
   const nummern = useMemo(() => spieltagNummern(spieltage), [spieltage]);
@@ -4678,18 +4687,25 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
         <div style={{ ...styles.addRow, flexWrap: "wrap", rowGap: 8, marginTop: 8 }}>
           <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
           <ZeitSelect value={neueZeit} onChange={setNeueZeit} />
+          <input
+            style={{ ...styles.input, flex: "1 1 160px", minWidth: 140 }}
+            placeholder="Ort (optional)"
+            value={neuerOrt}
+            onChange={(e) => setNeuerOrt(e.target.value)}
+          />
           <button
             style={styles.secondaryBtn}
             onClick={() => {
-              onAddSpieltag(neuesDatum, neueZeit, neuerTyp);
+              onAddSpieltag(neuesDatum, neueZeit, neuerTyp, neuerOrt.trim());
               setNeueZeit("");
               setNeuerTyp("spieltag");
+              setNeuerOrt("");
             }}
           >
             Anlegen
           </button>
         </div>
-        <div style={{ ...styles.hint, marginTop: 6, marginBottom: 0 }}>Spieltage und Turniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit ist optional.</div>
+        <div style={{ ...styles.hint, marginTop: 6, marginBottom: 0 }}>Spieltage und Turniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</div>
       </div>
 
       {/* Spieltag-Liste mit Gegner-Zuordnung */}
@@ -4715,6 +4731,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                   {nummern.get(s.id) && <>{spieltagLabel(s, nummern.get(s.id))} · </>}
                   {formatTerminLabel(s.date)}
                   {s.zeit && <span style={styles.mutedTag}> · {s.zeit} Uhr</span>}
+                  {s.ort && <span style={styles.mutedTag}> · {s.ort}</span>}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {!open && zugeordnet.length === 0 && <span style={styles.hint}>kein Gegner</span>}
