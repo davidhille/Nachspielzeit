@@ -4977,6 +4977,26 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
   const [vorschau, setVorschau] = useState(start?.bildUrl || null);
   const fileRef = useRef(null);
 
+  const setzeBild = (f) => {
+    setBildFile(f);
+    setVorschau(URL.createObjectURL(f));
+  };
+
+  // Screenshot/Bild aus der Zwischenablage einfügen (Strg/Cmd+V), solange das Formular offen ist
+  useEffect(() => {
+    const onPaste = (e) => {
+      const items = e.clipboardData ? Array.from(e.clipboardData.items || []) : [];
+      const bildItem = items.find((it) => it.kind === "file" && it.type.startsWith("image/"));
+      if (!bildItem) return;
+      const f = bildItem.getAsFile();
+      if (!f) return;
+      e.preventDefault();
+      setzeBild(f);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
   const addKeyword = (k) => {
     const wert = k.trim();
     if (!wert) return;
@@ -5021,14 +5041,15 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
               onChange={(e) => {
                 const f = e.target.files && e.target.files[0];
                 if (!f) return;
-                setBildFile(f);
-                setVorschau(URL.createObjectURL(f));
+                setzeBild(f);
               }}
             />
             <button style={styles.secondaryBtn} onClick={() => fileRef.current && fileRef.current.click()}>
               {vorschau ? "Bild ändern" : "Bild hochladen"}
             </button>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>Foto, Skizze oder Screenshot – wird automatisch verkleinert.</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
+              Foto, Skizze oder Screenshot – oder einfach einen Screenshot mit Strg/Cmd+V einfügen. Wird automatisch verkleinert.
+            </div>
           </div>
         </div>
 
