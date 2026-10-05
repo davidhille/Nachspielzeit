@@ -5120,7 +5120,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
         <input style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 14 }} value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Passdreieck" />
 
         <div style={{ marginBottom: 14 }}>
-          <FormatTextarea label="Beschreibung" value={beschreibung} onChange={setBeschreibung} rows={6} placeholder="Aufbau, Ablauf, Hinweise …" />
+          <FormatTextarea label="Ablauf" value={beschreibung} onChange={setBeschreibung} rows={7} placeholder="Aufbau, Ablauf, Coaching-Hinweise …" />
         </div>
 
         <div style={{ ...styles.label, marginBottom: 6 }}>Keywords</div>
@@ -5171,7 +5171,8 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
 
 function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }) {
   const [offen, setOffen] = useState(false);
-  const [beschreibungId, setBeschreibungId] = useState(null);
+  const [ausgeblendet, setAusgeblendet] = useState([]);
+  const [pickerAblaufId, setPickerAblaufId] = useState(null);
   const [waehlen, setWaehlen] = useState(false);
   const [suche, setSuche] = useState("");
   const [filter, setFilter] = useState([]);
@@ -5211,11 +5212,11 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                   <>
                     <button
                       style={{ ...styles.linkBtn, padding: "6px 0 0" }}
-                      onClick={() => setBeschreibungId(beschreibungId === e.id ? null : e.id)}
+                      onClick={() => setAusgeblendet(ausgeblendet.includes(e.id) ? ausgeblendet.filter((x) => x !== e.id) : [...ausgeblendet, e.id])}
                     >
-                      {beschreibungId === e.id ? "Beschreibung ausblenden" : "Beschreibung anzeigen"}
+                      {ausgeblendet.includes(e.id) ? "Ablauf anzeigen" : "Ablauf ausblenden"}
                     </button>
-                    {beschreibungId === e.id && <FormatierterText text={e.uebung.beschreibung} style={{ marginTop: 6 }} />}
+                    {!ausgeblendet.includes(e.id) && <FormatierterText text={e.uebung.beschreibung} style={{ marginTop: 6 }} />}
                   </>
                 )}
               </div>
@@ -5245,17 +5246,33 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {gefiltert.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Keine Übung passt zu Suche und Filter.</div>}
                     {gefiltert.map((u) => (
-                      <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
-                        <UebungBild url={u.bildUrl} size={64} titel={u.titel} zoom />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
+                      <div key={u.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <UebungBild url={u.bildUrl} size={64} titel={u.titel} zoom />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
+                            {u.keywords.length > 0 && (
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                {u.keywords.map((k) => <span key={k} style={tagStyle}>{k}</span>)}
+                              </div>
+                            )}
+                            {u.beschreibung && (
+                              <button
+                                style={{ ...styles.linkBtn, padding: "6px 0 0" }}
+                                onClick={() => setPickerAblaufId(pickerAblaufId === u.id ? null : u.id)}
+                              >
+                                {pickerAblaufId === u.id ? "Ablauf ausblenden" : "Ablauf anzeigen"}
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            style={{ ...(dabei.has(u.id) ? styles.secondaryBtn : { ...styles.primaryBtn, padding: "0 16px", height: 40 }), width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
+                            onClick={() => onAdd(termin.id, u.id)}
+                          >
+                            {dabei.has(u.id) ? "Nochmal" : "Hinzufügen"}
+                          </button>
                         </div>
-                        <button
-                          style={{ ...(dabei.has(u.id) ? styles.secondaryBtn : { ...styles.primaryBtn, padding: "0 16px", height: 40 }), width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
-                          onClick={() => onAdd(termin.id, u.id)}
-                        >
-                          {dabei.has(u.id) ? "Nochmal" : "Hinzufügen"}
-                        </button>
+                        {pickerAblaufId === u.id && <FormatierterText text={u.beschreibung} style={{ marginTop: 8 }} />}
                       </div>
                     ))}
                   </div>
