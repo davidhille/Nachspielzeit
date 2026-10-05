@@ -3244,6 +3244,114 @@ function BulletListIcon({ size = 16 }) {
   );
 }
 
+/* Einfaches Text-Format: "**fett**" und Zeilen mit "• " als Aufzählung */
+function FormatierterText({ text, style }) {
+  const zeilen = (text || "").split("\n");
+  const inline = (t) =>
+    t.split(/(\*\*[^*]+\*\*)/g).map((teil, i) =>
+      /^\*\*[^*]+\*\*$/.test(teil) ? <strong key={i}>{teil.slice(2, -2)}</strong> : <span key={i}>{teil}</span>
+    );
+  return (
+    <div style={{ fontSize: 13, lineHeight: 1.45, color: "var(--text)", ...style }}>
+      {zeilen.map((z, i) =>
+        z.startsWith("• ") ? (
+          <div key={i} style={{ display: "flex", gap: 6, paddingLeft: 2 }}>
+            <span aria-hidden="true">•</span>
+            <span style={{ flex: 1 }}>{inline(z.slice(2))}</span>
+          </div>
+        ) : z.trim() === "" ? (
+          <div key={i} style={{ height: 6 }} />
+        ) : (
+          <div key={i}>{inline(z)}</div>
+        )
+      )}
+    </div>
+  );
+}
+
+function FormatTextarea({ value, onChange, rows = 5, placeholder, label }) {
+  const ref = useRef(null);
+
+  const setMitCursor = (next, selStart, selEnd) => {
+    onChange(next);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(selStart, selEnd);
+    });
+  };
+
+  const insertBullet = () => {
+    const el = ref.current;
+    const start = el ? el.selectionStart : value.length;
+    const end = el ? el.selectionEnd : value.length;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const insertion = (before.length > 0 && !before.endsWith("\n") ? "\n" : "") + "• ";
+    const pos = (before + insertion).length;
+    setMitCursor(before + insertion + after, pos, pos);
+  };
+
+  const toggleBold = () => {
+    const el = ref.current;
+    const start = el ? el.selectionStart : value.length;
+    const end = el ? el.selectionEnd : value.length;
+    const auswahl = value.slice(start, end);
+    if (auswahl) {
+      const schonFett = auswahl.startsWith("**") && auswahl.endsWith("**") && auswahl.length >= 4;
+      const neu = schonFett ? auswahl.slice(2, -2) : `**${auswahl}**`;
+      setMitCursor(value.slice(0, start) + neu + value.slice(end), start, start + neu.length);
+    } else {
+      setMitCursor(value.slice(0, start) + "****" + value.slice(end), start + 2, start + 2);
+    }
+  };
+
+  // Enter in einer Aufzählungszeile: nächste Zeile beginnt wieder mit "• "; leere Zeile beendet die Liste
+  const onKeyDown = (e) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const el = e.currentTarget;
+    const pos = el.selectionStart;
+    if (pos !== el.selectionEnd) return;
+    const zeilenStart = value.lastIndexOf("\n", pos - 1) + 1;
+    const zeile = value.slice(zeilenStart, pos);
+    if (!zeile.startsWith("• ")) return;
+    e.preventDefault();
+    if (zeile === "• ") {
+      setMitCursor(value.slice(0, zeilenStart) + value.slice(pos), zeilenStart, zeilenStart);
+    } else {
+      const neu = value.slice(0, pos) + "\n• " + value.slice(pos);
+      setMitCursor(neu, pos + 3, pos + 3);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <label style={styles.label}>{label}</label>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button type="button" style={{ ...styles.iconBtn, flexShrink: 0, fontWeight: 800, fontSize: 15 }} onClick={toggleBold} title="Fett (markierten Text)" aria-label="Fett">
+            B
+          </button>
+          <button type="button" style={{ ...styles.iconBtn, flexShrink: 0 }} onClick={insertBullet} title="Aufzählungspunkt einfügen" aria-label="Aufzählungspunkt einfügen">
+            <BulletListIcon size={15} />
+          </button>
+        </div>
+      </div>
+      <textarea
+        ref={ref}
+        style={{ ...styles.textarea, marginTop: 6 }}
+        rows={rows}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      <div style={{ fontSize: 11.5, color: "var(--muted-2)", marginTop: 4 }}>Fett: Text markieren und „B“ tippen. Aufzählung: „•“ tippen, Enter führt die Liste fort.</div>
+    </div>
+  );
+}
+
 function SpieltagNotizen({ value, onSave }) {
   const [text, setText] = useState(value || "");
   const textareaRef = useRef(null);
@@ -4942,8 +5050,9 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
         <div style={{ ...styles.label, marginBottom: 6 }}>Titel</div>
         <input style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 14 }} value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Passdreieck" />
 
-        <div style={{ ...styles.label, marginBottom: 0 }}>Beschreibung</div>
-        <textarea style={{ ...styles.textarea, minHeight: 90, marginBottom: 14 }} value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} placeholder="Aufbau, Ablauf, Hinweise …" />
+        <div style={{ marginBottom: 14 }}>
+          <FormatTextarea label="Beschreibung" value={beschreibung} onChange={setBeschreibung} rows={6} placeholder="Aufbau, Ablauf, Hinweise …" />
+        </div>
 
         <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
@@ -5013,6 +5122,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
 
 function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }) {
   const [offen, setOffen] = useState(false);
+  const [beschreibungId, setBeschreibungId] = useState(null);
   const [waehlen, setWaehlen] = useState(false);
   const [suche, setSuche] = useState("");
   const [filter, setFilter] = useState([]);
@@ -5059,6 +5169,17 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
                     {e.uebung.keywords.map((k) => <span key={k} style={tagStyle}>{k}</span>)}
                   </div>
+                )}
+                {e.uebung.beschreibung && (
+                  <>
+                    <button
+                      style={{ ...styles.linkBtn, padding: "6px 0 0" }}
+                      onClick={() => setBeschreibungId(beschreibungId === e.id ? null : e.id)}
+                    >
+                      {beschreibungId === e.id ? "Beschreibung ausblenden" : "Beschreibung anzeigen"}
+                    </button>
+                    {beschreibungId === e.id && <FormatierterText text={e.uebung.beschreibung} style={{ marginTop: 6 }} />}
+                  </>
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
