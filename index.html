@@ -654,6 +654,9 @@ function App() {
 
   const removeSpieltag = (id) => softDelete("spieltage", id, "Spieltag");
 
+  const updateSpieltagZeit = (spieltagId, zeit) =>
+    wrapAction(() => dbUpdate("spieltage", spieltagId, { zeit }), "Uhrzeit aktualisiert");
+
   const toggleGegnerZuordnung = (spieltagId, opponentId, istZugeordnet) =>
     wrapAction(async () => {
       if (istZugeordnet) {
@@ -812,9 +815,6 @@ function App() {
                 await dbUpdate("spieltage", spieltagId, { foto_url: url });
               }, "Spieltagfoto aktualisiert")
             }
-            onUpdateZeit={(spieltagId, zeit) =>
-              wrapAction(() => dbUpdate("spieltage", spieltagId, { zeit }), "Uhrzeit aktualisiert")
-            }
             onOpenPlayer={(id) => {
               setSelectedPlayerId(id);
               setTab("dashboard");
@@ -870,6 +870,7 @@ function App() {
             onAddSpieltag={addSpieltag}
             onRemoveSpieltag={removeSpieltag}
             onToggleGegnerZuordnung={toggleGegnerZuordnung}
+            onUpdateSpieltagZeit={updateSpieltagZeit}
             trashPlayers={trashPlayers}
             trashGegner={trashGegner}
             trashSpieltage={trashSpieltage}
@@ -2546,7 +2547,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onUpdateZeit, onOpenPlayer }) {
+function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onOpenPlayer }) {
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const [subTab, setSubTab] = useState("liste");
   const [uebersichtSort, setUebersichtSort] = useState("spiele");
@@ -2617,7 +2618,6 @@ function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, o
                 onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
                 onUpdateNotizen={(notizen) => onUpdateNotizen(s.id, notizen)}
                 onUploadFoto={(file) => onUploadFoto(s.id, file)}
-                onUpdateZeit={(zeit) => onUpdateZeit(s.id, zeit)}
               />
             ))}
           </div>
@@ -2950,7 +2950,7 @@ function SpieltagNotizen({ value, onSave }) {
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onUpdateZeit }) {
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -2959,8 +2959,6 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
   const [spieltagTab, setSpieltagTab] = useState("spiele");
-  const [zeitBearbeiten, setZeitBearbeiten] = useState(false);
-  const [zeitEntwurf, setZeitEntwurf] = useState(spieltag.zeit || "");
 
   useEffect(() => {
     if (!opponentId && gegner[0]) setOpponentId(gegner[0].id);
@@ -3130,33 +3128,6 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
             marginBottom={14}
             titleSize={19}
           />
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            {zeitBearbeiten ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ZeitSelect value={zeitEntwurf} onChange={setZeitEntwurf} />
-                <button
-                  style={styles.linkBtn}
-                  onClick={() => {
-                    onUpdateZeit(zeitEntwurf || null);
-                    setZeitBearbeiten(false);
-                  }}
-                >
-                  Speichern
-                </button>
-                <button style={{ ...styles.linkBtn, color: "var(--muted)" }} onClick={() => setZeitBearbeiten(false)}>
-                  Abbrechen
-                </button>
-              </div>
-            ) : (
-              <button
-                style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
-                onClick={() => { setZeitEntwurf(spieltag.zeit || ""); setZeitBearbeiten(true); }}
-              >
-                <EditIcon size={13} /> {spieltag.zeit ? `Uhrzeit ${spieltag.zeit}` : "Uhrzeit hinzufügen"}
-              </button>
-            )}
-          </div>
 
           <div style={{ ...styles.segmentedControl, marginBottom: 14 }}>
             <button
@@ -3423,6 +3394,7 @@ function Verwaltung({
   onAddSpieltag,
   onRemoveSpieltag,
   onToggleGegnerZuordnung,
+  onUpdateSpieltagZeit,
   trashPlayers,
   trashGegner,
   trashSpieltage,
@@ -3494,6 +3466,7 @@ function Verwaltung({
           onAddSpieltag={onAddSpieltag}
           onRemoveSpieltag={onRemoveSpieltag}
           onToggleGegnerZuordnung={onToggleGegnerZuordnung}
+          onUpdateZeit={onUpdateSpieltagZeit}
         />
       )}
       {subTab === "material" && (
@@ -4313,12 +4286,14 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
   );
 }
 
-function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onAddSpieltag, onRemoveSpieltag, onToggleGegnerZuordnung }) {
+function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onAddSpieltag, onRemoveSpieltag, onToggleGegnerZuordnung, onUpdateZeit }) {
   const [name, setName] = useState("");
   const [gegnerOffen, setGegnerOffen] = useState(true);
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltagId, setOpenSpieltagId] = useState(null);
   const [drag, setDrag] = useState(null); // { gegnerId, gegnerName, x, y, over }
+  const [zeitBearbeiten, setZeitBearbeiten] = useState(false);
+  const [zeitEntwurf, setZeitEntwurf] = useState("");
   const dragRef = useRef(null);
 
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
@@ -4449,8 +4424,17 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                 ...(istDropziel ? { border: "2px dashed var(--accent-text)", background: "var(--accent-soft)" } : {}),
               }}
             >
-              <div style={{ ...styles.cardHead, cursor: "pointer" }} onClick={() => setOpenSpieltagId(open ? null : s.id)}>
-                <span style={styles.cardName}>{formatTerminLabel(s.date)}</span>
+              <div
+                style={{ ...styles.cardHead, cursor: "pointer" }}
+                onClick={() => {
+                  setZeitBearbeiten(false);
+                  setOpenSpieltagId(open ? null : s.id);
+                }}
+              >
+                <span style={styles.cardName}>
+                  {formatTerminLabel(s.date)}
+                  {s.zeit && <span style={styles.mutedTag}> · {s.zeit} Uhr</span>}
+                </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {!open && zugeordnet.length === 0 && <span style={styles.hint}>kein Gegner</span>}
                   {!open && zugeordnet.length > 0 && (
@@ -4476,7 +4460,39 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
               </div>
 
               {open && (
-                <div style={{ ...styles.chipGroup, marginTop: 12 }}>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)" }}>
+                  {zeitBearbeiten ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                      <ZeitSelect value={zeitEntwurf} onChange={setZeitEntwurf} />
+                      <button
+                        style={styles.linkBtn}
+                        onClick={() => {
+                          onUpdateZeit(s.id, zeitEntwurf || null);
+                          setZeitBearbeiten(false);
+                        }}
+                      >
+                        Speichern
+                      </button>
+                      <button style={{ ...styles.linkBtn, color: "var(--muted)" }} onClick={() => setZeitBearbeiten(false)}>
+                        Abbrechen
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}
+                      onClick={() => {
+                        setZeitEntwurf(s.zeit || "");
+                        setZeitBearbeiten(true);
+                      }}
+                    >
+                      <EditIcon size={13} /> {s.zeit ? `Uhrzeit ${s.zeit}` : "Uhrzeit hinzufügen"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {open && (
+                <div style={{ ...styles.chipGroup }}>
                   {gegner.length === 0 && <span style={styles.hint}>Noch keine Gegner hinterlegt.</span>}
                   {gegner.map((g) => {
                     const aktiv = s.zugeordneteGegner.includes(g.id);
