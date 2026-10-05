@@ -637,10 +637,10 @@ function App() {
       () => wrapAction(() => dbUpdate(table, id, { deleted_at: null }), "Wiederhergestellt")
     );
 
-  const addSpieltag = (date) =>
+  const addSpieltag = (date, zeit) =>
     wrapAction(async () => {
       const newId = uid();
-      await dbInsert("spieltage", { id: newId, date });
+      await dbInsert("spieltage", { id: newId, date, zeit: zeit || null });
       const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
       const activeIds = new Set(players.map((p) => p.id));
       const uebernommeneTeilnehmer = (letzterSpieltag?.teilnehmer || []).filter((id) => activeIds.has(id));
@@ -4295,6 +4295,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
   const [zeitEntwurf, setZeitEntwurf] = useState("");
   const [gegnerHinzufuegen, setGegnerHinzufuegen] = useState(false);
   const [neuerGegnerId, setNeuerGegnerId] = useState("");
+  const [neueZeit, setNeueZeit] = useState("");
 
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -4366,12 +4367,20 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
       {/* Spieltag anlegen */}
       <div style={{ marginBottom: 10 }}>
         <div style={styles.subheading}>Neuen Spieltag anlegen</div>
-        <div style={styles.addRow}>
+        <div style={{ ...styles.addRow, flexWrap: "wrap", rowGap: 8 }}>
           <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
-          <button style={styles.secondaryBtn} onClick={() => onAddSpieltag(neuesDatum)}>
+          <ZeitSelect value={neueZeit} onChange={setNeueZeit} />
+          <button
+            style={styles.secondaryBtn}
+            onClick={() => {
+              onAddSpieltag(neuesDatum, neueZeit);
+              setNeueZeit("");
+            }}
+          >
             Anlegen
           </button>
         </div>
+        <div style={{ ...styles.hint, marginTop: 6, marginBottom: 0 }}>Uhrzeit optional – kann bei bestehenden Spieltagen auch nachträglich ergänzt werden.</div>
       </div>
 
       {/* Spieltag-Liste mit Gegner-Zuordnung */}
