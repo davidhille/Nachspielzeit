@@ -350,8 +350,22 @@ const confirmAnd = (message, fn) => {
 };
 function friendlyError(e) {
   const raw = (e && e.message) || "";
+  // Supabase-/Storage-Fehler enthalten JSON mit einer lesbaren "message": diese anzeigen statt der Standardmeldung
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart > 0) {
+    try {
+      const detail = JSON.parse(raw.slice(jsonStart));
+      const msg = detail.message || detail.error_description || detail.error;
+      if (msg) {
+        const kontext = raw.slice(0, jsonStart).replace(/:\s*$/, "").trim();
+        return `${kontext ? kontext + ": " : ""}${msg}`;
+      }
+    } catch (err) {
+      // kein gültiges JSON: weiter mit der Standardlogik
+    }
+  }
   const trimmed = raw.trim();
-  if (!raw || raw.length > 160 || trimmed.startsWith("{") || trimmed.startsWith("[")) {
+  if (!raw || raw.length > 260 || trimmed.startsWith("{") || trimmed.startsWith("[")) {
     return "Etwas ist schiefgelaufen. Bitte versuch es erneut.";
   }
   return raw;
