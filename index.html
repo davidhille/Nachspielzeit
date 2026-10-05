@@ -1035,7 +1035,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, onUploadFoto }) {
       style={{
         position: "relative",
         width: "100%",
-        height: 320,
+        height: 360,
         borderRadius: 18,
         overflow: "hidden",
         marginBottom: 20,
@@ -1050,7 +1050,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, onUploadFoto }) {
         />
       )}
       {!photoUrl && (
-        <svg width="100%" height="100%" viewBox="0 0 390 320" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, opacity: 0.18 }}>
+        <svg width="100%" height="100%" viewBox="0 0 390 360" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, opacity: 0.18 }}>
           <circle cx="80" cy="150" r="46" fill="#fff" />
           <circle cx="150" cy="130" r="52" fill="#fff" />
           <circle cx="225" cy="150" r="46" fill="#fff" />
@@ -1131,7 +1131,7 @@ function TermineLeiste({ termine, spieltage }) {
   const kommende = useMemo(() => {
     const trainingsEintraege = (termine || [])
       .filter((t) => t.status !== "abgesagt" && t.date >= heute)
-      .map((t) => ({ id: `t-${t.id}`, date: t.date, typ: "training" }));
+      .map((t) => ({ id: `t-${t.id}`, date: t.date, typ: t.typ === "hallentraining" ? "hallentraining" : "training" }));
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
       .map((s) => ({ id: `s-${s.id}`, date: s.date, typ: "spieltag" }));
@@ -1146,6 +1146,17 @@ function TermineLeiste({ termine, spieltage }) {
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7l4 3-1.5 4.5h-5L8 10z" />
+        </svg>
+      ),
+    },
+    hallentraining: {
+      label: "Hallentr.",
+      color: "var(--gold-2)",
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M3 11l9-6 9 6" />
+          <path d="M5 10v9h14v-9" />
+          <path d="M9 19v-5h6v5" />
         </svg>
       ),
     },
@@ -1238,6 +1249,7 @@ function Dashboard({
   const [month, setMonth] = useState(months[months.length - 1]);
   const [sortKey, setSortKey] = useState("gesamtMonat");
   const [sortDir, setSortDir] = useState("desc");
+  const [uebersichtTab, setUebersichtTab] = useState("training");
 
   useEffect(() => {
     if (seasons.length > 0 && !seasons.includes(season)) setSeason(seasons[seasons.length - 1]);
@@ -1321,8 +1333,24 @@ function Dashboard({
       />
       <TermineLeiste termine={termine} spieltage={spieltage} />
       <SaisonwechselHinweis seasons={seasons} />
-      <div style={styles.rowBetween}>
-        <h2 style={styles.h2}>Punktestand</h2>
+
+      <div style={styles.segmentedControl}>
+        <button
+          onClick={() => setUebersichtTab("training")}
+          style={{ ...styles.segmentedBtn, ...(uebersichtTab === "training" ? styles.segmentedBtnActive : {}) }}
+        >
+          Training
+        </button>
+        <button
+          onClick={() => setUebersichtTab("saison")}
+          style={{ ...styles.segmentedBtn, ...(uebersichtTab === "saison" ? styles.segmentedBtnActive : {}) }}
+        >
+          Saison
+        </button>
+      </div>
+
+      <div style={{ ...styles.rowBetween, marginTop: 18 }}>
+        <h2 style={styles.h2}>{uebersichtTab === "training" ? "Punktestand" : "Saisonübersicht"}</h2>
         <div style={{ display: "flex", gap: 8 }}>
           {seasons.length > 1 && (
             <div style={styles.selectGroup}>
@@ -1336,63 +1364,76 @@ function Dashboard({
               </select>
             </div>
           )}
-          <div style={styles.selectGroup}>
-            <label style={styles.selectGroupLabel}>Monat</label>
-            <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
-              {monateDerSaison.map((m) => (
-                <option key={m} value={m}>
-                  {monthLabel(m)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {uebersichtTab === "training" && (
+            <div style={styles.selectGroup}>
+              <label style={styles.selectGroupLabel}>Monat</label>
+              <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
+                {monateDerSaison.map((m) => (
+                  <option key={m} value={m}>
+                    {monthLabel(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
+      {uebersichtTab === "training" && (
+        <>
+          {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
 
-      {rows.length > 0 && (
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                {spalten.map(([key, label]) => (
-                  <th key={key} style={{ ...styles.th, cursor: "pointer", userSelect: "none" }} onClick={() => sortiereNach(key)}>
-                    {label}
-                    <span style={{ marginLeft: 4, opacity: sortKey === key ? 1 : 0.35 }}>
-                      {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.id} style={!r.active ? { opacity: 0.5 } : undefined}>
-                  <td style={styles.tdName}>
-                    <span style={styles.rank}>{i + 1}</span>
-                    <Avatar name={r.name} size={26} photoUrl={r.photoUrl} />
-                    <button style={styles.playerNameBtn} onClick={() => onSelectPlayer(r.id)}>
-                      {r.name}
-                    </button>
-                  </td>
-                  <td style={styles.td}>{r.basisAktuell.toFixed(2)}</td>
-                  <td style={styles.td}>{r.monatsPunkte.toFixed(2)}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.gesamtMonat.toFixed(2)}</td>
-                  <td style={styles.td}>{r.saisonPunkte.toFixed(2)}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.gesamtSaison.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          {rows.length > 0 && (
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    {spalten.map(([key, label]) => (
+                      <th key={key} style={{ ...styles.th, cursor: "pointer", userSelect: "none" }} onClick={() => sortiereNach(key)}>
+                        {label}
+                        <span style={{ marginLeft: 4, opacity: sortKey === key ? 1 : 0.35 }}>
+                          {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={r.id} style={!r.active ? { opacity: 0.5 } : undefined}>
+                      <td style={styles.tdName}>
+                        <span style={styles.rank}>{i + 1}</span>
+                        <Avatar name={r.name} size={26} photoUrl={r.photoUrl} />
+                        <button style={styles.playerNameBtn} onClick={() => onSelectPlayer(r.id)}>
+                          {r.name}
+                        </button>
+                      </td>
+                      <td style={styles.td}>{r.basisAktuell.toFixed(2)}</td>
+                      <td style={styles.td}>{r.monatsPunkte.toFixed(2)}</td>
+                      <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.gesamtMonat.toFixed(2)}</td>
+                      <td style={styles.td}>{r.saisonPunkte.toFixed(2)}</td>
+                      <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>{r.gesamtSaison.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <AnwesenheitsStatistik trainings={trainings} players={players} month={month} />
+          <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} />
+          <TrainerNotizen trainings={trainings} players={players} month={month} />
+        </>
       )}
 
-      <SaisonBilanz spieltage={spieltage} players={players} month={month} />
-      <GegnerBilanzTabelle spieltage={spieltage} gegner={gegner} />
-      <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} />
-      <AnwesenheitsStatistik trainings={trainings} players={players} month={month} />
-      <TrainerNotizen trainings={trainings} players={players} month={month} />
+      {uebersichtTab === "saison" && (
+        <>
+          <SaisonBilanz spieltage={spieltage} players={players} month={month} />
+          <GegnerBilanzTabelle spieltage={spieltage} gegner={gegner} />
+          <SpieltagAnwesenheit spieltage={spieltage} players={players} month={month} />
+          <SpieltagNotizenUebersicht spieltage={spieltage} month={month} />
+        </>
+      )}
     </section>
   );
 }
@@ -1472,6 +1513,79 @@ function TrainerNotizen({ trainings, players, month }) {
               <span style={styles.mutedTag}>{formatTerminLabel(n.date)}</span>
             </div>
             <div style={{ fontSize: 13, color: "var(--text)" }}>{n.kommentar}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SpieltagAnwesenheit({ spieltage, players, month }) {
+  const saison = seasonKeyOf(month);
+  const spieltageDerSaison = spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison);
+  const gesamt = spieltageDerSaison.length;
+
+  const rows = players
+    .map((p) => {
+      const dabei = spieltageDerSaison.filter((s) => s.teilnehmer.includes(p.id)).length;
+      const quote = gesamt > 0 ? (dabei / gesamt) * 100 : null;
+      return { id: p.id, name: p.name, dabei, gesamt, quote };
+    })
+    .sort((a, b) => (b.quote ?? 0) - (a.quote ?? 0));
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <h3 style={styles.h3}>Anwesenheit Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
+      {gesamt === 0 ? (
+        <EmptyState text="Noch keine Spieltage in dieser Saison erfasst." />
+      ) : (
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Spieler</th>
+                <th style={styles.th}>Teilnahmen</th>
+                <th style={styles.th}>Quote</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td style={styles.tdName}>{r.name}</td>
+                  <td style={styles.td}>
+                    {r.dabei} / {r.gesamt}
+                  </td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent-text)" }}>
+                    {r.quote != null ? r.quote.toFixed(0) + "%" : "–"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpieltagNotizenUebersicht({ spieltage, month }) {
+  const saison = seasonKeyOf(month);
+  const notizen = spieltage
+    .filter((s) => s.notizen && s.notizen.trim() !== "" && seasonKeyOf(s.date.slice(0, 7)) === saison)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  if (notizen.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <h3 style={styles.h3}>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
+      <div style={styles.cardList}>
+        {notizen.map((s) => (
+          <div key={s.id} style={styles.card}>
+            <div style={styles.cardHead}>
+              <span style={styles.cardName}>{formatTerminLabel(s.date)}</span>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text)", whiteSpace: "pre-line" }}>{s.notizen}</div>
           </div>
         ))}
       </div>
@@ -3480,6 +3594,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
   const [wochen, setWochen] = useState(8);
   const [startDatum, setStartDatum] = useState(todayISO());
   const [terminTab, setTerminTab] = useState("kommende");
+  const [terminTyp, setTerminTyp] = useState("training");
 
   const toggleWochentag = (idx) => {
     setWochentage((w) => (w.includes(idx) ? w.filter((x) => x !== idx) : [...w, idx].sort()));
@@ -3495,7 +3610,7 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       if (wochentage.includes(d.getDay())) {
-        neue.push({ id: uid(), date: toLocalISODate(d), status: "geplant" });
+        neue.push({ id: uid(), date: toLocalISODate(d), status: "geplant", typ: terminTyp });
       }
     }
     onGenerateTermine(neue);
@@ -3522,6 +3637,23 @@ function TrainingsplanBereich({ termine, onGenerateTermine, onToggleAbsage, onRe
             value={startDatum}
             onChange={(e) => setStartDatum(e.target.value)}
           />
+        </div>
+        <div style={styles.fieldRow}>
+          <label style={styles.label}>Art</label>
+          <div style={styles.chipGroup}>
+            <button
+              onClick={(e) => { setTerminTyp("training"); e.currentTarget.blur(); }}
+              style={{ ...styles.chip, ...(terminTyp === "training" ? styles.chipActive : {}) }}
+            >
+              Training
+            </button>
+            <button
+              onClick={(e) => { setTerminTyp("hallentraining"); e.currentTarget.blur(); }}
+              style={{ ...styles.chip, ...(terminTyp === "hallentraining" ? styles.chipActive : {}) }}
+            >
+              Hallentraining
+            </button>
+          </div>
         </div>
         <div style={styles.fieldRow}>
           <label style={styles.label}>Wochentage</label>
@@ -3609,6 +3741,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin }) {
     <div style={styles.spielRow}>
       <div>
         {formatTerminLabel(termin.date)}
+        {termin.typ === "hallentraining" && <span style={{ ...styles.mutedTag, color: "var(--gold-2)" }}> · Hallentraining</span>}
         {abgesagt && <span style={{ ...styles.mutedTag, color: "var(--danger-text)" }}> · abgesagt</span>}
       </div>
       <div style={{ display: "flex", gap: 10 }}>
@@ -3888,6 +4021,31 @@ const styles = {
     marginBottom: -1,
   },
   subNavBtnActive: { color: "#AE1E1D", borderBottom: "2px solid #AE1E1D" },
+  segmentedControl: {
+    display: "flex",
+    background: "#EFE7E7",
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 20,
+  },
+  segmentedBtn: {
+    flex: 1,
+    textAlign: "center",
+    padding: "9px 0",
+    borderRadius: 9,
+    border: "none",
+    background: "transparent",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--muted)",
+    cursor: "pointer",
+  },
+  segmentedBtnActive: {
+    background: "var(--surface)",
+    boxShadow: "0 1px 3px rgba(28,20,20,0.1)",
+    color: "var(--accent-text)",
+    fontWeight: 700,
+  },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
