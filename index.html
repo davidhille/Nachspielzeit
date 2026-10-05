@@ -654,9 +654,6 @@ function App() {
 
   const removeSpieltag = (id) => softDelete("spieltage", id, "Spieltag");
 
-  const updateSpieltagZeit = (spieltagId, zeit) =>
-    wrapAction(() => dbUpdate("spieltage", spieltagId, { zeit }), "Uhrzeit aktualisiert");
-
   const toggleGegnerZuordnung = (spieltagId, opponentId, istZugeordnet) =>
     wrapAction(async () => {
       if (istZugeordnet) {
@@ -870,7 +867,6 @@ function App() {
             onAddSpieltag={addSpieltag}
             onRemoveSpieltag={removeSpieltag}
             onToggleGegnerZuordnung={toggleGegnerZuordnung}
-            onUpdateSpieltagZeit={updateSpieltagZeit}
             trashPlayers={trashPlayers}
             trashGegner={trashGegner}
             trashSpieltage={trashSpieltage}
@@ -3394,7 +3390,6 @@ function Verwaltung({
   onAddSpieltag,
   onRemoveSpieltag,
   onToggleGegnerZuordnung,
-  onUpdateSpieltagZeit,
   trashPlayers,
   trashGegner,
   trashSpieltage,
@@ -3466,7 +3461,6 @@ function Verwaltung({
           onAddSpieltag={onAddSpieltag}
           onRemoveSpieltag={onRemoveSpieltag}
           onToggleGegnerZuordnung={onToggleGegnerZuordnung}
-          onUpdateZeit={onUpdateSpieltagZeit}
         />
       )}
       {subTab === "material" && (
@@ -4286,13 +4280,11 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit }) {
   );
 }
 
-function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onAddSpieltag, onRemoveSpieltag, onToggleGegnerZuordnung, onUpdateZeit }) {
+function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onAddSpieltag, onRemoveSpieltag, onToggleGegnerZuordnung }) {
   const [name, setName] = useState("");
   const [gegnerOffen, setGegnerOffen] = useState(true);
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltagId, setOpenSpieltagId] = useState(null);
-  const [zeitBearbeiten, setZeitBearbeiten] = useState(false);
-  const [zeitEntwurf, setZeitEntwurf] = useState("");
   const [gegnerHinzufuegen, setGegnerHinzufuegen] = useState(false);
   const [neuerGegnerId, setNeuerGegnerId] = useState("");
   const [neueZeit, setNeueZeit] = useState("");
@@ -4398,7 +4390,6 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
               <div
                 style={{ ...styles.cardHead, cursor: "pointer" }}
                 onClick={() => {
-                  setZeitBearbeiten(false);
                   setGegnerHinzufuegen(false);
                   setOpenSpieltagId(open ? null : s.id);
                 }}
@@ -4433,34 +4424,6 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
               {open && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)" }}>
-                  {zeitBearbeiten ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                      <ZeitSelect value={zeitEntwurf} onChange={setZeitEntwurf} />
-                      <button
-                        style={styles.linkBtn}
-                        onClick={() => {
-                          onUpdateZeit(s.id, zeitEntwurf || null);
-                          setZeitBearbeiten(false);
-                        }}
-                      >
-                        Speichern
-                      </button>
-                      <button style={{ ...styles.linkBtn, color: "var(--muted)" }} onClick={() => setZeitBearbeiten(false)}>
-                        Abbrechen
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 14 }}
-                      onClick={() => {
-                        setZeitEntwurf(s.zeit || "");
-                        setZeitBearbeiten(true);
-                      }}
-                    >
-                      <EditIcon size={13} /> {s.zeit ? `Uhrzeit ${s.zeit}` : "Uhrzeit hinzufügen"}
-                    </button>
-                  )}
-
                   <div style={styles.hint}>Gegner</div>
                   <div style={styles.chipGroup}>
                     {zugeordnet.length === 0 && !gegnerHinzufuegen && (
