@@ -4840,16 +4840,53 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
 
 /* ---------- Übungsbibliothek ---------- */
 
-function UebungBild({ url, size = 64, titel = "" }) {
-  const box = { width: size, height: size, borderRadius: 10, flexShrink: 0, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" };
-  if (url) return <div style={box}><img src={url} alt={titel} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>;
+function BildLightbox({ url, alt, onClose }) {
   return (
-    <div style={box} aria-hidden="true">
-      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3l4 18H8z" />
-        <ellipse cx="12" cy="19.5" rx="6" ry="1.5" />
-      </svg>
+    <div
+      style={{ ...styles.modalOverlay, background: "rgba(10,6,6,0.9)", zIndex: 150, padding: 16 }}
+      onClick={(e) => { e.stopPropagation(); onClose(); }}
+      role="dialog"
+      aria-label="Bild vergrößert"
+    >
+      <img src={url} alt={alt || ""} style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 10 }} />
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        aria-label="Schließen"
+        style={{ position: "fixed", top: 16, right: 16, width: 44, height: 44, borderRadius: 999, border: "none", background: "rgba(255,255,255,0.18)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
     </div>
+  );
+}
+
+function UebungBild({ url, size = 64, titel = "", zoom = false }) {
+  const [offen, setOffen] = useState(false);
+  const box = { width: size, height: size, borderRadius: 10, flexShrink: 0, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" };
+  if (!url) {
+    return (
+      <div style={box} aria-hidden="true">
+        <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l4 18H8z" />
+          <ellipse cx="12" cy="19.5" rx="6" ry="1.5" />
+        </svg>
+      </div>
+    );
+  }
+  const img = <img src={url} alt={titel} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+  if (!zoom) return <div style={box}>{img}</div>;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOffen(true)}
+        aria-label={`Bild von ${titel || "Übung"} vergrößern`}
+        style={{ ...box, padding: 0, border: "none", cursor: "zoom-in" }}
+      >
+        {img}
+      </button>
+      {offen && <BildLightbox url={url} alt={titel} onClose={() => setOffen(false)} />}
+    </>
   );
 }
 
@@ -4982,6 +5019,18 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
   );
 }
 
+function FormVorschau({ url }) {
+  const [offen, setOffen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOffen(true)} aria-label="Bild vergrößern" style={{ width: "100%", height: "100%", padding: 0, border: "none", cursor: "zoom-in", background: "transparent" }}>
+        <img src={url} alt="Vorschau" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      </button>
+      {offen && <BildLightbox url={url} alt="Vorschau" onClose={() => setOffen(false)} />}
+    </>
+  );
+}
+
 function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
   const [titel, setTitel] = useState(start?.titel || "");
   const [beschreibung, setBeschreibung] = useState(start?.beschreibung || "");
@@ -5044,7 +5093,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
         <div style={{ ...styles.label, marginBottom: 6 }}>Bild</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div style={{ width: 120, height: 90, borderRadius: 12, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {vorschau ? <img src={vorschau} alt="Vorschau" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UebungBild url={null} size={64} />}
+            {vorschau ? <FormVorschau url={vorschau} /> : <UebungBild url={null} size={64} />}
           </div>
           <div>
             <input
@@ -5149,7 +5198,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
           {liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Übungen für dieses Training geplant.</div>}
           {liste.map((e, i) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
-              <UebungBild url={e.uebung.bildUrl} size={56} titel={e.uebung.titel} />
+              <UebungBild url={e.uebung.bildUrl} size={72} titel={e.uebung.titel} zoom />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-2)" }}>{i + 1}</div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{e.uebung.titel}</div>
@@ -5197,12 +5246,12 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
                     {gefiltert.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Keine Übung passt zu Suche und Filter.</div>}
                     {gefiltert.map((u) => (
                       <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
-                        <UebungBild url={u.bildUrl} size={48} titel={u.titel} />
+                        <UebungBild url={u.bildUrl} size={64} titel={u.titel} zoom />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
                         </div>
                         <button
-                          style={dabei.has(u.id) ? { ...styles.secondaryBtn, opacity: 0.8 } : styles.primaryBtn}
+                          style={{ ...(dabei.has(u.id) ? styles.secondaryBtn : { ...styles.primaryBtn, padding: "0 16px", height: 40 }), width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
                           onClick={() => onAdd(termin.id, u.id)}
                         >
                           {dabei.has(u.id) ? "Nochmal" : "Hinzufügen"}
