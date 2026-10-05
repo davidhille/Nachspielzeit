@@ -2787,18 +2787,26 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
                   <Avatar name={p.name} size={26} photoUrl={p.photo_url} />
                   {p.name}
                 </span>
-                <span
+                <div
                   style={{
-                    ...styles.pill,
-                    padding: "6px 14px",
-                    fontSize: 16,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 64,
+                    padding: "6px 12px",
+                    borderRadius: 12,
+                    lineHeight: 1.1,
                     background: punkte >= 0 ? "var(--pos-bg)" : "var(--neg-bg)",
                     color: punkte >= 0 ? "var(--pos-text)" : "var(--danger-text)",
                   }}
                 >
-                  {punkte >= 0 ? "+" : ""}
-                  {punkte.toFixed(2)} Pkt.
-                </span>
+                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 800 }}>
+                    {punkte >= 0 ? "+" : ""}
+                    {punkte.toFixed(2)}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.8 }}>Punkte</span>
+                </div>
               </div>
 
               <div style={styles.fieldRow}>
