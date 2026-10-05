@@ -573,6 +573,7 @@ function App() {
         date: s.date,
         notizen: s.notizen || "",
         fotoUrl: s.foto_url || null,
+        zeit: s.zeit || null,
         deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
         teilnehmer: stRaw.filter((t) => t.spieltag_id === s.id).map((t) => t.player_id),
@@ -799,6 +800,9 @@ function App() {
                 const url = await uploadSpieltagFoto(spieltagId, file);
                 await dbUpdate("spieltage", spieltagId, { foto_url: url });
               }, "Spieltagfoto aktualisiert")
+            }
+            onUpdateZeit={(spieltagId, zeit) =>
+              wrapAction(() => dbUpdate("spieltage", spieltagId, { zeit }), "Uhrzeit aktualisiert")
             }
             onOpenPlayer={(id) => {
               setSelectedPlayerId(id);
@@ -1347,7 +1351,7 @@ function TermineLeiste({ termine, spieltage }) {
       }));
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
-      .map((s) => ({ id: `s-${s.id}`, date: s.date, typ: "spieltag" }));
+      .map((s) => ({ id: `s-${s.id}`, date: s.date, typ: "spieltag", zeit: s.zeit || null }));
     return [...trainingsEintraege, ...spieltagEintraege].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
   }, [termine, spieltage, heute]);
 
@@ -1430,6 +1434,9 @@ function TermineLeiste({ termine, spieltage }) {
                   <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
                     {eintrag.startZeit}–{eintrag.endZeit}
                   </div>
+                )}
+                {eintrag.zeit && (
+                  <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>{eintrag.zeit} Uhr</div>
                 )}
               </div>
             );
@@ -2537,7 +2544,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onOpenPlayer }) {
+function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onUpdateZeit, onOpenPlayer }) {
   const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltag, setOpenSpieltag] = useState(null);
   const [subTab, setSubTab] = useState("liste");
@@ -2614,6 +2621,7 @@ function Spieltage({ players, gegner, spieltage, onAddSpieltag, onRemoveSpieltag
                 onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
                 onUpdateNotizen={(notizen) => onUpdateNotizen(s.id, notizen)}
                 onUploadFoto={(file) => onUploadFoto(s.id, file)}
+                onUpdateZeit={(zeit) => onUpdateZeit(s.id, zeit)}
               />
             ))}
           </div>
@@ -2946,7 +2954,7 @@ function SpieltagNotizen({ value, onSave }) {
   );
 }
 
-function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto }) {
+function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onUpdateZeit }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -2955,6 +2963,8 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
   const [spieltagTab, setSpieltagTab] = useState("spiele");
+  const [zeitBearbeiten, setZeitBearbeiten] = useState(false);
+  const [zeitEntwurf, setZeitEntwurf] = useState(spieltag.zeit || "");
 
   useEffect(() => {
     if (!opponentId && gegner[0]) setOpponentId(gegner[0].id);
@@ -3117,13 +3127,40 @@ function SpieltagCard({ spieltag, players, gegner, open, onToggle, onRemoveSpiel
         <>
           <TeamHero
             photoUrl={spieltag.fotoUrl}
-            teamName={datumFormatiert}
+            teamName={spieltag.zeit ? `${datumFormatiert} · ${spieltag.zeit} Uhr` : datumFormatiert}
             subtitle={spieltagSubtitle}
             onUploadFoto={(file) => onUploadFoto(file)}
             height={300}
             marginBottom={14}
             titleSize={19}
           />
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            {zeitBearbeiten ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <ZeitSelect value={zeitEntwurf} onChange={setZeitEntwurf} />
+                <button
+                  style={styles.linkBtn}
+                  onClick={() => {
+                    onUpdateZeit(zeitEntwurf || null);
+                    setZeitBearbeiten(false);
+                  }}
+                >
+                  Speichern
+                </button>
+                <button style={{ ...styles.linkBtn, color: "var(--muted)" }} onClick={() => setZeitBearbeiten(false)}>
+                  Abbrechen
+                </button>
+              </div>
+            ) : (
+              <button
+                style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
+                onClick={() => { setZeitEntwurf(spieltag.zeit || ""); setZeitBearbeiten(true); }}
+              >
+                <EditIcon size={13} /> {spieltag.zeit ? `Uhrzeit ${spieltag.zeit}` : "Uhrzeit hinzufügen"}
+              </button>
+            )}
+          </div>
 
           <div style={{ ...styles.segmentedControl, marginBottom: 14 }}>
             <button
