@@ -516,6 +516,182 @@ const BACKUP_TABELLEN = [
   "training_uebungen", "app_features",
 ];
 
+/* ---------- Spieler-Import (BFV/DFBnet-CSV) ---------- */
+
+function parseBfvCsv(text) {
+  const zeilen = text.replace(/\r/g, "").split("\n").filter((z) => z.trim() !== "");
+  if (zeilen.length < 2) return [];
+  const kopf = zeilen[0].split(";").map((h) => h.trim().toLowerCase());
+  const idx = (re) => kopf.findIndex((h) => re.test(h));
+  const iNach = idx(/^name/);
+  const iVor = idx(/^vorname/);
+  const iGeb = idx(/^geb/);
+  const iPass = idx(/^passnummer/);
+  return zeilen.slice(1).map((z) => {
+    const c = z.split(";");
+    const get = (i) => (i >= 0 && c[i] != null ? c[i].trim() : "");
+    const vor = get(iVor).replace(/\s*\((m|w|d|x)\)\s*$/i, "").trim();
+    const gebRaw = get(iGeb);
+    const mt = gebRaw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    return {
+      vorname: vor,
+      nachname: get(iNach),
+      geburtsdatum: mt ? `${mt[3]}-${mt[2].padStart(2, "0")}-${mt[1].padStart(2, "0")}` : null,
+      passnummer: get(iPass) || null,
+    };
+  }).filter((r) => r.vorname);
+}
+
+function SpielerImport() {
+  const [zeilen, setZeilen] = useState(null);
+  const [spieler, setSpieler] = useState([]);
+  const [fehler, setFehler] = useState(null);
+  const [laeuft, setLaeuft] = useState(false);
+  const [ergebnis, setErgebnis] = useState(null);
+  const [auswahl, setAuswahl] = useState({});
+  const [zuordnung, setZuordnung] = useState({});
+
+  const ladeDatei = async (file) => {
+    setFehler(null);
+    setErgebnis(null);
+    try {
+      const buf = await file.arrayBuffer();
+      let text = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+      setZeilen(parseBfvCsv(text));
+    } catch (e) {
+      try {
+        const buf = await file.arrayBuffer();
+        setZeilen(parseBfvCsv(new TextDecoder("windows-1252").decode(buf)));
+      } catch (e2) {
+        setFehler("Datei konnte nicht gelesen werden.");
+        return;
+      }
+    }
+    try {
+      const rows = await dbSelect("players");
+      setSpieler(rows.filter((p) => !p.deleted_at));
+    } catch (e) {
+      setFehler(friendlyError(e));
+    }
+  };
+
+  // Abgleich: Passnummer, sonst eindeutiger Vorname
+  const vorschau = useMemo(() => {
+    if (!zeilen) return [];
+    return zeilen.map((z, i) => {
+      let treffer = z.passnummer ? spieler.filter((p) => p.passnummer && p.passnummer === z.passnummer) : [];
+      let art = treffer.length === 1 ? "pass" : null;
+      if (!art) {
+        const gleicheImport = zeilen.filter((o) => o.vorname.toLowerCase() === z.vorname.toLowerCase()).length;
+        treffer = spieler.filter((p) => (p.name || "").trim().toLowerCase() === z.vorname.toLowerCase());
+        if (treffer.length === 1 && gleicheImport === 1) art = "name";
+        else if (treffer.length >= 1) art = "unklar";
+        else art = "neu";
+      }
+      return { ...z, i, art, treffer };
+    });
+  }, [zeilen, spieler]);
+
+  const zielFuer = (v) => {
+    if (v.art === "pass" || v.art === "name") return v.treffer[0].id;
+    if (v.art === "unklar") return zuordnung[v.i] || null;
+    return null;
+  };
+  const aktiv = (v) => (auswahl[v.i] !== undefined ? auswahl[v.i] : v.art !== "unklar" || !!zuordnung[v.i]);
+
+  const importiere = async () => {
+    setLaeuft(true);
+    setFehler(null);
+    let neu = 0, aktualisiert = 0;
+    try {
+      for (const v of vorschau) {
+        if (!aktiv(v)) continue;
+        const daten = { nachname: v.nachname || null, geburtsdatum: v.geburtsdatum, passnummer: v.passnummer };
+        const ziel = zielFuer(v);
+        if (ziel) {
+          await dbUpdate("players", ziel, daten);
+          aktualisiert++;
+        } else if (v.art === "neu") {
+          await dbInsert("players", { id: uid(), name: v.vorname, active: true, ...daten });
+          neu++;
+        }
+      }
+      setErgebnis({ neu, aktualisiert });
+      setZeilen(null);
+    } catch (e) {
+      setFehler(friendlyError(e));
+    } finally {
+      setLaeuft(false);
+    }
+  };
+
+  const importierteIds = new Set(vorschau.map((v) => zielFuer(v)).filter(Boolean));
+  const fehlend = spieler.filter((p) => !importierteIds.has(p.id));
+  const SQL_SPIELER = `alter table players add column if not exists nachname text;
+alter table players add column if not exists geburtsdatum date;
+alter table players add column if not exists passnummer text;
+notify pgrst, 'reload schema';`;
+  const label = { neu: "Neu anlegen", pass: "Aktualisieren (Passnr.)", name: "Aktualisieren (Vorname)", unklar: "Unklar – bitte zuordnen" };
+
+  return (
+    <section>
+      <h2 style={styles.h2}>Spieler-Import</h2>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+        CSV-Export aus dem DFBnet hochladen (Spalten: Name, Vorname, Geb., Passnummer). Übernommen werden Nachname, Geburtsdatum und Passnummer. Es wird nichts gelöscht.
+      </div>
+      <div style={styles.card}>
+        <input type="file" accept=".csv,text/csv,text/plain" onChange={(e) => e.target.files[0] && ladeDatei(e.target.files[0])} />
+      </div>
+      {fehler && (
+        <div style={{ ...styles.editBanner, marginTop: 12 }}>
+          <div>{fehler}</div>
+          <div style={{ fontSize: 12, marginTop: 6 }}>Falls die Spalten fehlen, einmal in Supabase (SQL Editor) ausführen:</div>
+          <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_SPIELER}</pre>
+        </div>
+      )}
+      {ergebnis && (
+        <div style={{ ...styles.editBanner, marginTop: 12 }}>
+          Fertig: {ergebnis.neu} neu angelegt, {ergebnis.aktualisiert} aktualisiert.
+        </div>
+      )}
+      {zeilen && (
+        <div style={{ marginTop: 14 }}>
+          <div style={styles.cardList}>
+            {vorschau.map((v) => (
+              <div key={v.i} style={{ ...styles.card, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <input type="checkbox" checked={aktiv(v)} onChange={(e) => setAuswahl((a) => ({ ...a, [v.i]: e.target.checked }))} aria-label="Übernehmen" />
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{v.vorname} {v.nachname}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {v.geburtsdatum ? formatGeburtsdatum(v.geburtsdatum) : "kein Geburtsdatum"} · Pass {v.passnummer || "–"}
+                  </div>
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: v.art === "neu" ? "var(--success-text)" : v.art === "unklar" ? "var(--danger-text)" : "var(--text)" }}>{label[v.art]}</div>
+                {v.art === "unklar" && (
+                  <select style={styles.select} value={zuordnung[v.i] || ""} onChange={(e) => setZuordnung((z) => ({ ...z, [v.i]: e.target.value }))}>
+                    <option value="">Spieler wählen …</option>
+                    {(v.treffer.length > 0 ? v.treffer : spieler).map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}{p.nachname ? ` ${p.nachname}` : ""}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+          {fehlend.length > 0 && (
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 10 }}>
+              In der App, aber nicht in der Datei (bleiben unverändert): {fehlend.map((p) => p.name).join(", ")}
+            </div>
+          )}
+          <button style={{ ...styles.primaryBtn, marginTop: 14 }} onClick={importiere} disabled={laeuft}>
+            {laeuft ? "Importiere …" : `Import starten (${vorschau.filter(aktiv).length})`}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AdminApp() {
   const [tab, setTab] = useState("backup");
   const [features, setFeatures] = useState(null);
@@ -625,7 +801,7 @@ notify pgrst, 'reload schema';`;
           </button>
         </div>
         <nav style={styles.nav}>
-          {[["backup", "Backup"], ["funktionen", "Funktionen"]].map(([key, label]) => (
+          {[["backup", "Backup"], ["funktionen", "Funktionen"], ["import", "Spieler-Import"]].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}>
               {label}
             </button>
@@ -661,6 +837,8 @@ notify pgrst, 'reload schema';`;
             <div style={{ fontSize: 12, color: "var(--muted-2)", marginTop: 8 }}>Wiederherstellen aus einem Backup folgt in einem späteren Schritt.</div>
           </section>
         )}
+
+        {tab === "import" && <SpielerImport />}
 
         {tab === "funktionen" && (
           <section>
@@ -1224,6 +1402,7 @@ function App() {
             onTrikotnummerChange={(playerId, trikotnummer) =>
               wrapAction(() => dbUpdate("players", playerId, { trikotnummer }))
             }
+            onUpdatePlayer={(playerId, patch) => wrapAction(() => dbUpdate("players", playerId, patch), "Gespeichert")}
             onGenerateTermine={(neueTermine) =>
               wrapAction(async () => {
                 const bestehendeDaten = new Set(termine.map((t) => t.date));
@@ -2561,10 +2740,17 @@ function PlayerCard({ player, stats }) {
             }}
           >
             {player.name}
+            {player.nachname ? ` ${player.nachname}` : ""}
           </div>
           <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
             SV HEIMSTETTEN U8
           </div>
+          {player.geburtsdatum && (
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 6 }}>
+              Geboren am {formatGeburtsdatum(player.geburtsdatum)}
+              {alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10)) != null ? ` · ${alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10))} Jahre` : ""}
+            </div>
+          )}
         </div>
 
         <div
@@ -2597,6 +2783,56 @@ function PlayerCard({ player, stats }) {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function alterVonGeburtsdatum(iso) {
+  if (!iso) return null;
+  const g = new Date(iso + "T00:00:00");
+  if (isNaN(g)) return null;
+  const heute = new Date();
+  let a = heute.getFullYear() - g.getFullYear();
+  const m = heute.getMonth() - g.getMonth();
+  if (m < 0 || (m === 0 && heute.getDate() < g.getDate())) a--;
+  return a;
+}
+
+function formatGeburtsdatum(iso) {
+  if (!iso) return "";
+  const [y, m, d] = String(iso).slice(0, 10).split("-");
+  return `${d}.${m}.${y}`;
+}
+
+/* Nachname und Geburtsdatum (Spielerverwaltung); Speichern beim Verlassen des Feldes */
+function PlayerStammdaten({ player, onSave }) {
+  const [nachname, setNachname] = useState(player.nachname || "");
+  const [geb, setGeb] = useState(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
+  useEffect(() => {
+    setNachname(player.nachname || "");
+    setGeb(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
+  }, [player.nachname, player.geburtsdatum]);
+  return (
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <div style={{ flex: "1 1 160px" }}>
+        <label style={styles.label}>Nachname (nur im Profil sichtbar)</label>
+        <input
+          style={{ ...styles.input, width: "100%" }}
+          value={nachname}
+          onChange={(e) => setNachname(e.target.value)}
+          onBlur={() => nachname.trim() !== (player.nachname || "") && onSave({ nachname: nachname.trim() || null })}
+        />
+      </div>
+      <div style={{ flex: "0 0 auto" }}>
+        <label style={styles.label}>Geburtsdatum</label>
+        <input
+          type="date"
+          style={{ ...styles.input, width: 160 }}
+          value={geb}
+          onChange={(e) => setGeb(e.target.value)}
+          onBlur={() => geb !== (player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "") && onSave({ geburtsdatum: geb || null })}
+        />
       </div>
     </div>
   );
@@ -4458,6 +4694,7 @@ function Verwaltung({
   onOpenPlayer,
   settingsPlayerId,
   onTrikotnummerChange,
+  onUpdatePlayer,
   material,
   onSaveBestand,
   onDeleteMaterialEintrag,
@@ -4503,6 +4740,7 @@ function Verwaltung({
           onRemovePhoto={onRemovePhoto}
           onOpenPlayer={onOpenPlayer}
           onTrikotnummerChange={onTrikotnummerChange}
+          onUpdatePlayer={onUpdatePlayer}
           initialOpenId={settingsPlayerId}
         />
       )}
@@ -4909,6 +5147,7 @@ function SpielerBereich({
   onRemovePhoto,
   onOpenPlayer,
   onTrikotnummerChange,
+  onUpdatePlayer,
   initialOpenId,
 }) {
   const [name, setName] = useState("");
@@ -5037,6 +5276,7 @@ function SpielerBereich({
                     />
                     <JerseyBadge number={p.trikotnummer} size={42} />
                   </div>
+                  <PlayerStammdaten player={p} onSave={(patch) => onUpdatePlayer && onUpdatePlayer(p.id, patch)} />
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <button
                       style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
