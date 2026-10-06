@@ -163,7 +163,12 @@ async function dbSelect(table, opts = {}) {
   const filter = !opts.alle && teamFilterAktiv(table);
   let alle = [];
   for (let von = 0; ; von += SEITE) {
-    const res = await fetch(REST + table + "?select=*" + (filter ? `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}` : ""), {
+    const teamQs = !filter
+      ? ""
+      : table === "uebungen"
+      ? `&or=(team_id.eq.${encodeURIComponent(CURRENT_TEAM)},team_id.eq.alle)`
+      : `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
+    const res = await fetch(REST + table + "?select=*" + teamQs, {
       headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
     });
     if (!res.ok) {
@@ -899,6 +904,20 @@ create policy "profilbilder schreiben" on storage.objects for insert to public w
 create policy "profilbilder aendern" on storage.objects for update to public using (bucket_id = 'profilbilder' and public.nsz_code_ok());
 create policy "profilbilder loeschen" on storage.objects for delete to public using (bucket_id = 'profilbilder' and public.nsz_code_ok());
 
+
+-- 6) Übungen: Übungen mit team_id 'alle' sind für alle Teams lesbar (ändern nur Admin)
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname = 'public' and tablename = 'uebungen' loop
+    execute format('drop policy %I on public.uebungen', p.policyname);
+  end loop;
+end $$;
+create policy "uebungen lesen" on uebungen for select to public using ((team_id = 'alle' and nsz_code_ok()) or nsz_code_ok(team_id));
+create policy "uebungen anlegen" on uebungen for insert to public with check (nsz_code_ok(team_id));
+create policy "uebungen aendern" on uebungen for update to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
+create policy "uebungen loeschen" on uebungen for delete to public using (nsz_code_ok(team_id));
+
 notify pgrst, 'reload schema';
 `;
 
@@ -907,6 +926,187 @@ function neuerCode() {
   const bytes = new Uint8Array(10);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+}
+
+const SQL_UEBUNGEN_ALLE = `-- Übungen für alle Teams (team_id 'alle'): Lesen für jeden gültigen Code, Ändern nur Admin
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname = 'public' and tablename = 'uebungen' loop
+    execute format('drop policy %I on public.uebungen', p.policyname);
+  end loop;
+end $$;
+create policy "uebungen lesen" on uebungen for select to public using ((team_id = 'alle' and nsz_code_ok()) or nsz_code_ok(team_id));
+create policy "uebungen anlegen" on uebungen for insert to public with check (nsz_code_ok(team_id));
+create policy "uebungen aendern" on uebungen for update to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
+create policy "uebungen loeschen" on uebungen for delete to public using (nsz_code_ok(team_id));
+notify pgrst, 'reload schema';
+`;
+
+// Datei-Format: { "uebungen": [ { "titel": "...", "ablauf": "...", "keywords": ["..."] } ] } oder direkt eine Liste
+function parseUebungenImport(text) {
+  const roh = JSON.parse(text);
+  const liste = Array.isArray(roh) ? roh : roh.uebungen;
+  if (!Array.isArray(liste)) throw new Error("Keine Übungsliste gefunden.");
+  return liste
+    .map((u) => ({
+      titel: String(u.titel || u.name || "").trim(),
+      beschreibung: String(u.ablauf || u.beschreibung || "").trim(),
+      keywords: (Array.isArray(u.keywords) ? u.keywords : String(u.keywords || "").split(/[,;]/)).map((k) => String(k).trim()).filter(Boolean),
+      bild_url: u.bild_url || u.bild || null,
+    }))
+    .filter((u) => u.titel);
+}
+
+function UebungenAdmin({ teams }) {
+  const [alle, setAlle] = useState(null);
+  const [fehler, setFehler] = useState(null);
+  const [ziel, setZiel] = useState("alle");
+  const [text, setText] = useState("");
+  const [vorschau, setVorschau] = useState(null);
+  const [meldung, setMeldung] = useState("");
+  const [suche, setSuche] = useState("");
+  const laden = async () => {
+    try {
+      const rows = await dbSelect("uebungen", { alle: true });
+      setAlle(rows.filter((u) => !u.deleted_at).sort((a, b) => String(a.titel).localeCompare(String(b.titel), "de")));
+      setFehler(null);
+    } catch (e) {
+      setAlle([]);
+      setFehler(friendlyError(e));
+    }
+  };
+  useEffect(() => {
+    laden();
+  }, []);
+  const zuordnungName = (id) => (id === "alle" ? "Alle Teams" : (teams.find((t) => t.id === id) || { name: id }).name);
+  const lesen = (t) => {
+    setText(t);
+    setMeldung("");
+    try {
+      setVorschau(t.trim() ? parseUebungenImport(t) : null);
+    } catch (e) {
+      setVorschau(null);
+      setMeldung("Datei nicht lesbar: " + e.message);
+    }
+  };
+  const bekannt = (titel) => (alle || []).some((u) => (u.team_id || "u8") === ziel && String(u.titel).trim().toLowerCase() === titel.toLowerCase());
+  const neue = (vorschau || []).filter((u) => !bekannt(u.titel));
+  const importieren = async () => {
+    try {
+      await dbInsert(
+        "uebungen",
+        neue.map((u) => ({ id: uid(), titel: u.titel, beschreibung: u.beschreibung || null, keywords: u.keywords, bild_url: u.bild_url, team_id: ziel }))
+      );
+      setMeldung(`${neue.length} Übungen importiert (${zuordnungName(ziel)}).`);
+      setText("");
+      setVorschau(null);
+      await laden();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const zuordnen = async (u, teamId) => {
+    try {
+      await dbUpdate("uebungen", u.id, { team_id: teamId });
+      await laden();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const gefiltert = (alle || []).filter((u) => !suche.trim() || String(u.titel).toLowerCase().includes(suche.trim().toLowerCase()));
+  return (
+    <section>
+      <h2 style={styles.h2}>Übungen</h2>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+        Übungen importieren und Teams zuordnen. Eine Übung gehört entweder einem Team oder allen Teams (dann ist sie in jeder Team-App sichtbar, ändern können sie nur Admins).
+      </div>
+      {fehler && <div style={{ ...styles.editBanner, marginBottom: 12 }}>{fehler}</div>}
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>Übungen importieren</div>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Zuordnung der importierten Übungen
+          <select style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={ziel} onChange={(e) => setZiel(e.target.value)}>
+            <option value="alle">Alle Teams</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                Nur {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <input
+          type="file"
+          accept=".json,application/json,text/plain"
+          onChange={async (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (f) lesen(await f.text());
+          }}
+        />
+        <textarea
+          style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 90, fontFamily: "monospace", fontSize: 12 }}
+          placeholder="… oder den Inhalt der Datei hier einfügen"
+          value={text}
+          onChange={(e) => lesen(e.target.value)}
+        />
+        {vorschau && (
+          <div style={{ fontSize: 13 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              {neue.length} neue Übungen{vorschau.length - neue.length > 0 ? `, ${vorschau.length - neue.length} gibt es schon (werden übersprungen)` : ""}
+            </div>
+            {vorschau.map((u, i) => (
+              <div key={i} style={{ padding: "2px 0", color: bekannt(u.titel) ? "var(--muted-2)" : "var(--text)" }}>
+                {bekannt(u.titel) ? "– " : "+ "}
+                {u.titel}
+                {u.keywords.length > 0 ? ` · ${u.keywords.join(", ")}` : ""}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button style={{ ...styles.primaryBtn, opacity: neue.length ? 1 : 0.5 }} disabled={!neue.length} onClick={importieren}>
+            {neue.length ? `${neue.length} Übungen importieren` : "Importieren"}
+          </button>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted-2)" }}>
+          Bilder lassen sich später in der Team-App je Übung ergänzen (Alle-Teams-Übungen im Admin: Bild per Import-Feld „bild_url“).
+        </div>
+      </div>
+
+      <details style={{ ...styles.card, marginBottom: 16 }}>
+        <summary style={{ fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Einmalig: SQL für „Alle Teams“-Übungen</summary>
+        <div style={{ fontSize: 12, color: "var(--muted)", margin: "6px 0" }}>In Supabase (SQL Editor) ausführen, falls das Zuordnen auf „Alle Teams“ einen Fehler meldet:</div>
+        <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: 0, userSelect: "all" }}>{SQL_UEBUNGEN_ALLE}</pre>
+      </details>
+
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Alle Übungen {alle ? `(${alle.length})` : ""}</div>
+      <input style={{ ...styles.input, width: "100%", boxSizing: "border-box", marginBottom: 10 }} placeholder="Suchen …" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      {alle === null ? (
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
+      ) : (
+        <div style={styles.cardList}>
+          {gefiltert.map((u) => (
+            <div key={u.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{Array.isArray(u.keywords) ? u.keywords.join(", ") : ""}</div>
+              </div>
+              <select style={{ ...styles.input, flex: "none" }} value={u.team_id || "u8"} onChange={(e) => zuordnen(u, e.target.value)} aria-label={`Zuordnung von ${u.titel}`}>
+                <option value="alle">Alle Teams</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+          {gefiltert.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Keine Übungen.</div>}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function ZugaengeVerwaltung({ teams }) {
@@ -1092,7 +1292,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
     const id = kuerzel.trim().toLowerCase();
     if (!name.trim()) return setMeldung("Bitte einen Namen eingeben.");
     if (!/^[a-z0-9-]{2,20}$/.test(id)) return setMeldung("Kürzel: 2–20 Zeichen, nur a–z, 0–9 und Bindestrich.");
-    if (["admin", "www", "app"].includes(id) || teams.some((t) => t.id === id)) return setMeldung("Dieses Kürzel ist nicht verfügbar.");
+    if (["admin", "www", "app", "alle"].includes(id) || teams.some((t) => t.id === id)) return setMeldung("Dieses Kürzel ist nicht verfügbar.");
     try {
       await dbInsert("teams", { id, name: name.trim(), config: {} });
       setName("");
@@ -1162,7 +1362,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
 }
 
 const ADMIN_SCOPE = "__admin__";
-const ADMIN_TABS_ALLGEMEIN = [["teams", "Teams"], ["zugaenge", "Zugänge"], ["backup", "Backup"]];
+const ADMIN_TABS_ALLGEMEIN = [["teams", "Teams"], ["zugaenge", "Zugänge"], ["uebungen", "Übungen"], ["backup", "Backup"]];
 const ADMIN_TABS_TEAM = [["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"]];
 const ADMIN_TABS = [...ADMIN_TABS_ALLGEMEIN, ...ADMIN_TABS_TEAM].map((t) => t[0]);
 
@@ -1380,6 +1580,7 @@ notify pgrst, 'reload schema';`;
         {tab === "import" && <SpielerImport key={team} />}
         {tab === "einstellungen" && <TeamEinstellungen key={team} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
         {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
+        {tab === "uebungen" && <UebungenAdmin teams={teams} />}
         {tab === "teams" && <TeamsVerwaltung teams={teams} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
 
         {tab === "funktionen" && (
@@ -1671,6 +1872,7 @@ function App() {
             keywords: Array.isArray(u.keywords) ? u.keywords : [],
             material: Array.isArray(u.material) ? u.material : [],
             bildUrl: u.bild_url || null,
+            teamId: u.team_id || CURRENT_TEAM,
           }))
           .sort((a, b) => a.titel.localeCompare(b.titel, "de"))
       );
@@ -1762,6 +1964,7 @@ function App() {
           beschreibung: u.beschreibung || null,
           keywords: u.keywords,
           bild_url: bildUrl,
+          team_id: u.teamId || CURRENT_TEAM,
           deleted_at: null,
         },
         "id"
@@ -6342,8 +6545,9 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
           setEdit(null);
         }}
         onCancel={() => setEdit(null)}
+        gesperrt={edit !== "neu" && edit.teamId === "alle"}
         onRemove={
-          edit === "neu"
+          edit === "neu" || edit.teamId === "alle"
             ? null
             : () => confirmAnd(`Übung „${edit.titel}“ wirklich löschen?`, () => { onRemove(edit.id); setEdit(null); })
         }
@@ -6388,6 +6592,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
                   <div style={{ padding: "10px 12px 12px" }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{u.titel}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {u.teamId === "alle" && <span style={{ ...tagStyle, background: "var(--success-bg, #E6F2EA)", color: "var(--success-text)" }}>Alle Teams</span>}
                       {u.keywords.map((k) => (
                         <span key={k} style={tagStyle}>{k}</span>
                       ))}
@@ -6415,7 +6620,7 @@ function FormVorschau({ url }) {
   );
 }
 
-function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
+function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt = false }) {
   const [titel, setTitel] = useState(start?.titel || "");
   const [beschreibung, setBeschreibung] = useState(start?.beschreibung || "");
   const [keywords, setKeywords] = useState(start?.keywords || []);
@@ -6539,8 +6744,11 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
           </>
         )}
 
+        {gesperrt && (
+          <div style={{ ...styles.editBanner, marginBottom: 12 }}>Diese Übung gehört allen Teams und kann nur in der Administration geändert werden.</div>
+        )}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button style={{ ...styles.primaryBtn, opacity: titel.trim() ? 1 : 0.5 }} disabled={!titel.trim()} onClick={speichern}>Speichern</button>
+          <button style={{ ...styles.primaryBtn, opacity: titel.trim() && !gesperrt ? 1 : 0.5 }} disabled={!titel.trim() || gesperrt} onClick={speichern}>Speichern</button>
           <button style={styles.secondaryBtn} onClick={onCancel}>Abbrechen</button>
           {onRemove && (
             <button style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }} onClick={onRemove}>
