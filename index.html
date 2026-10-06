@@ -951,7 +951,8 @@ function parseUebungenImport(text) {
       titel: String(u.titel || u.name || "").trim(),
       beschreibung: String(u.ablauf || u.beschreibung || "").trim(),
       keywords: (Array.isArray(u.keywords) ? u.keywords : String(u.keywords || "").split(/[,;]/)).map((k) => String(k).trim()).filter(Boolean),
-      bild_url: u.bild_url || u.bild || null,
+      bild_url: u.bild_url || (String(u.bild || "").startsWith("http") ? u.bild : null),
+      bild_data: u.bild_data || (String(u.bild || "").startsWith("data:") ? u.bild : null),
     }))
     .filter((u) => u.titel);
 }
@@ -989,6 +990,7 @@ function UebungenAdmin({ teams }) {
   const [vorschau, setVorschau] = useState(null);
   const [meldung, setMeldung] = useState("");
   const [suche, setSuche] = useState("");
+  const [offenId, setOffenId] = useState(null);
   const laden = async () => {
     try {
       const rows = await dbSelect("uebungen", { alle: true });
@@ -1014,16 +1016,30 @@ function UebungenAdmin({ teams }) {
     }
   };
   const teamsVon = (u) => (Array.isArray(u.team_ids) ? u.team_ids : [u.team_id || "u8"]);
-  const bekannt = (titel) =>
-    (alle || []).some((u) => teamsVon(u).some((t) => ziel.includes(t)) && String(u.titel).trim().toLowerCase() === titel.toLowerCase());
+  const findeBekannte = (titel) =>
+    (alle || []).find((u) => teamsVon(u).some((t) => ziel.includes(t)) && String(u.titel).trim().toLowerCase() === titel.toLowerCase());
+  const bekannt = (titel) => !!findeBekannte(titel);
   const neue = (vorschau || []).filter((u) => !bekannt(u.titel));
+  // vorhandene Übungen ohne Bild bekommen das Bild aus der Datei
+  const ergaenzen = (vorschau || []).filter((u) => u.bild_data && findeBekannte(u.titel) && !findeBekannte(u.titel).bild_url);
+  const bildHochladen = async (id, dataUrl) => {
+    const blob = await (await fetch(dataUrl)).blob();
+    return uploadUebungBild(id, new File([blob], "bild.jpg", { type: blob.type || "image/jpeg" }));
+  };
   const importieren = async () => {
     try {
-      await dbInsert(
-        "uebungen",
-        neue.map((u) => ({ id: uid(), titel: u.titel, beschreibung: u.beschreibung || null, keywords: u.keywords, bild_url: u.bild_url, team_ids: ziel }))
-      );
-      setMeldung(`${neue.length} Übungen importiert (${zuordnungName(ziel)}).`);
+      const rows = [];
+      for (const u of neue) {
+        const id = uid();
+        const bildUrl = u.bild_data ? await bildHochladen(id, u.bild_data) : u.bild_url;
+        rows.push({ id, titel: u.titel, beschreibung: u.beschreibung || null, keywords: u.keywords, bild_url: bildUrl, team_ids: ziel });
+      }
+      if (rows.length) await dbInsert("uebungen", rows);
+      for (const u of ergaenzen) {
+        const b = findeBekannte(u.titel);
+        await dbUpdate("uebungen", b.id, { bild_url: await bildHochladen(b.id, u.bild_data) });
+      }
+      setMeldung(`${rows.length} Übungen importiert${ergaenzen.length ? `, ${ergaenzen.length} Bild(er) ergänzt` : ""} (${zuordnungName(ziel)}).`);
       setText("");
       setVorschau(null);
       await laden();
@@ -1072,20 +1088,21 @@ function UebungenAdmin({ teams }) {
         {vorschau && (
           <div style={{ fontSize: 13 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>
-              {neue.length} neue Übungen{vorschau.length - neue.length > 0 ? `, ${vorschau.length - neue.length} gibt es schon (werden übersprungen)` : ""}
+              {neue.length} neue Übungen{vorschau.length - neue.length > 0 ? `, ${vorschau.length - neue.length} gibt es schon (werden übersprungen${ergaenzen.length ? `, ${ergaenzen.length} bekommen das Bild` : ""})` : ""}
             </div>
             {vorschau.map((u, i) => (
               <div key={i} style={{ padding: "2px 0", color: bekannt(u.titel) ? "var(--muted-2)" : "var(--text)" }}>
                 {bekannt(u.titel) ? "– " : "+ "}
                 {u.titel}
                 {u.keywords.length > 0 ? ` · ${u.keywords.join(", ")}` : ""}
+                {u.bild_data || u.bild_url ? " · mit Bild" : ""}
               </div>
             ))}
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button style={{ ...styles.primaryBtn, opacity: neue.length ? 1 : 0.5 }} disabled={!neue.length} onClick={importieren}>
-            {neue.length ? `${neue.length} Übungen importieren` : "Importieren"}
+          <button style={{ ...styles.primaryBtn, opacity: neue.length || ergaenzen.length ? 1 : 0.5 }} disabled={!neue.length && !ergaenzen.length} onClick={importieren}>
+            {neue.length ? `${neue.length} Übungen importieren` : ergaenzen.length ? `${ergaenzen.length} Bild(er) ergänzen` : "Importieren"}
           </button>
           <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
         </div>
@@ -1102,10 +1119,23 @@ function UebungenAdmin({ teams }) {
         <div style={styles.cardList}>
           {gefiltert.map((u) => (
             <div key={u.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 140 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
+              <button
+                type="button"
+                onClick={() => setOffenId(offenId === u.id ? null : u.id)}
+                aria-expanded={offenId === u.id}
+                style={{ flex: 1, minWidth: 140, textAlign: "left", background: "transparent", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  {offenId === u.id ? "▾" : "▸"} {u.titel}
+                </div>
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{Array.isArray(u.keywords) ? u.keywords.join(", ") : ""}</div>
-              </div>
+              </button>
+              {offenId === u.id && (
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {u.bild_url && <img src={u.bild_url} alt={u.titel} style={{ maxWidth: "100%", borderRadius: 10 }} />}
+                  {u.beschreibung ? <FormatierterText text={u.beschreibung} /> : <div style={{ fontSize: 13, color: "var(--muted)" }}>Kein Ablauf hinterlegt.</div>}
+                </div>
+              )}
               <div style={{ width: "100%" }}>
                 <TeamMehrfachAuswahl teams={teams} value={teamsVon(u)} onChange={(ids) => zuordnen(u, ids)} />
               </div>
