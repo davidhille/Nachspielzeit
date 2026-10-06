@@ -854,7 +854,7 @@ function App() {
             players={activePlayers}
             trainings={trainings}
             termine={termine}
-            onSaveTerminNotiz={(id, notizen) => wrapAction(() => dbUpdate("trainingstermine", id, { notizen }), "Notiz gespeichert")}
+            onSaveTerminNotiz={(id, text) => wrapAction(() => dbUpdate("trainingstermine", id, { bewertung_notizen: text }), "Notiz gespeichert")}
             onSave={(entries, date) =>
               wrapAction(async () => {
                 await dbDeleteWhere("trainings", `date=eq.${date}`);
@@ -2806,10 +2806,10 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete, onSa
           <div style={{ ...styles.card, marginBottom: 12 }}>
             <SpieltagNotizen
               key={termin.id}
-              value={termin.notizen}
+              value={termin.bewertung_notizen}
               onSave={(text) => onSaveTerminNotiz(termin.id, text)}
-              label="Notizen zum Training"
-              placeholder="Allgemeine Eindrücke, Themen, was gut/schlecht lief …"
+              label="Notizen zur Bewertung"
+              placeholder="Allgemeine Eindrücke zum Training, was gut/schlecht lief …"
               rows={3}
             />
           </div>
@@ -5491,8 +5491,8 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
           <SpieltagNotizen
             value={termin.notizen}
             onSave={(text) => onSaveNotiz && onSaveNotiz(termin.id, text)}
-            label="Notizen zum Training"
-            placeholder="Schwerpunkt, Ablauf, Material, Hinweise …"
+            label="Notizen zum Ablauf"
+            placeholder="Schwerpunkt, Ablauf des Trainings, allgemeine Themen neben den Übungen …"
             rows={4}
           />
           {liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Übungen für dieses Training geplant.</div>}
