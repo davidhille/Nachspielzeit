@@ -991,6 +991,7 @@ function UebungenAdmin({ teams }) {
   const [meldung, setMeldung] = useState("");
   const [suche, setSuche] = useState("");
   const [offenId, setOffenId] = useState(null);
+  const [bearbeite, setBearbeite] = useState(null);
   const laden = async () => {
     try {
       const rows = await dbSelect("uebungen", { alle: true });
@@ -1055,6 +1056,40 @@ function UebungenAdmin({ teams }) {
       setMeldung(friendlyError(e));
     }
   };
+  const speichernUebung = async (u, file) => {
+    try {
+      let bildUrl = bearbeite.bild_url || null;
+      if (file) bildUrl = await uploadUebungBild(u.id, file);
+      await dbUpdate("uebungen", u.id, { titel: u.titel, beschreibung: u.beschreibung || null, keywords: u.keywords, bild_url: bildUrl });
+      setBearbeite(null);
+      setMeldung("Übung gespeichert.");
+      await laden();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const loescheUebung = (u) =>
+    confirmAnd(`Übung „${u.titel}“ wirklich löschen?`, async () => {
+      try {
+        await dbUpdate("uebungen", u.id, { deleted_at: new Date().toISOString() });
+        setBearbeite(null);
+        await laden();
+      } catch (e) {
+        setMeldung(friendlyError(e));
+      }
+    });
+  if (bearbeite) {
+    return (
+      <UebungForm
+        key={bearbeite.id}
+        start={{ id: bearbeite.id, titel: bearbeite.titel || "", beschreibung: bearbeite.beschreibung || "", keywords: Array.isArray(bearbeite.keywords) ? bearbeite.keywords : [], bildUrl: bearbeite.bild_url || null }}
+        alleKeywords={alleKeywordsVon((alle || []).map((x) => ({ keywords: Array.isArray(x.keywords) ? x.keywords : [] })))}
+        onSave={speichernUebung}
+        onCancel={() => setBearbeite(null)}
+        onRemove={() => loescheUebung(bearbeite)}
+      />
+    );
+  }
   const gefiltert = (alle || []).filter((u) => !suche.trim() || String(u.titel).toLowerCase().includes(suche.trim().toLowerCase()));
   return (
     <section>
@@ -1134,6 +1169,11 @@ function UebungenAdmin({ teams }) {
                 <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
                   {u.bild_url && <img src={u.bild_url} alt={u.titel} style={{ maxWidth: "100%", borderRadius: 10 }} />}
                   {u.beschreibung ? <FormatierterText text={u.beschreibung} /> : <div style={{ fontSize: 13, color: "var(--muted)" }}>Kein Ablauf hinterlegt.</div>}
+                  <div>
+                    <button style={styles.secondaryBtn} onClick={() => setBearbeite(u)}>
+                      Bearbeiten
+                    </button>
+                  </div>
                 </div>
               )}
               <div style={{ width: "100%" }}>
