@@ -1162,7 +1162,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
 }
 
 const ADMIN_SCOPE = "__admin__";
-const ADMIN_TABS_ALLGEMEIN = [["backup", "Backup"], ["teams", "Teams"], ["zugaenge", "Zugänge"]];
+const ADMIN_TABS_ALLGEMEIN = [["teams", "Teams"], ["zugaenge", "Zugänge"], ["backup", "Backup"]];
 const ADMIN_TABS_TEAM = [["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"]];
 const ADMIN_TABS = [...ADMIN_TABS_ALLGEMEIN, ...ADMIN_TABS_TEAM].map((t) => t[0]);
 
@@ -1174,7 +1174,7 @@ function AdminApp() {
       const gespeichert = localStorage.getItem("nsz_admin_tab");
       if (ADMIN_TABS.includes(gespeichert)) return gespeichert;
     } catch {}
-    return "backup";
+    return "teams";
   });
   const setTab = (t) => {
     setTabState(t);
