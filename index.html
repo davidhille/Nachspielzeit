@@ -1319,9 +1319,9 @@ notify pgrst, 'reload schema';`;
                 aria-label="Team auswählen"
                 style={{ font: "inherit", fontWeight: 700, background: "transparent", color: "inherit", border: "1px solid var(--border-strong)", borderRadius: 8, padding: "1px 4px" }}
               >
-                <option value={ADMIN_SCOPE}>Admin</option>
+                <option value={ADMIN_SCOPE} style={{ color: "#1a1a1a", background: "#fff" }}>Admin</option>
                 {teams.filter((t) => !t.archived || t.id === team).map((t) => (
-                  <option key={t.id} value={t.id}>
+                  <option key={t.id} value={t.id} style={{ color: "#1a1a1a", background: "#fff" }}>
                     {t.name}
                   </option>
                 ))}
