@@ -496,6 +496,7 @@ function Gate({ onUnlock }) {
 /* ---------- Funktionsschalter (Admin: admin.nachspielzeit.app) ---------- */
 
 const FEATURES = [
+  { key: "mannschaftsbild", label: "Mannschaftsbild", beschreibung: "Großes Mannschaftsbild oben auf der Übersichtsseite (inkl. Foto-Upload)" },
   { key: "entwicklung", label: "Monatsentwicklung", beschreibung: "Tab „Monatsentwicklung“ (Extrapunkt je Spieler und Monat)" },
   { key: "spieltage", label: "Spieltage", beschreibung: "Tab „Spieltage“ inkl. Ergebnissen, Torschützen und Fotos" },
   { key: "teilen", label: "Spieltag teilen", beschreibung: "Button „Teilen“ (WhatsApp-Bild) an den Spieltagen" },
@@ -2136,6 +2137,7 @@ function Dashboard({
   const [sortKey, setSortKey] = useState("gesamtMonat");
   const [sortDir, setSortDir] = useState("desc");
   const [uebersichtTab, setUebersichtTab] = useState("training");
+  const fMannschaftsbild = useFeature("mannschaftsbild");
 
   useEffect(() => {
     if (seasons.length > 0 && !seasons.includes(season)) setSeason(seasons[seasons.length - 1]);
@@ -2211,12 +2213,14 @@ function Dashboard({
 
   return (
     <section>
-      <TeamHero
-        photoUrl={teamSettings?.team_photo_url || null}
-        teamName="SV Heimstetten U8"
-        seasonLabel={season ? season.replace("-", "/") : ""}
-        onUploadFoto={onUploadTeamFoto}
-      />
+      {fMannschaftsbild && (
+        <TeamHero
+          photoUrl={teamSettings?.team_photo_url || null}
+          teamName="SV Heimstetten U8"
+          seasonLabel={season ? season.replace("-", "/") : ""}
+          onUploadFoto={onUploadTeamFoto}
+        />
+      )}
       <TermineLeiste termine={termine} spieltage={spieltage} />
       <SaisonwechselHinweis seasons={seasons} />
 
