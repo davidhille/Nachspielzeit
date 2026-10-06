@@ -40,6 +40,10 @@
   );
 </script>
 <style>
+  .wys-edit[data-empty="true"]:before { content: attr(data-placeholder); color: var(--muted-2); pointer-events: none; position: absolute; }
+  .wys-edit:focus { border-color: var(--accent-text) !important; }
+  .wys-edit img { display: block; max-width: 100%; max-height: 260px; border-radius: 8px; margin: 6px 0; }
+  .wys-edit ul, .wys-edit ol { margin: 2px 0; padding-left: 22px; }
   :root {
     color-scheme: light dark;
     --bg: #F7F4F3; --surface: #fff; --surface-2: #FBF5F5; --divider: #F3E9E9; --border: #EADADA; --border-strong: #E4D2D2;
@@ -850,6 +854,7 @@ function App() {
             players={activePlayers}
             trainings={trainings}
             termine={termine}
+            onSaveTerminNotiz={(id, notizen) => wrapAction(() => dbUpdate("trainingstermine", id, { notizen }), "Notiz gespeichert")}
             onSave={(entries, date) =>
               wrapAction(async () => {
                 await dbDeleteWhere("trainings", `date=eq.${date}`);
@@ -2696,7 +2701,7 @@ function Sparkline({ values, width = 220, height = 46 }) {
 
 /* ---------- Training bewerten ---------- */
 
-function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
+function TrainingBewertung({ players, trainings, termine, onSave, onDelete, onSaveTerminNotiz }) {
   const geplanteTermine = useMemo(
     () =>
       termine
@@ -2793,6 +2798,23 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
           </button>
         </div>
       )}
+
+      {(() => {
+        const termin = termine.find((t) => t.date === date);
+        if (!termin || !onSaveTerminNotiz) return null;
+        return (
+          <div style={{ ...styles.card, marginBottom: 12 }}>
+            <SpieltagNotizen
+              key={termin.id}
+              value={termin.notizen}
+              onSave={(text) => onSaveTerminNotiz(termin.id, text)}
+              label="Notizen zum Training"
+              placeholder="Allgemeine Eindrücke, Themen, was gut/schlecht lief …"
+              rows={3}
+            />
+          </div>
+        );
+      })()}
 
       <div style={styles.cardList}>
         {players.map((p) => {
@@ -3401,77 +3423,191 @@ function ImageIcon({ size = 16 }) {
   );
 }
 
-/* Mehrzeiliges Textfeld mit Format-Leiste (Fett, Unterstrichen, Kursiv, Aufzählung, Nummerierung, Bild) und Screenshot-Einfügen per Strg/Cmd+V */
+/* ---------- WYSIWYG-Editor ----------
+   Gespeichert wird weiterhin das einfache Text-Format (**fett**, __unterstrichen__, *kursiv*, "• ", "1. ", ![](URL)),
+   angezeigt/bearbeitet wird es als formatierter Text (contenteditable). */
+function escapeHtml(t) {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function markupZuHtml(text) {
+  const inlineHtml = (t) =>
+    escapeHtml(t)
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/__([^_]+)__/g, "<u>$1</u>")
+      .replace(/\*([^*\s][^*]*)\*/g, "<i>$1</i>");
+  const zeilen = (text || "").split("\n");
+  let html = "";
+  let liste = null; // "ul" | "ol"
+  const schliesse = () => {
+    if (liste) html += `</${liste}>`;
+    liste = null;
+  };
+  zeilen.forEach((z) => {
+    const bild = z.trim().match(BILD_ZEILE);
+    const num = z.match(/^(\d+)\. (.*)$/);
+    if (z.startsWith("• ")) {
+      if (liste !== "ul") { schliesse(); html += "<ul>"; liste = "ul"; }
+      html += `<li>${inlineHtml(z.slice(2))}</li>`;
+    } else if (num) {
+      if (liste !== "ol") { schliesse(); html += `<ol start="${num[1]}">`; liste = "ol"; }
+      html += `<li>${inlineHtml(num[2])}</li>`;
+    } else if (bild) {
+      schliesse();
+      html += `<div><img src="${escapeHtml(bild[1])}" alt=""></div>`;
+    } else if (z.trim() === "") {
+      schliesse();
+      html += "<div><br></div>";
+    } else {
+      schliesse();
+      html += `<div>${inlineHtml(z)}</div>`;
+    }
+  });
+  schliesse();
+  return html;
+}
+
+function htmlZuMarkup(root) {
+  const wrap = (m, inner) => {
+    const mt = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
+    if (!mt[2]) return inner;
+    return `${mt[1]}${m}${mt[2]}${m}${mt[3]}`;
+  };
+  const inline = (node) => {
+    if (node.nodeType === 3) return node.nodeValue.replace(/ /g, " ");
+    if (node.nodeType !== 1) return "";
+    const tag = node.tagName;
+    if (tag === "BR") return "\n";
+    if (tag === "IMG") return `\n![](${node.getAttribute("src")})\n`;
+    const inner = Array.from(node.childNodes).map(inline).join("");
+    const st = node.style || {};
+    const fett = tag === "B" || tag === "STRONG" || st.fontWeight === "bold" || parseInt(st.fontWeight, 10) >= 600;
+    const kursiv = tag === "I" || tag === "EM" || st.fontStyle === "italic";
+    const unter = tag === "U" || (st.textDecoration || "").includes("underline");
+    let out = inner;
+    if (fett) out = wrap("**", out);
+    if (kursiv) out = wrap("*", out);
+    if (unter) out = wrap("__", out);
+    return out;
+  };
+  const zeilen = [];
+  let offen = "";
+  const flush = () => {
+    if (offen !== "") {
+      offen.split("\n").forEach((l) => zeilen.push(l));
+      offen = "";
+    }
+  };
+  const verarbeite = (parent) => {
+    Array.from(parent.childNodes).forEach((n) => {
+      if (n.nodeType === 1 && (n.tagName === "UL" || n.tagName === "OL")) {
+        flush();
+        const start = n.tagName === "OL" ? parseInt(n.getAttribute("start") || "1", 10) || 1 : 0;
+        Array.from(n.children).forEach((li, i) => {
+          const t = Array.from(li.childNodes).map(inline).join("").replace(/\n+$/, "").replace(/\n/g, " ");
+          zeilen.push((n.tagName === "OL" ? `${start + i}. ` : "• ") + t);
+        });
+      } else if (n.nodeType === 1 && (n.tagName === "DIV" || n.tagName === "P")) {
+        flush();
+        if (n.querySelector("ul,ol")) {
+          verarbeite(n);
+          flush();
+        } else {
+          const t = Array.from(n.childNodes).map(inline).join("").replace(/^\n/, "").replace(/\n$/, "");
+          t.split("\n").forEach((l) => zeilen.push(l));
+        }
+      } else if (n.nodeType === 1 && n.tagName === "BR") {
+        flush();
+        zeilen.push("");
+      } else {
+        offen += inline(n);
+      }
+    });
+  };
+  verarbeite(root);
+  flush();
+  while (zeilen.length && zeilen[zeilen.length - 1].trim() === "") zeilen.pop();
+  return zeilen.join("\n");
+}
+
+/* Mehrzeiliges Textfeld (WYSIWYG) mit Format-Leiste (Fett, Unterstrichen, Kursiv, Aufzählung, Nummerierung, Bild) und Screenshot-Einfügen per Strg/Cmd+V */
 function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = true }) {
   const ref = useRef(null);
   const fileRef = useRef(null);
+  const letzter = useRef(null);
+  const gemerkterBereich = useRef(null);
   const [ladeBild, setLadeBild] = useState(false);
   const [bildFehler, setBildFehler] = useState(null);
+  const [aktiv, setAktiv] = useState({});
+  const [leer, setLeer] = useState(!(value || "").trim());
   const text = value || "";
 
-  const setMitCursor = (next, selStart, selEnd) => {
-    onChange(next);
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(selStart, selEnd);
-    });
-  };
-
-  const selection = () => {
+  // Externe Änderungen (Laden, Speichern, Terminwechsel) in den Editor übernehmen, ohne den Cursor bei eigener Eingabe zu verschieben
+  useEffect(() => {
     const el = ref.current;
-    return { start: el ? el.selectionStart : text.length, end: el ? el.selectionEnd : text.length };
-  };
-
-  const insertZeilenPrefix = (prefix) => {
-    const { start, end } = selection();
-    const before = text.slice(0, start);
-    const after = text.slice(end);
-    const insertion = (before.length > 0 && !before.endsWith("\n") ? "\n" : "") + prefix;
-    const pos = (before + insertion).length;
-    setMitCursor(before + insertion + after, pos, pos);
-  };
-
-  const insertBullet = () => insertZeilenPrefix("• ");
-
-  const insertNumbered = () => {
-    const { start } = selection();
-    const zeilenStart = text.lastIndexOf("\n", start - 1) + 1;
-    const vorherEnde = zeilenStart - 1;
-    let n = 1;
-    if (vorherEnde >= 0) {
-      const vorherStart = text.lastIndexOf("\n", vorherEnde - 1) + 1;
-      const m = text.slice(vorherStart, vorherEnde).match(/^(\d+)\. /);
-      if (m) n = parseInt(m[1], 10) + 1;
+    if (!el) return;
+    if (text !== letzter.current) {
+      el.innerHTML = markupZuHtml(text);
+      letzter.current = text;
     }
-    insertZeilenPrefix(`${n}. `);
+    setLeer(!text.trim());
+  }, [text]);
+
+  useEffect(() => {
+    const onSel = () => {
+      const el = ref.current;
+      const sel = window.getSelection();
+      if (!el || !sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) return;
+      gemerkterBereich.current = sel.getRangeAt(0).cloneRange();
+      try {
+        setAktiv({
+          bold: document.queryCommandState("bold"),
+          underline: document.queryCommandState("underline"),
+          italic: document.queryCommandState("italic"),
+          ul: document.queryCommandState("insertUnorderedList"),
+          ol: document.queryCommandState("insertOrderedList"),
+        });
+      } catch (e) {}
+    };
+    document.addEventListener("selectionchange", onSel);
+    return () => document.removeEventListener("selectionchange", onSel);
+  }, []);
+
+  const sync = () => {
+    const el = ref.current;
+    if (!el) return;
+    const md = htmlZuMarkup(el);
+    letzter.current = md;
+    setLeer(!md.trim() && !el.querySelector("img"));
+    onChange(md);
   };
 
-  const toggleWrap = (marker) => {
-    const { start, end } = selection();
-    const auswahl = text.slice(start, end);
-    const l = marker.length;
-    if (auswahl) {
-      const schon = auswahl.startsWith(marker) && auswahl.endsWith(marker) && auswahl.length >= 2 * l && !(marker === "*" && auswahl.startsWith("**"));
-      const neu = schon ? auswahl.slice(l, -l) : `${marker}${auswahl}${marker}`;
-      setMitCursor(text.slice(0, start) + neu + text.slice(end), start, start + neu.length);
-    } else {
-      setMitCursor(text.slice(0, start) + marker + marker + text.slice(end), start + l, start + l);
+  const fokus = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const r = gemerkterBereich.current;
+    if (r) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
     }
+  };
+
+  const cmd = (name) => {
+    fokus();
+    document.execCommand(name, false, null);
+    sync();
   };
 
   const fuegeBildEin = async (file) => {
     setBildFehler(null);
     setLadeBild(true);
-    const { start, end } = selection();
     try {
       const url = await uploadTextBild(file);
-      const before = text.slice(0, start);
-      const after = text.slice(end);
-      const token = `${before.length > 0 && !before.endsWith("\n") ? "\n" : ""}![](${url})\n`;
-      const pos = (before + token).length;
-      setMitCursor(before + token + after, pos, pos);
+      fokus();
+      document.execCommand("insertHTML", false, `<div><img src="${url}" alt=""></div><div><br></div>`);
+      sync();
     } catch (err) {
       setBildFehler(friendlyError(err));
     } finally {
@@ -3482,51 +3618,41 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
   const onPaste = (e) => {
     const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
     const bildItem = items.find((it) => it.kind === "file" && it.type.startsWith("image/"));
-    if (!bildItem) return;
-    const f = bildItem.getAsFile();
-    if (!f) return;
-    e.preventDefault();
     e.stopPropagation();
-    fuegeBildEin(f);
-  };
-
-  // Enter in Aufzählung/Nummerierung: nächste Zeile beginnt automatisch mit dem nächsten Punkt; leerer Punkt beendet die Liste
-  const onKeyDown = (e) => {
-    if (e.key !== "Enter" || e.shiftKey) return;
-    const el = e.currentTarget;
-    const pos = el.selectionStart;
-    if (pos !== el.selectionEnd) return;
-    const zeilenStart = text.lastIndexOf("\n", pos - 1) + 1;
-    const zeile = text.slice(zeilenStart, pos);
-    let prefix = null;
-    if (zeile.startsWith("• ")) prefix = "• ";
-    else {
-      const m = zeile.match(/^(\d+)\. /);
-      if (m) prefix = `${parseInt(m[1], 10) + 1}. `;
+    if (bildItem) {
+      const f = bildItem.getAsFile();
+      if (f) {
+        e.preventDefault();
+        fuegeBildEin(f);
+        return;
+      }
     }
-    if (!prefix) return;
+    // Fremd-Formatierung vermeiden: nur Text einfügen
     e.preventDefault();
-    const leer = zeile === "• " || /^\d+\. $/.test(zeile);
-    if (leer) {
-      setMitCursor(text.slice(0, zeilenStart) + text.slice(pos), zeilenStart, zeilenStart);
-    } else {
-      setMitCursor(text.slice(0, pos) + "\n" + prefix + text.slice(pos), pos + 1 + prefix.length, pos + 1 + prefix.length);
+    const t = e.clipboardData ? e.clipboardData.getData("text/plain") : "";
+    if (t) {
+      document.execCommand("insertText", false, t);
+      sync();
     }
   };
 
-  const btn = { ...styles.iconBtn, flexShrink: 0 };
-  const hatBild = /!\[[^\]]*\]\(https?:\/\/[^)\s]+\)/.test(text);
+  const btn = (an) => ({
+    ...styles.iconBtn,
+    flexShrink: 0,
+    ...(an ? { background: "var(--accent-text)", color: "#fff" } : {}),
+  });
+  const keepFocus = (e) => e.preventDefault();
 
   return (
-    <div>
+    <div className="wys">
       {label && <label style={styles.label}>{label}</label>}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: label ? 4 : 0 }}>
-        <button type="button" style={{ ...btn, fontWeight: 800, fontSize: 15 }} onClick={() => toggleWrap("**")} title="Fett (markierten Text)" aria-label="Fett">B</button>
-        <button type="button" style={{ ...btn, fontSize: 15, textDecoration: "underline" }} onClick={() => toggleWrap("__")} title="Unterstrichen (markierten Text)" aria-label="Unterstrichen">U</button>
-        <button type="button" style={{ ...btn, fontSize: 15, fontStyle: "italic", fontFamily: "Georgia, serif" }} onClick={() => toggleWrap("*")} title="Kursiv (markierten Text)" aria-label="Kursiv">I</button>
-        <button type="button" style={btn} onClick={insertBullet} title="Aufzählung" aria-label="Aufzählung"><BulletListIcon size={15} /></button>
-        <button type="button" style={btn} onClick={insertNumbered} title="Nummerierte Liste" aria-label="Nummerierte Liste"><NumberedListIcon size={15} /></button>
-        <button type="button" style={btn} onClick={() => fileRef.current && fileRef.current.click()} title="Bild einfügen" aria-label="Bild einfügen" disabled={ladeBild}><ImageIcon size={15} /></button>
+        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.bold), fontWeight: 800, fontSize: 15 }} onClick={() => cmd("bold")} title="Fett" aria-label="Fett">B</button>
+        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.underline), fontSize: 15, textDecoration: "underline" }} onClick={() => cmd("underline")} title="Unterstrichen" aria-label="Unterstrichen">U</button>
+        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.italic), fontSize: 15, fontStyle: "italic", fontFamily: "Georgia, serif" }} onClick={() => cmd("italic")} title="Kursiv" aria-label="Kursiv">I</button>
+        <button type="button" onMouseDown={keepFocus} style={btn(aktiv.ul)} onClick={() => cmd("insertUnorderedList")} title="Aufzählung" aria-label="Aufzählung"><BulletListIcon size={15} /></button>
+        <button type="button" onMouseDown={keepFocus} style={btn(aktiv.ol)} onClick={() => cmd("insertOrderedList")} title="Nummerierte Liste" aria-label="Nummerierte Liste"><NumberedListIcon size={15} /></button>
+        <button type="button" onMouseDown={keepFocus} style={btn(false)} onClick={() => fileRef.current && fileRef.current.click()} title="Bild einfügen" aria-label="Bild einfügen" disabled={ladeBild}><ImageIcon size={15} /></button>
         {ladeBild && <span style={{ fontSize: 12, color: "var(--muted)" }}>Bild wird hochgeladen …</span>}
         <input
           ref={fileRef}
@@ -3540,24 +3666,23 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
           }}
         />
       </div>
-      <textarea
+      <div
         ref={ref}
-        style={{ ...styles.textarea, marginTop: 6 }}
-        rows={rows}
-        placeholder={placeholder}
-        value={text}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
+        className="wys-edit"
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-label={label || "Text"}
+        data-placeholder={placeholder || ""}
+        data-empty={leer ? "true" : "false"}
+        style={{ ...styles.textarea, marginTop: 6, minHeight: rows * 20 + 16, overflowY: "auto", resize: "vertical", outline: "none", lineHeight: "20px", wordBreak: "break-word" }}
+        onInput={sync}
+        onBlur={sync}
         onPaste={onPaste}
       />
       {bildFehler && <div style={{ fontSize: 12, color: "var(--danger-text)", marginTop: 4 }}>{bildFehler}</div>}
-      {hatBild && (
-        <div style={{ marginTop: 8, padding: 10, border: "1px dashed var(--border-strong)", borderRadius: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Vorschau</div>
-          <FormatierterText text={text} />
-        </div>
-      )}
-      {hint && <div style={{ fontSize: 11.5, color: "var(--muted-2)", marginTop: 4 }}>Format: Text markieren und B / U / I tippen. Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
+      {hint && <div style={{ fontSize: 11.5, color: "var(--muted-2)", marginTop: 4 }}>Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
     </div>
   );
 }
