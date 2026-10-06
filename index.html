@@ -116,14 +116,44 @@ async function verifyAccessCode(code) {
   return (await res.json()) === true;
 }
 
-async function dbSelect(table) {
+/* ---------- Teams (Mandanten-Vorbereitung) ----------
+   Das aktuelle Team kommt aus dem Hostnamen (u8.nachspielzeit.app -> "u8"), ?team=… oder, im Admin, aus der Team-Auswahl.
+   Tabellen in TEAM_TABLES werden nach team_id gefiltert; neue Zeilen bekommen automatisch die team_id.
+   Fehlt die Spalte noch in der Datenbank, arbeitet die App wie bisher ohne Filter. */
+let CURRENT_TEAM = (() => {
+  try {
+    const q = new URLSearchParams(window.location.search).get("team");
+    if (q && /^[a-z0-9-]+$/i.test(q)) return q.toLowerCase();
+    const m = window.location.hostname.match(/^([a-z0-9-]+)\.nachspielzeit\.app$/i);
+    if (m && !["admin", "www"].includes(m[1].toLowerCase())) return m[1].toLowerCase();
+  } catch {}
+  return "u8";
+})();
+const TEAM_TABLES = ["players", "trainingstermine", "gegner", "spieltage", "uebungen", "material_bestand", "app_features"];
+let TEAM_COL_OK = null;
+const mitTeamId = (table, rowOrRows) => {
+  if (!TEAM_TABLES.includes(table) || TEAM_COL_OK === false) return rowOrRows;
+  const tag = (r) => (r.team_id === undefined ? { ...r, team_id: CURRENT_TEAM } : r);
+  return Array.isArray(rowOrRows) ? rowOrRows.map(tag) : tag(rowOrRows);
+};
+
+async function dbSelect(table, opts = {}) {
   const SEITE = 1000;
+  const filter = !opts.alle && TEAM_TABLES.includes(table) && TEAM_COL_OK !== false;
   let alle = [];
   for (let von = 0; ; von += SEITE) {
-    const res = await fetch(REST + table + "?select=*", {
+    const res = await fetch(REST + table + "?select=*" + (filter ? `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}` : ""), {
       headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
     });
-    if (!res.ok) throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      if (filter && /team_id/.test(txt)) {
+        TEAM_COL_OK = false;
+        return dbSelect(table, opts);
+      }
+      throw new Error(`Laden von "${table}" fehlgeschlagen: ${txt}`);
+    }
+    if (filter) TEAM_COL_OK = true;
     const teil = await res.json();
     alle = alle.concat(teil);
     if (teil.length < SEITE) break;
@@ -134,7 +164,7 @@ async function dbInsert(table, rowOrRows) {
   const res = await fetch(REST + table, {
     method: "POST",
     headers: dbHeaders({ Prefer: "return=representation" }),
-    body: JSON.stringify(rowOrRows),
+    body: JSON.stringify(mitTeamId(table, rowOrRows)),
   });
   if (!res.ok) throw new Error(`Speichern in "${table}" fehlgeschlagen: ${await res.text()}`);
   return res.json();
@@ -143,7 +173,7 @@ async function dbUpsert(table, row, conflictCol) {
   const res = await fetch(`${REST}${table}?on_conflict=${conflictCol}`, {
     method: "POST",
     headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
-    body: JSON.stringify(row),
+    body: JSON.stringify(mitTeamId(table, row)),
   });
   if (!res.ok) throw new Error(`Speichern in "${table}" fehlgeschlagen: ${await res.text()}`);
   return res.json();
@@ -502,6 +532,7 @@ const FEATURES = [
   { key: "teilen", label: "Spieltag teilen", beschreibung: "Button „Teilen“ (WhatsApp-Bild) an den Spieltagen" },
   { key: "uebungen", label: "Übungsbibliothek", beschreibung: "Verwaltung → Übungen sowie Übungen und Notizen im Trainingsplan" },
   { key: "material", label: "Material", beschreibung: "Verwaltung → Material (Bestandsführung)" },
+  { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Übersichtsseite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
 
 const FeatureCtx = React.createContext({});
@@ -513,7 +544,7 @@ const IS_ADMIN_HOST = /^admin\./i.test(window.location.hostname) || /[?&]admin=1
 const BACKUP_TABELLEN = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele",
   "torschuetzen", "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "team_settings", "uebungen",
-  "training_uebungen", "app_features",
+  "training_uebungen", "app_features", "teams",
 ];
 
 /* ---------- Spieler-Import (BFV/DFBnet-CSV) ---------- */
@@ -692,8 +723,225 @@ notify pgrst, 'reload schema';`;
   );
 }
 
+/* ---------- Admin: Teams & Team-Einstellungen ---------- */
+
+const SQL_TEAMS = `create table if not exists teams (
+  id text primary key,
+  name text not null,
+  config jsonb not null default '{}'::jsonb,
+  archived boolean not null default false,
+  created_at timestamptz default now()
+);
+alter table teams enable row level security;
+drop policy if exists "access via code" on teams;
+create policy "access via code" on teams for all to public using (true) with check (true);
+insert into teams (id, name) values ('u8', 'U8') on conflict (id) do nothing;
+
+-- Daten den Teams zuordnen (bestehende Daten gehören zu "u8")
+alter table players add column if not exists team_id text not null default 'u8';
+alter table trainingstermine add column if not exists team_id text not null default 'u8';
+alter table gegner add column if not exists team_id text not null default 'u8';
+alter table spieltage add column if not exists team_id text not null default 'u8';
+alter table uebungen add column if not exists team_id text not null default 'u8';
+alter table material_bestand add column if not exists team_id text not null default 'u8';
+alter table app_features add column if not exists team_id text not null default 'u8';
+alter table app_features drop constraint if exists app_features_pkey;
+alter table app_features add primary key (team_id, key);
+notify pgrst, 'reload schema';`;
+
+function SqlHinweis({ fehler }) {
+  return (
+    <div style={{ ...styles.editBanner, marginBottom: 12 }}>
+      <div style={{ marginBottom: 6 }}>{fehler}</div>
+      <div style={{ fontSize: 12 }}>Falls die Teams-Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
+      <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TEAMS}</pre>
+    </div>
+  );
+}
+
+function TeamEinstellungen({ team, teamRow, onSaved }) {
+  const cfg = (teamRow && teamRow.config) || {};
+  const [name, setName] = useState(teamRow ? teamRow.name : "");
+  const [vorlauf, setVorlauf] = useState(String(cfg.geburtstage_vorlauf ?? 7));
+  const [status, setStatus] = useState("");
+  const speichern = async () => {
+    setStatus("…");
+    try {
+      const v = Math.max(0, Math.min(60, parseInt(vorlauf, 10) || 0));
+      await dbUpdate("teams", team, { name: name.trim() || team, config: { ...cfg, geburtstage_vorlauf: v } });
+      setVorlauf(String(v));
+      setStatus("Gespeichert");
+      onSaved && onSaved();
+    } catch (e) {
+      setStatus(friendlyError(e));
+    }
+  };
+  if (!teamRow) {
+    return <SqlHinweis fehler={`Für das Team „${team}“ gibt es noch keinen Eintrag in der Tabelle „teams“.`} />;
+  }
+  return (
+    <section>
+      <h2 style={styles.h2}>Einstellungen · {teamRow.name}</h2>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+        Einstellungen gelten nur für dieses Team. Die Änderung gilt nach dem nächsten Laden der App.
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Teamname
+          <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Geburtstagsreminder: Vorlauf in Tagen
+          <input
+            type="number"
+            min="0"
+            max="60"
+            style={{ ...styles.input, marginTop: 4, width: 100 }}
+            value={vorlauf}
+            onChange={(e) => setVorlauf(e.target.value)}
+          />
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            So viele Tage vorher erscheint der Hinweis auf der Übersicht (0 = nur am Geburtstag selbst). Ein-/ausschalten unter „Funktionen“.
+          </div>
+        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button style={styles.primaryBtn} onClick={speichern}>Speichern</button>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>{status}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) {
+  const [name, setName] = useState("");
+  const [kuerzel, setKuerzel] = useState("");
+  const [meldung, setMeldung] = useState("");
+  const anlegen = async () => {
+    const id = kuerzel.trim().toLowerCase();
+    if (!name.trim()) return setMeldung("Bitte einen Namen eingeben.");
+    if (!/^[a-z0-9-]{2,20}$/.test(id)) return setMeldung("Kürzel: 2–20 Zeichen, nur a–z, 0–9 und Bindestrich.");
+    if (["admin", "www", "app"].includes(id) || teams.some((t) => t.id === id)) return setMeldung("Dieses Kürzel ist nicht verfügbar.");
+    try {
+      await dbInsert("teams", { id, name: name.trim(), config: {} });
+      setName("");
+      setKuerzel("");
+      setMeldung(`Team „${name.trim()}“ angelegt.`);
+      await onChanged(id);
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const archivieren = async (t) => {
+    try {
+      await dbUpdate("teams", t.id, { archived: !t.archived });
+      await onChanged();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  return (
+    <section>
+      <h2 style={styles.h2}>Teams</h2>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+        Jedes Team hat eigene Spieler, Trainings, Spieltage und Übungen sowie eigene Funktionen und Einstellungen. Die App eines Teams läuft unter <b>kürzel.nachspielzeit.app</b>.
+      </div>
+      {fehler && <SqlHinweis fehler={fehler} />}
+      <div style={styles.cardList}>
+        {teams.map((t) => (
+          <div key={t.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, opacity: t.archived ? 0.6 : 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>
+                {t.name}
+                {t.id === aktuellesTeam ? " · ausgewählt" : ""}
+                {t.archived ? " · archiviert" : ""}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{t.id}.nachspielzeit.app</div>
+            </div>
+            {t.id !== aktuellesTeam && (
+              <button style={styles.secondaryBtnOutline} onClick={() => onSelect(t.id)}>Auswählen</button>
+            )}
+            {!fehler && t.id !== "u8" && (
+              <button style={styles.secondaryBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
+            )}
+          </div>
+        ))}
+      </div>
+      {!fehler && (
+        <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Neues Team anlegen</div>
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. U9)" value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
+            placeholder="Kürzel für die Adresse (z. B. u9)"
+            value={kuerzel}
+            onChange={(e) => setKuerzel(e.target.value)}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={styles.primaryBtn} onClick={anlegen}>Team anlegen</button>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted-2)" }}>
+            Die Adresse kürzel.nachspielzeit.app muss zusätzlich in Cloudflare als Custom Domain beim Projekt eingetragen werden.
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const ADMIN_TABS = ["backup", "funktionen", "einstellungen", "import", "teams"];
+
 function AdminApp() {
-  const [tab, setTab] = useState("backup");
+  const [tab, setTabState] = useState(() => {
+    const h = window.location.hash.replace("#", "");
+    if (ADMIN_TABS.includes(h)) return h;
+    try {
+      const gespeichert = localStorage.getItem("nsz_admin_tab");
+      if (ADMIN_TABS.includes(gespeichert)) return gespeichert;
+    } catch {}
+    return "backup";
+  });
+  const setTab = (t) => {
+    setTabState(t);
+    try {
+      localStorage.setItem("nsz_admin_tab", t);
+      window.history.replaceState(null, "", "#" + t);
+    } catch {}
+  };
+  const [team, setTeamState] = useState(() => {
+    let t = "u8";
+    try {
+      t = localStorage.getItem("nsz_admin_team") || "u8";
+    } catch {}
+    CURRENT_TEAM = t;
+    return t;
+  });
+  const setTeam = (t) => {
+    CURRENT_TEAM = t;
+    try {
+      localStorage.setItem("nsz_admin_team", t);
+    } catch {}
+    setFeatures(null);
+    setTeamState(t);
+  };
+  const [teams, setTeams] = useState([{ id: "u8", name: "U8" }]);
+  const [teamsFehler, setTeamsFehler] = useState(null);
+  const ladeTeams = async (waehle) => {
+    try {
+      const rows = (await dbSelect("teams")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+      if (rows.length > 0) setTeams(rows);
+      setTeamsFehler(null);
+      if (waehle) setTeam(waehle);
+    } catch (e) {
+      setTeamsFehler(friendlyError(e));
+    }
+  };
+  useEffect(() => {
+    ladeTeams();
+  }, []);
+  const teamRow = teams.find((t) => t.id === team && t.created_at !== undefined) || null;
+  const teamName = (teams.find((t) => t.id === team) || { name: team }).name;
   const [features, setFeatures] = useState(null);
   const [featureFehler, setFeatureFehler] = useState(null);
   const [speichert, setSpeichert] = useState(null);
@@ -721,12 +969,12 @@ function AdminApp() {
   };
   useEffect(() => {
     ladeFeatures();
-  }, []);
+  }, [team]);
 
   const schalte = async (key, an) => {
     setSpeichert(key);
     try {
-      await dbUpsert("app_features", { key, enabled: an, updated_at: new Date().toISOString() }, "key");
+      await dbUpsert("app_features", { key, enabled: an, updated_at: new Date().toISOString() }, TEAM_COL_OK === false ? "key" : "team_id,key");
       setFeatures((f) => ({ ...f, [key]: an }));
       setFeatureFehler(null);
     } catch (e) {
@@ -743,7 +991,7 @@ function AdminApp() {
     const infos = [];
     for (const t of BACKUP_TABELLEN) {
       try {
-        const rows = await dbSelect(t);
+        const rows = await dbSelect(t, { alle: true });
         daten[t] = rows;
         infos.push({ tabelle: t, anzahl: rows.length });
       } catch (e) {
@@ -787,7 +1035,21 @@ notify pgrst, 'reload schema';`;
           <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
           <div style={{ flex: 1 }}>
             <div style={styles.title}>Nachspielzeit Admin</div>
-            <div style={styles.subtitle}>Verwaltung der App · U8</div>
+            <div style={{ ...styles.subtitle, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>Team</span>
+              <select
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                aria-label="Team auswählen"
+                style={{ font: "inherit", fontWeight: 700, background: "transparent", color: "inherit", border: "1px solid var(--border-strong)", borderRadius: 8, padding: "1px 4px" }}
+              >
+                {teams.filter((t) => !t.archived || t.id === team).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <button
             style={styles.logoutBtn}
@@ -801,7 +1063,7 @@ notify pgrst, 'reload schema';`;
           </button>
         </div>
         <nav style={styles.nav}>
-          {[["backup", "Backup"], ["funktionen", "Funktionen"], ["import", "Spieler-Import"]].map(([key, label]) => (
+          {[["backup", "Backup"], ["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"], ["teams", "Teams"]].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}>
               {label}
             </button>
@@ -838,19 +1100,22 @@ notify pgrst, 'reload schema';`;
           </section>
         )}
 
-        {tab === "import" && <SpielerImport />}
+        {tab === "import" && <SpielerImport key={team} />}
+        {tab === "einstellungen" && <TeamEinstellungen key={team} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
+        {tab === "teams" && <TeamsVerwaltung teams={teams} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
 
         {tab === "funktionen" && (
           <section>
-            <h2 style={styles.h2}>Funktionen der U8-App</h2>
+            <h2 style={styles.h2}>Funktionen · {teamName}</h2>
             <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
-              Deaktivierte Funktionen verschwinden in der App u8.nachspielzeit.app. Die Daten bleiben erhalten. Die Änderung gilt nach dem nächsten Laden der App.
+              Deaktivierte Funktionen verschwinden in der App dieses Teams ({team}.nachspielzeit.app). Die Daten bleiben erhalten. Die Änderung gilt nach dem nächsten Laden der App.
             </div>
             {featureFehler && (
               <div style={{ ...styles.editBanner, marginBottom: 12 }}>
                 <div style={{ marginBottom: 6 }}>{featureFehler}</div>
                 <div style={{ fontSize: 12 }}>Falls die Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
                 <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_FEATURES}</pre>
+                <div style={{ fontSize: 12, marginTop: 8 }}>Für die Team-Zuordnung zusätzlich das SQL aus dem Tab „Teams“ ausführen.</div>
               </div>
             )}
             {features === null ? (
@@ -933,6 +1198,7 @@ function App() {
   const [trainingUebungen, setTrainingUebungen] = useState([]);
   const [teamSettings, setTeamSettings] = useState({});
   const [features, setFeatures] = useState({});
+  const [teamInfo, setTeamInfo] = useState(null);
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
   const [trashSpieltage, setTrashSpieltage] = useState([]);
@@ -1014,7 +1280,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw, teamsRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -1033,6 +1299,7 @@ function App() {
           dbSelect("uebungen").catch(() => []),
           dbSelect("training_uebungen").catch(() => []),
           dbSelect("app_features").catch(() => []),
+          dbSelect("teams").catch(() => []),
         ]);
       setPlayers(playersRaw.filter((p) => !p.deleted_at));
       setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
@@ -1092,6 +1359,7 @@ function App() {
       );
       setTeamSettings(teamSettingsRaw[0] || {});
       setFeatures(Object.fromEntries(featuresRaw.map((r) => [r.key, r.enabled !== false])));
+      setTeamInfo(teamsRaw.find((t) => t.id === CURRENT_TEAM) || null);
       setUebungen(
         uebungenRaw
           .filter((u) => !u.deleted_at)
@@ -1253,6 +1521,7 @@ function App() {
             spieltage={spieltage}
             gegner={gegner}
             teamSettings={teamSettings}
+            teamInfo={teamInfo}
             termine={termine}
             onUploadTeamFoto={(file) =>
               wrapAction(async () => {
@@ -2288,6 +2557,39 @@ function TermineLeiste({ termine, spieltage }) {
   );
 }
 
+function GeburtstagsKarte({ players, vorlauf }) {
+  const heute = new Date();
+  heute.setHours(0, 0, 0, 0);
+  const eintraege = players
+    .filter((p) => p.active !== false && p.geburtsdatum)
+    .map((p) => {
+      const [y, m, d] = String(p.geburtsdatum).slice(0, 10).split("-").map(Number);
+      let datum = new Date(heute.getFullYear(), m - 1, d);
+      if (datum < heute) datum = new Date(heute.getFullYear() + 1, m - 1, d);
+      return { id: p.id, name: p.name, tage: Math.round((datum - heute) / 86400000), alter: datum.getFullYear() - y, datum };
+    })
+    .filter((e) => e.tage <= vorlauf)
+    .sort((a, b) => a.tage - b.tage);
+  if (eintraege.length === 0) return null;
+  const wann = (e) =>
+    e.tage === 0
+      ? "heute"
+      : `${e.tage === 1 ? "morgen" : `in ${e.tage} Tagen`} (${e.datum.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })})`;
+  return (
+    <div style={{ ...styles.card, marginBottom: 12, display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <div style={{ fontSize: 26, lineHeight: 1 }} aria-hidden="true">🎂</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{eintraege.some((e) => e.tage === 0) ? "Heute ist Geburtstag!" : "Bald Geburtstag"}</div>
+        {eintraege.map((e) => (
+          <div key={e.id} style={{ fontSize: 13.5, padding: "1px 0", fontWeight: e.tage === 0 ? 700 : 400 }}>
+            {e.name} wird {e.alter} · {wann(e)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({
   players,
   basis,
@@ -2296,6 +2598,7 @@ function Dashboard({
   spieltage,
   gegner,
   teamSettings,
+  teamInfo,
   termine,
   onUploadTeamFoto,
   selectedPlayerId,
@@ -2317,6 +2620,7 @@ function Dashboard({
   const [sortDir, setSortDir] = useState("desc");
   const [uebersichtTab, setUebersichtTab] = useState("training");
   const fMannschaftsbild = useFeature("mannschaftsbild");
+  const fGeburtstage = useFeature("geburtstage");
 
   useEffect(() => {
     if (seasons.length > 0 && !seasons.includes(season)) setSeason(seasons[seasons.length - 1]);
@@ -2395,12 +2699,13 @@ function Dashboard({
       {fMannschaftsbild && (
         <TeamHero
           photoUrl={teamSettings?.team_photo_url || null}
-          teamName="SV Heimstetten U8"
+          teamName={`SV Heimstetten ${teamInfo?.name || "U8"}`}
           seasonLabel={season ? season.replace("-", "/") : ""}
           onUploadFoto={onUploadTeamFoto}
         />
       )}
       <TermineLeiste termine={termine} spieltage={spieltage} />
+      {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
       <SaisonwechselHinweis seasons={seasons} />
 
       <div style={styles.segmentedControl}>
