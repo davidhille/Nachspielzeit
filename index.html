@@ -117,9 +117,18 @@ async function verifyAccessCode(code) {
 }
 
 async function dbSelect(table) {
-  const res = await fetch(REST + table + "?select=*", { headers: dbHeaders() });
-  if (!res.ok) throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
-  return res.json();
+  const SEITE = 1000;
+  let alle = [];
+  for (let von = 0; ; von += SEITE) {
+    const res = await fetch(REST + table + "?select=*", {
+      headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
+    });
+    if (!res.ok) throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
+    const teil = await res.json();
+    alle = alle.concat(teil);
+    if (teil.length < SEITE) break;
+  }
+  return alle;
 }
 async function dbInsert(table, rowOrRows) {
   const res = await fetch(REST + table, {
@@ -484,6 +493,230 @@ function Gate({ onUnlock }) {
   );
 }
 
+/* ---------- Funktionsschalter (Admin: admin.nachspielzeit.app) ---------- */
+
+const FEATURES = [
+  { key: "entwicklung", label: "Monatsentwicklung", beschreibung: "Tab „Monatsentwicklung“ (Extrapunkt je Spieler und Monat)" },
+  { key: "spieltage", label: "Spieltage", beschreibung: "Tab „Spieltage“ inkl. Ergebnissen, Torschützen und Fotos" },
+  { key: "teilen", label: "Spieltag teilen", beschreibung: "Button „Teilen“ (WhatsApp-Bild) an den Spieltagen" },
+  { key: "uebungen", label: "Übungsbibliothek", beschreibung: "Verwaltung → Übungen sowie Übungen und Notizen im Trainingsplan" },
+  { key: "material", label: "Material", beschreibung: "Verwaltung → Material (Bestandsführung)" },
+];
+
+const FeatureCtx = React.createContext({});
+// Ohne Eintrag in der Datenbank gilt eine Funktion als aktiv
+const useFeature = (key) => React.useContext(FeatureCtx)[key] !== false;
+
+const IS_ADMIN_HOST = /^admin\./i.test(window.location.hostname) || /[?&]admin=1\b/.test(window.location.search);
+
+const BACKUP_TABELLEN = [
+  "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele",
+  "torschuetzen", "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "team_settings", "uebungen",
+  "training_uebungen", "app_features",
+];
+
+function AdminApp() {
+  const [tab, setTab] = useState("backup");
+  const [features, setFeatures] = useState(null);
+  const [featureFehler, setFeatureFehler] = useState(null);
+  const [speichert, setSpeichert] = useState(null);
+  const [backupLaeuft, setBackupLaeuft] = useState(false);
+  const [backupInfo, setBackupInfo] = useState(null);
+  const [letztesBackup, setLetztesBackup] = useState(() => {
+    try {
+      return localStorage.getItem("nsz_admin_last_backup") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const ladeFeatures = async () => {
+    try {
+      const rows = await dbSelect("app_features");
+      const m = {};
+      rows.forEach((r) => (m[r.key] = r.enabled !== false));
+      setFeatures(m);
+      setFeatureFehler(null);
+    } catch (e) {
+      setFeatures({});
+      setFeatureFehler(friendlyError(e));
+    }
+  };
+  useEffect(() => {
+    ladeFeatures();
+  }, []);
+
+  const schalte = async (key, an) => {
+    setSpeichert(key);
+    try {
+      await dbUpsert("app_features", { key, enabled: an, updated_at: new Date().toISOString() }, "key");
+      setFeatures((f) => ({ ...f, [key]: an }));
+      setFeatureFehler(null);
+    } catch (e) {
+      setFeatureFehler(friendlyError(e));
+    } finally {
+      setSpeichert(null);
+    }
+  };
+
+  const backupErstellen = async () => {
+    setBackupLaeuft(true);
+    setBackupInfo(null);
+    const daten = {};
+    const infos = [];
+    for (const t of BACKUP_TABELLEN) {
+      try {
+        const rows = await dbSelect(t);
+        daten[t] = rows;
+        infos.push({ tabelle: t, anzahl: rows.length });
+      } catch (e) {
+        infos.push({ tabelle: t, fehler: true });
+      }
+    }
+    const jetzt = new Date();
+    const payload = { app: "Nachspielzeit", erstellt: jetzt.toISOString(), host: window.location.hostname, tabellen: daten };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nachspielzeit-backup-${jetzt.toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    const stempel = jetzt.toLocaleString("de-DE");
+    try {
+      localStorage.setItem("nsz_admin_last_backup", stempel);
+    } catch {}
+    setLetztesBackup(stempel);
+    setBackupInfo(infos);
+    setBackupLaeuft(false);
+  };
+
+  const SQL_FEATURES = `create table if not exists app_features (
+  key text primary key,
+  enabled boolean not null default true,
+  updated_at timestamptz default now()
+);
+alter table app_features enable row level security;
+drop policy if exists "access via code" on app_features;
+create policy "access via code" on app_features for all to public using (true) with check (true);
+notify pgrst, 'reload schema';`;
+
+  return (
+    <div style={styles.app}>
+      <header className="app-header" style={styles.header}>
+        <div style={styles.headerTop}>
+          <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
+          <div style={{ flex: 1 }}>
+            <div style={styles.title}>Nachspielzeit Admin</div>
+            <div style={styles.subtitle}>Verwaltung der App · U8</div>
+          </div>
+          <button
+            style={styles.logoutBtn}
+            onClick={() => {
+              localStorage.removeItem("nsz_access_code");
+              window.location.reload();
+            }}
+          >
+            <LogoutIcon size={13} />
+            Abmelden
+          </button>
+        </div>
+        <nav style={styles.nav}>
+          {[["backup", "Backup"], ["funktionen", "Funktionen"]].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)} style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}>
+              {label}
+            </button>
+          ))}
+        </nav>
+      </header>
+      <main style={styles.main}>
+        {tab === "backup" && (
+          <section>
+            <h2 style={styles.h2}>Backup</h2>
+            <div style={styles.card}>
+              <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+                Lädt alle Daten der App (Spieler, Trainings, Spieltage, Übungen, Notizen, Einstellungen …) als eine JSON-Datei herunter. Bilder liegen im Supabase-Storage und sind nur als Link enthalten.
+              </div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
+                Letztes Backup von diesem Gerät: {letztesBackup || "noch keines"}
+              </div>
+              <button style={{ ...styles.primaryBtn, marginTop: 12 }} onClick={backupErstellen} disabled={backupLaeuft}>
+                {backupLaeuft ? "Backup läuft …" : "Backup jetzt herunterladen"}
+              </button>
+              {backupInfo && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Gesichert:</div>
+                  {backupInfo.map((i) => (
+                    <div key={i.tabelle} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "2px 0", color: i.fehler ? "var(--danger-text)" : "var(--text)" }}>
+                      <span>{i.tabelle}</span>
+                      <span>{i.fehler ? "nicht gefunden / Fehler" : `${i.anzahl} Einträge`}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted-2)", marginTop: 8 }}>Wiederherstellen aus einem Backup folgt in einem späteren Schritt.</div>
+          </section>
+        )}
+
+        {tab === "funktionen" && (
+          <section>
+            <h2 style={styles.h2}>Funktionen der U8-App</h2>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+              Deaktivierte Funktionen verschwinden in der App u8.nachspielzeit.app. Die Daten bleiben erhalten. Die Änderung gilt nach dem nächsten Laden der App.
+            </div>
+            {featureFehler && (
+              <div style={{ ...styles.editBanner, marginBottom: 12 }}>
+                <div style={{ marginBottom: 6 }}>{featureFehler}</div>
+                <div style={{ fontSize: 12 }}>Falls die Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
+                <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_FEATURES}</pre>
+              </div>
+            )}
+            {features === null ? (
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
+            ) : (
+              <div style={styles.cardList}>
+                {FEATURES.map((f) => {
+                  const an = features[f.key] !== false;
+                  return (
+                    <div key={f.key} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{f.label}</div>
+                        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{f.beschreibung}</div>
+                      </div>
+                      <button
+                        role="switch"
+                        aria-checked={an}
+                        aria-label={f.label}
+                        disabled={speichert === f.key}
+                        onClick={() => schalte(f.key, !an)}
+                        style={{
+                          width: 52,
+                          height: 30,
+                          borderRadius: 999,
+                          border: "none",
+                          background: an ? "var(--success-text)" : "var(--border-strong)",
+                          position: "relative",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span style={{ position: "absolute", top: 3, left: an ? 25 : 3, width: 24, height: 24, borderRadius: 999, background: "#fff", transition: "left 120ms ease" }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
 function Root() {
   const [unlocked, setUnlocked] = useState(!!ACCESS_CODE);
   if (!unlocked) {
@@ -496,7 +729,7 @@ function Root() {
       />
     );
   }
-  return <App />;
+  return IS_ADMIN_HOST ? <AdminApp /> : <App />;
 }
 
 /* ---------- App ---------- */
@@ -520,6 +753,7 @@ function App() {
   const [uebungen, setUebungen] = useState([]);
   const [trainingUebungen, setTrainingUebungen] = useState([]);
   const [teamSettings, setTeamSettings] = useState({});
+  const [features, setFeatures] = useState({});
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
   const [trashSpieltage, setTrashSpieltage] = useState([]);
@@ -601,7 +835,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -619,6 +853,7 @@ function App() {
           // Übungsbibliothek: falls die Tabellen noch nicht angelegt sind, bleibt die App trotzdem nutzbar
           dbSelect("uebungen").catch(() => []),
           dbSelect("training_uebungen").catch(() => []),
+          dbSelect("app_features").catch(() => []),
         ]);
       setPlayers(playersRaw.filter((p) => !p.deleted_at));
       setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
@@ -677,6 +912,7 @@ function App() {
         }))
       );
       setTeamSettings(teamSettingsRaw[0] || {});
+      setFeatures(Object.fromEntries(featuresRaw.map((r) => [r.key, r.enabled !== false])));
       setUebungen(
         uebungenRaw
           .filter((u) => !u.deleted_at)
@@ -825,6 +1061,7 @@ function App() {
   }
 
   return (
+    <FeatureCtx.Provider value={features}>
     <div style={styles.app}>
       <Header tab={tab} setTab={setTab} />
       <main style={styles.main}>
@@ -879,7 +1116,7 @@ function App() {
             }
           />
         )}
-        {tab === "entwicklung" && (
+        {tab === "entwicklung" && features.entwicklung !== false && (
           <MonatsEntwicklung
             players={activePlayers}
             entwicklungen={entwicklungen}
@@ -894,7 +1131,7 @@ function App() {
             }
           />
         )}
-        {tab === "spieltage" && (
+        {tab === "spieltage" && features.spieltage !== false && (
           <Spieltage
             players={players}
             gegner={gegner}
@@ -1085,19 +1322,22 @@ function App() {
         </div>
       )}
     </div>
+    </FeatureCtx.Provider>
   );
 }
 
 /* ---------- Header ---------- */
 
 function Header({ tab, setTab }) {
+  const fEntwicklung = useFeature("entwicklung");
+  const fSpieltage = useFeature("spieltage");
   const items = [
     ["dashboard", "Übersicht"],
     ["training", "Training bewerten"],
-    ["entwicklung", "Monatsentwicklung"],
-    ["spieltage", "Spieltage"],
+    fEntwicklung && ["entwicklung", "Monatsentwicklung"],
+    fSpieltage && ["spieltage", "Spieltage"],
     ["verwaltung", "Verwaltung"],
-  ];
+  ].filter(Boolean);
   const navRef = useRef(null);
   const [scrollFade, setScrollFade] = useState({ left: false, right: false });
 
@@ -3717,6 +3957,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
   const [spieltagTab, setSpieltagTab] = useState("spiele");
+  const fTeilen = useFeature("teilen");
   const [teilenLaeuft, setTeilenLaeuft] = useState(false);
   const [teilenFehler, setTeilenFehler] = useState(null);
 
@@ -3877,13 +4118,15 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
             <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }} onClick={onToggle}>
               {open ? "Schließen" : "Öffnen"} <ChevronIcon open={open} />
             </button>
-            <button
-              style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4, opacity: teilenLaeuft ? 0.6 : 1 }}
-              onClick={handleTeilen}
-              disabled={teilenLaeuft}
-            >
-              <ShareIcon size={14} /> {teilenLaeuft ? "Erstelle Bild …" : "Teilen"}
-            </button>
+            {fTeilen && (
+              <button
+                style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4, opacity: teilenLaeuft ? 0.6 : 1 }}
+                onClick={handleTeilen}
+                disabled={teilenLaeuft}
+              >
+                <ShareIcon size={14} /> {teilenLaeuft ? "Erstelle Bild …" : "Teilen"}
+              </button>
+            )}
             <button
               style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => confirmAnd("Diesen Spieltag in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.", onRemoveSpieltag)}
@@ -4216,15 +4459,17 @@ function Verwaltung({
   onDeleteMaterialEintrag,
 }) {
   const [subTab, setSubTab] = useState("spieler");
+  const fUebungen = useFeature("uebungen");
+  const fMaterial = useFeature("material");
   const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   const items = [
     ["spieler", "Spieler"],
     ["trainingsplan", "Trainingsplan"],
-    ["uebungen", "Übungen"],
+    fUebungen && ["uebungen", "Übungen"],
     ["spieltage", "Spieltage"],
-    ["material", "Material"],
+    fMaterial && ["material", "Material"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
-  ];
+  ].filter(Boolean);
 
   return (
     <section>
@@ -4272,7 +4517,7 @@ function Verwaltung({
           onSaveTerminNotiz={onSaveTerminNotiz}
         />
       )}
-      {subTab === "uebungen" && <UebungenBereich uebungen={uebungen} onSave={onSaveUebung} onRemove={onRemoveUebung} />}
+      {subTab === "uebungen" && fUebungen && <UebungenBereich uebungen={uebungen} onSave={onSaveUebung} onRemove={onRemoveUebung} />}
       {subTab === "spieltage" && (
         <SpieltageVerwaltungBereich
           gegner={gegner}
@@ -4284,7 +4529,7 @@ function Verwaltung({
           onToggleGegnerZuordnung={onToggleGegnerZuordnung}
         />
       )}
-      {subTab === "material" && (
+      {subTab === "material" && fMaterial && (
         <MaterialBereich
           material={material}
           onSaveBestand={onSaveBestand}
@@ -5035,6 +5280,7 @@ function TrainingsplanBereich({
 }
 
 function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung, onSaveTerminNotiz }) {
+  const fUebungenTermin = useFeature("uebungen");
   const abgesagt = termin.status === "abgesagt";
   const istHalle = termin.typ === "hallentraining";
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -5111,7 +5357,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
         </div>
       )}
 
-      {!abgesagt && (
+      {!abgesagt && fUebungenTermin && (
         <div style={{ flexBasis: "100%" }}>
           <TerminUebungen
             termin={termin}
