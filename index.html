@@ -137,7 +137,14 @@ const TEAM_COL_FEHLT = new Set(); // Tabellen, in denen die Spalte team_id (noch
 const teamFilterAktiv = (table) => TEAM_TABLES.includes(table) && !TEAM_COL_FEHLT.has(table);
 const mitTeamId = (table, rowOrRows) => {
   if (!teamFilterAktiv(table)) return rowOrRows;
-  const tag = (r) => (r.team_id === undefined ? { ...r, team_id: CURRENT_TEAM } : r);
+  const tag = (r) =>
+    table === "uebungen"
+      ? r.team_ids === undefined
+        ? { ...r, team_ids: [CURRENT_TEAM] }
+        : r
+      : r.team_id === undefined
+      ? { ...r, team_id: CURRENT_TEAM }
+      : r;
   return Array.isArray(rowOrRows) ? rowOrRows.map(tag) : tag(rowOrRows);
 };
 
@@ -166,7 +173,7 @@ async function dbSelect(table, opts = {}) {
     const teamQs = !filter
       ? ""
       : table === "uebungen"
-      ? `&or=(team_id.eq.${encodeURIComponent(CURRENT_TEAM)},team_id.eq.alle)`
+      ? `&or=(team_ids.cs.{${encodeURIComponent(CURRENT_TEAM)}},team_ids.cs.{alle})`
       : `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
     const res = await fetch(REST + table + "?select=*" + teamQs, {
       headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
@@ -905,7 +912,12 @@ create policy "profilbilder aendern" on storage.objects for update to public usi
 create policy "profilbilder loeschen" on storage.objects for delete to public using (bucket_id = 'profilbilder' and public.nsz_code_ok());
 
 
--- 6) Übungen: Übungen mit team_id 'alle' sind für alle Teams lesbar (ändern nur Admin)
+-- 6) Übungen: mehrere Teams je Übung (team_ids); 'alle' = für alle Teams lesbar (ändern nur Admin)
+alter table uebungen add column if not exists team_ids text[] not null default '{u8}';
+update uebungen set team_ids = array[team_id] where team_id is not null and team_id <> 'u8' and team_ids = '{u8}';
+create or replace function nsz_code_ok_arr(t text[]) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and (team_id is null or team_id = any(t)))
+$$;
 do $$
 declare p record;
 begin
@@ -913,10 +925,10 @@ begin
     execute format('drop policy %I on public.uebungen', p.policyname);
   end loop;
 end $$;
-create policy "uebungen lesen" on uebungen for select to public using ((team_id = 'alle' and nsz_code_ok()) or nsz_code_ok(team_id));
-create policy "uebungen anlegen" on uebungen for insert to public with check (nsz_code_ok(team_id));
-create policy "uebungen aendern" on uebungen for update to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
-create policy "uebungen loeschen" on uebungen for delete to public using (nsz_code_ok(team_id));
+create policy "uebungen lesen" on uebungen for select to public using (nsz_code_ok_arr(team_ids) or ('alle' = any(team_ids) and nsz_code_ok()));
+create policy "uebungen anlegen" on uebungen for insert to public with check (nsz_code_ok_arr(team_ids));
+create policy "uebungen aendern" on uebungen for update to public using (nsz_code_ok_arr(team_ids)) with check (nsz_code_ok_arr(team_ids));
+create policy "uebungen loeschen" on uebungen for delete to public using (nsz_code_ok_arr(team_ids));
 
 notify pgrst, 'reload schema';
 `;
@@ -928,20 +940,6 @@ function neuerCode() {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }
 
-const SQL_UEBUNGEN_ALLE = `-- Übungen für alle Teams (team_id 'alle'): Lesen für jeden gültigen Code, Ändern nur Admin
-do $$
-declare p record;
-begin
-  for p in select policyname from pg_policies where schemaname = 'public' and tablename = 'uebungen' loop
-    execute format('drop policy %I on public.uebungen', p.policyname);
-  end loop;
-end $$;
-create policy "uebungen lesen" on uebungen for select to public using ((team_id = 'alle' and nsz_code_ok()) or nsz_code_ok(team_id));
-create policy "uebungen anlegen" on uebungen for insert to public with check (nsz_code_ok(team_id));
-create policy "uebungen aendern" on uebungen for update to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
-create policy "uebungen loeschen" on uebungen for delete to public using (nsz_code_ok(team_id));
-notify pgrst, 'reload schema';
-`;
 
 // Datei-Format: { "uebungen": [ { "titel": "...", "ablauf": "...", "keywords": ["..."] } ] } oder direkt eine Liste
 function parseUebungenImport(text) {
@@ -958,10 +956,35 @@ function parseUebungenImport(text) {
     .filter((u) => u.titel);
 }
 
+// Mehrfachauswahl: einzelne Teams oder "Alle Teams" (schließen sich gegenseitig aus)
+function TeamMehrfachAuswahl({ teams, value, onChange }) {
+  const alleAn = value.includes("alle");
+  const umschalten = (id) => {
+    if (id === "alle") return onChange(alleAn ? [teams[0] ? teams[0].id : "u8"] : ["alle"]);
+    const basis = alleAn ? [] : value;
+    const neu = basis.includes(id) ? basis.filter((x) => x !== id) : [...basis, id];
+    if (neu.length > 0) onChange(neu);
+  };
+  const chip = (id, label) => {
+    const an = id === "alle" ? alleAn : !alleAn && value.includes(id);
+    return (
+      <button key={id} type="button" role="checkbox" aria-checked={an} onClick={() => umschalten(id)} style={{ ...styles.chip, ...(an ? styles.chipActive : {}) }}>
+        {label}
+      </button>
+    );
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {chip("alle", "Alle Teams")}
+      {teams.filter((t) => !t.archived).map((t) => chip(t.id, t.name))}
+    </div>
+  );
+}
+
 function UebungenAdmin({ teams }) {
   const [alle, setAlle] = useState(null);
   const [fehler, setFehler] = useState(null);
-  const [ziel, setZiel] = useState("alle");
+  const [ziel, setZiel] = useState(["alle"]);
   const [text, setText] = useState("");
   const [vorschau, setVorschau] = useState(null);
   const [meldung, setMeldung] = useState("");
@@ -979,7 +1002,7 @@ function UebungenAdmin({ teams }) {
   useEffect(() => {
     laden();
   }, []);
-  const zuordnungName = (id) => (id === "alle" ? "Alle Teams" : (teams.find((t) => t.id === id) || { name: id }).name);
+  const zuordnungName = (ids) => ids.map((id) => (id === "alle" ? "Alle Teams" : (teams.find((t) => t.id === id) || { name: id }).name)).join(", ");
   const lesen = (t) => {
     setText(t);
     setMeldung("");
@@ -990,13 +1013,15 @@ function UebungenAdmin({ teams }) {
       setMeldung("Datei nicht lesbar: " + e.message);
     }
   };
-  const bekannt = (titel) => (alle || []).some((u) => (u.team_id || "u8") === ziel && String(u.titel).trim().toLowerCase() === titel.toLowerCase());
+  const teamsVon = (u) => (Array.isArray(u.team_ids) ? u.team_ids : [u.team_id || "u8"]);
+  const bekannt = (titel) =>
+    (alle || []).some((u) => teamsVon(u).some((t) => ziel.includes(t)) && String(u.titel).trim().toLowerCase() === titel.toLowerCase());
   const neue = (vorschau || []).filter((u) => !bekannt(u.titel));
   const importieren = async () => {
     try {
       await dbInsert(
         "uebungen",
-        neue.map((u) => ({ id: uid(), titel: u.titel, beschreibung: u.beschreibung || null, keywords: u.keywords, bild_url: u.bild_url, team_id: ziel }))
+        neue.map((u) => ({ id: uid(), titel: u.titel, beschreibung: u.beschreibung || null, keywords: u.keywords, bild_url: u.bild_url, team_ids: ziel }))
       );
       setMeldung(`${neue.length} Übungen importiert (${zuordnungName(ziel)}).`);
       setText("");
@@ -1006,9 +1031,9 @@ function UebungenAdmin({ teams }) {
       setMeldung(friendlyError(e));
     }
   };
-  const zuordnen = async (u, teamId) => {
+  const zuordnen = async (u, ids) => {
     try {
-      await dbUpdate("uebungen", u.id, { team_id: teamId });
+      await dbUpdate("uebungen", u.id, { team_ids: ids });
       await laden();
     } catch (e) {
       setMeldung(friendlyError(e));
@@ -1024,17 +1049,12 @@ function UebungenAdmin({ teams }) {
       {fehler && <div style={{ ...styles.editBanner, marginBottom: 12 }}>{fehler}</div>}
       <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 14 }}>Übungen importieren</div>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
           Zuordnung der importierten Übungen
-          <select style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={ziel} onChange={(e) => setZiel(e.target.value)}>
-            <option value="alle">Alle Teams</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                Nur {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div style={{ marginTop: 6 }}>
+            <TeamMehrfachAuswahl teams={teams} value={ziel} onChange={setZiel} />
+          </div>
+        </div>
         <input
           type="file"
           accept=".json,application/json,text/plain"
@@ -1074,12 +1094,6 @@ function UebungenAdmin({ teams }) {
         </div>
       </div>
 
-      <details style={{ ...styles.card, marginBottom: 16 }}>
-        <summary style={{ fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Einmalig: SQL für „Alle Teams“-Übungen</summary>
-        <div style={{ fontSize: 12, color: "var(--muted)", margin: "6px 0" }}>In Supabase (SQL Editor) ausführen, falls das Zuordnen auf „Alle Teams“ einen Fehler meldet:</div>
-        <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: 0, userSelect: "all" }}>{SQL_UEBUNGEN_ALLE}</pre>
-      </details>
-
       <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Alle Übungen {alle ? `(${alle.length})` : ""}</div>
       <input style={{ ...styles.input, width: "100%", boxSizing: "border-box", marginBottom: 10 }} placeholder="Suchen …" value={suche} onChange={(e) => setSuche(e.target.value)} />
       {alle === null ? (
@@ -1092,14 +1106,9 @@ function UebungenAdmin({ teams }) {
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{u.titel}</div>
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{Array.isArray(u.keywords) ? u.keywords.join(", ") : ""}</div>
               </div>
-              <select style={{ ...styles.input, flex: "none" }} value={u.team_id || "u8"} onChange={(e) => zuordnen(u, e.target.value)} aria-label={`Zuordnung von ${u.titel}`}>
-                <option value="alle">Alle Teams</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <div style={{ width: "100%" }}>
+                <TeamMehrfachAuswahl teams={teams} value={teamsVon(u)} onChange={(ids) => zuordnen(u, ids)} />
+              </div>
             </div>
           ))}
           {gefiltert.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Keine Übungen.</div>}
@@ -1872,7 +1881,7 @@ function App() {
             keywords: Array.isArray(u.keywords) ? u.keywords : [],
             material: Array.isArray(u.material) ? u.material : [],
             bildUrl: u.bild_url || null,
-            teamId: u.team_id || CURRENT_TEAM,
+            teamIds: Array.isArray(u.team_ids) ? u.team_ids : [CURRENT_TEAM],
           }))
           .sort((a, b) => a.titel.localeCompare(b.titel, "de"))
       );
@@ -1964,7 +1973,7 @@ function App() {
           beschreibung: u.beschreibung || null,
           keywords: u.keywords,
           bild_url: bildUrl,
-          team_id: u.teamId || CURRENT_TEAM,
+          ...(teamFilterAktiv("uebungen") ? { team_ids: u.teamIds || [CURRENT_TEAM] } : {}),
           deleted_at: null,
         },
         "id"
@@ -6545,9 +6554,9 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
           setEdit(null);
         }}
         onCancel={() => setEdit(null)}
-        gesperrt={edit !== "neu" && edit.teamId === "alle"}
+        gesperrt={edit !== "neu" && (edit.teamIds || []).includes("alle")}
         onRemove={
-          edit === "neu" || edit.teamId === "alle"
+          edit === "neu" || (edit.teamIds || []).includes("alle")
             ? null
             : () => confirmAnd(`Übung „${edit.titel}“ wirklich löschen?`, () => { onRemove(edit.id); setEdit(null); })
         }
@@ -6592,7 +6601,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
                   <div style={{ padding: "10px 12px 12px" }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{u.titel}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {u.teamId === "alle" && <span style={{ ...tagStyle, background: "var(--success-bg, #E6F2EA)", color: "var(--success-text)" }}>Alle Teams</span>}
+                      {(u.teamIds || []).includes("alle") && <span style={{ ...tagStyle, background: "var(--success-bg, #E6F2EA)", color: "var(--success-text)" }}>Alle Teams</span>}
                       {u.keywords.map((k) => (
                         <span key={k} style={tagStyle}>{k}</span>
                       ))}
