@@ -238,6 +238,23 @@ async function uploadUebungBild(uebungId, file) {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}?t=${Date.now()}`;
 }
 
+async function uploadTextBild(file) {
+  const blob = await resizeImageFile(file, 1000, 0.85);
+  const path = `textbilder/${uid()}.jpg`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "x-access-code": ACCESS_CODE,
+      "Content-Type": "image/jpeg",
+    },
+    body: blob,
+  });
+  if (!res.ok) throw new Error(`Hochladen des Bilds fehlgeschlagen: ${await res.text()}`);
+  return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}`;
+}
+
 async function uploadSpieltagFoto(spieltagId, file) {
   const blob = await resizeImageFile(file, 1200, 0.85);
   const path = `spieltage/${spieltagId}.jpg`;
@@ -2135,7 +2152,7 @@ function TrainerNotizen({ trainings, players, month }) {
               <span style={styles.cardName}>{spielerName(n.playerId)}</span>
               <span style={styles.mutedTag}>{formatTerminLabel(n.date)}</span>
             </div>
-            <div style={{ fontSize: 13, color: "var(--text)" }}>{n.kommentar}</div>
+            <FormatierterText text={n.kommentar} />
           </div>
         ))}
       </div>
@@ -2208,7 +2225,7 @@ function SpieltagNotizenUebersicht({ spieltage, month }) {
             <div style={styles.cardHead}>
               <span style={styles.cardName}>{formatTerminLabel(s.date)}</span>
             </div>
-            <div style={{ fontSize: 13, color: "var(--text)", whiteSpace: "pre-line" }}>{s.notizen}</div>
+            <FormatierterText text={s.notizen} />
           </div>
         ))}
       </div>
@@ -2434,7 +2451,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                   {TEILNAHME_LABEL[t.teilnahme]}
                   {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
                 </div>
-                {t.kommentar && <div style={{ marginTop: 6, fontSize: 13 }}>{t.kommentar}</div>}
+                {t.kommentar && <FormatierterText text={t.kommentar} style={{ marginTop: 6 }} />}
               </div>
             ))}
           </div>
@@ -2854,13 +2871,13 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete }) {
               </div>
 
               <div style={{ marginTop: 8 }}>
-                <label style={styles.label}>Kommentar (optional)</label>
-                <textarea
-                  style={styles.textarea}
+                <FormatTextarea
+                  label="Kommentar (optional)"
                   placeholder="Etwas Besonderes zu diesem Spieler festhalten…"
                   value={row.kommentar || ""}
-                  onChange={(e) => setRow(p.id, { kommentar: e.target.value })}
+                  onChange={(v) => setRow(p.id, { kommentar: v })}
                   rows={2}
+                  hint={false}
                 />
               </div>
             </div>
@@ -3310,33 +3327,86 @@ function BulletListIcon({ size = 16 }) {
   );
 }
 
-/* Einfaches Text-Format: "**fett**" und Zeilen mit "• " als Aufzählung */
+/* Einfaches Text-Format: **fett**, __unterstrichen__, *kursiv*, "• " Aufzählung, "1. " Nummerierung, ![](Bild-URL) Bild */
+const BILD_ZEILE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/;
+
 function FormatierterText({ text, style }) {
+  const [lightbox, setLightbox] = useState(null);
   const zeilen = (text || "").split("\n");
   const inline = (t) =>
-    t.split(/(\*\*[^*]+\*\*)/g).map((teil, i) =>
-      /^\*\*[^*]+\*\*$/.test(teil) ? <strong key={i}>{teil.slice(2, -2)}</strong> : <span key={i}>{teil}</span>
-    );
+    t.split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*\s][^*]*\*)/g).map((teil, i) => {
+      if (/^\*\*[^*]+\*\*$/.test(teil)) return <strong key={i}>{inline(teil.slice(2, -2))}</strong>;
+      if (/^__[^_]+__$/.test(teil)) return <u key={i}>{inline(teil.slice(2, -2))}</u>;
+      if (/^\*[^*\s][^*]*\*$/.test(teil)) return <em key={i}>{inline(teil.slice(1, -1))}</em>;
+      return <span key={i}>{teil}</span>;
+    });
   return (
     <div style={{ fontSize: 13, lineHeight: 1.45, color: "var(--text)", ...style }}>
-      {zeilen.map((z, i) =>
-        z.startsWith("• ") ? (
-          <div key={i} style={{ display: "flex", gap: 6, paddingLeft: 2 }}>
-            <span aria-hidden="true">•</span>
-            <span style={{ flex: 1 }}>{inline(z.slice(2))}</span>
-          </div>
-        ) : z.trim() === "" ? (
-          <div key={i} style={{ height: 6 }} />
-        ) : (
-          <div key={i}>{inline(z)}</div>
-        )
-      )}
+      {zeilen.map((z, i) => {
+        const bild = z.trim().match(BILD_ZEILE);
+        const num = z.match(/^(\d+)\. (.*)$/);
+        if (bild) {
+          return (
+            <img
+              key={i}
+              src={bild[1]}
+              alt=""
+              onClick={(e) => { e.stopPropagation(); setLightbox(bild[1]); }}
+              style={{ display: "block", maxWidth: "100%", maxHeight: 320, borderRadius: 8, margin: "6px 0", cursor: "zoom-in" }}
+            />
+          );
+        }
+        if (z.startsWith("• ")) {
+          return (
+            <div key={i} style={{ display: "flex", gap: 6, paddingLeft: 2 }}>
+              <span aria-hidden="true">•</span>
+              <span style={{ flex: 1 }}>{inline(z.slice(2))}</span>
+            </div>
+          );
+        }
+        if (num) {
+          return (
+            <div key={i} style={{ display: "flex", gap: 6, paddingLeft: 2 }}>
+              <span aria-hidden="true" style={{ minWidth: 16 }}>{num[1]}.</span>
+              <span style={{ flex: 1 }}>{inline(num[2])}</span>
+            </div>
+          );
+        }
+        if (z.trim() === "") return <div key={i} style={{ height: 6 }} />;
+        return <div key={i}>{inline(z)}</div>;
+      })}
+      {lightbox && <BildLightbox url={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );
 }
 
-function FormatTextarea({ value, onChange, rows = 5, placeholder, label }) {
+function NumberedListIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 6h11M10 12h11M10 18h11" />
+      <path d="M3.5 5l1.5-1v4" strokeWidth="1.6" />
+      <path d="M3 13.5c.3-.9 2.5-.9 2.5.3 0 1-2.5 1.6-2.5 2.7h2.7" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function ImageIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <circle cx="9" cy="11" r="1.8" />
+      <path d="M21 16l-5-5-8 8" />
+    </svg>
+  );
+}
+
+/* Mehrzeiliges Textfeld mit Format-Leiste (Fett, Unterstrichen, Kursiv, Aufzählung, Nummerierung, Bild) und Screenshot-Einfügen per Strg/Cmd+V */
+function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = true }) {
   const ref = useRef(null);
+  const fileRef = useRef(null);
+  const [ladeBild, setLadeBild] = useState(false);
+  const [bildFehler, setBildFehler] = useState(null);
+  const text = value || "";
 
   const setMitCursor = (next, selStart, selEnd) => {
     onChange(next);
@@ -3348,79 +3418,151 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label }) {
     });
   };
 
-  const insertBullet = () => {
+  const selection = () => {
     const el = ref.current;
-    const start = el ? el.selectionStart : value.length;
-    const end = el ? el.selectionEnd : value.length;
-    const before = value.slice(0, start);
-    const after = value.slice(end);
-    const insertion = (before.length > 0 && !before.endsWith("\n") ? "\n" : "") + "• ";
+    return { start: el ? el.selectionStart : text.length, end: el ? el.selectionEnd : text.length };
+  };
+
+  const insertZeilenPrefix = (prefix) => {
+    const { start, end } = selection();
+    const before = text.slice(0, start);
+    const after = text.slice(end);
+    const insertion = (before.length > 0 && !before.endsWith("\n") ? "\n" : "") + prefix;
     const pos = (before + insertion).length;
     setMitCursor(before + insertion + after, pos, pos);
   };
 
-  const toggleBold = () => {
-    const el = ref.current;
-    const start = el ? el.selectionStart : value.length;
-    const end = el ? el.selectionEnd : value.length;
-    const auswahl = value.slice(start, end);
+  const insertBullet = () => insertZeilenPrefix("• ");
+
+  const insertNumbered = () => {
+    const { start } = selection();
+    const zeilenStart = text.lastIndexOf("\n", start - 1) + 1;
+    const vorherEnde = zeilenStart - 1;
+    let n = 1;
+    if (vorherEnde >= 0) {
+      const vorherStart = text.lastIndexOf("\n", vorherEnde - 1) + 1;
+      const m = text.slice(vorherStart, vorherEnde).match(/^(\d+)\. /);
+      if (m) n = parseInt(m[1], 10) + 1;
+    }
+    insertZeilenPrefix(`${n}. `);
+  };
+
+  const toggleWrap = (marker) => {
+    const { start, end } = selection();
+    const auswahl = text.slice(start, end);
+    const l = marker.length;
     if (auswahl) {
-      const schonFett = auswahl.startsWith("**") && auswahl.endsWith("**") && auswahl.length >= 4;
-      const neu = schonFett ? auswahl.slice(2, -2) : `**${auswahl}**`;
-      setMitCursor(value.slice(0, start) + neu + value.slice(end), start, start + neu.length);
+      const schon = auswahl.startsWith(marker) && auswahl.endsWith(marker) && auswahl.length >= 2 * l && !(marker === "*" && auswahl.startsWith("**"));
+      const neu = schon ? auswahl.slice(l, -l) : `${marker}${auswahl}${marker}`;
+      setMitCursor(text.slice(0, start) + neu + text.slice(end), start, start + neu.length);
     } else {
-      setMitCursor(value.slice(0, start) + "****" + value.slice(end), start + 2, start + 2);
+      setMitCursor(text.slice(0, start) + marker + marker + text.slice(end), start + l, start + l);
     }
   };
 
-  // Enter in einer Aufzählungszeile: nächste Zeile beginnt wieder mit "• "; leere Zeile beendet die Liste
+  const fuegeBildEin = async (file) => {
+    setBildFehler(null);
+    setLadeBild(true);
+    const { start, end } = selection();
+    try {
+      const url = await uploadTextBild(file);
+      const before = text.slice(0, start);
+      const after = text.slice(end);
+      const token = `${before.length > 0 && !before.endsWith("\n") ? "\n" : ""}![](${url})\n`;
+      const pos = (before + token).length;
+      setMitCursor(before + token + after, pos, pos);
+    } catch (err) {
+      setBildFehler(friendlyError(err));
+    } finally {
+      setLadeBild(false);
+    }
+  };
+
+  const onPaste = (e) => {
+    const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
+    const bildItem = items.find((it) => it.kind === "file" && it.type.startsWith("image/"));
+    if (!bildItem) return;
+    const f = bildItem.getAsFile();
+    if (!f) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fuegeBildEin(f);
+  };
+
+  // Enter in Aufzählung/Nummerierung: nächste Zeile beginnt automatisch mit dem nächsten Punkt; leerer Punkt beendet die Liste
   const onKeyDown = (e) => {
     if (e.key !== "Enter" || e.shiftKey) return;
     const el = e.currentTarget;
     const pos = el.selectionStart;
     if (pos !== el.selectionEnd) return;
-    const zeilenStart = value.lastIndexOf("\n", pos - 1) + 1;
-    const zeile = value.slice(zeilenStart, pos);
-    if (!zeile.startsWith("• ")) return;
+    const zeilenStart = text.lastIndexOf("\n", pos - 1) + 1;
+    const zeile = text.slice(zeilenStart, pos);
+    let prefix = null;
+    if (zeile.startsWith("• ")) prefix = "• ";
+    else {
+      const m = zeile.match(/^(\d+)\. /);
+      if (m) prefix = `${parseInt(m[1], 10) + 1}. `;
+    }
+    if (!prefix) return;
     e.preventDefault();
-    if (zeile === "• ") {
-      setMitCursor(value.slice(0, zeilenStart) + value.slice(pos), zeilenStart, zeilenStart);
+    const leer = zeile === "• " || /^\d+\. $/.test(zeile);
+    if (leer) {
+      setMitCursor(text.slice(0, zeilenStart) + text.slice(pos), zeilenStart, zeilenStart);
     } else {
-      const neu = value.slice(0, pos) + "\n• " + value.slice(pos);
-      setMitCursor(neu, pos + 3, pos + 3);
+      setMitCursor(text.slice(0, pos) + "\n" + prefix + text.slice(pos), pos + 1 + prefix.length, pos + 1 + prefix.length);
     }
   };
 
+  const btn = { ...styles.iconBtn, flexShrink: 0 };
+  const hatBild = /!\[[^\]]*\]\(https?:\/\/[^)\s]+\)/.test(text);
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <label style={styles.label}>{label}</label>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button type="button" style={{ ...styles.iconBtn, flexShrink: 0, fontWeight: 800, fontSize: 15 }} onClick={toggleBold} title="Fett (markierten Text)" aria-label="Fett">
-            B
-          </button>
-          <button type="button" style={{ ...styles.iconBtn, flexShrink: 0 }} onClick={insertBullet} title="Aufzählungspunkt einfügen" aria-label="Aufzählungspunkt einfügen">
-            <BulletListIcon size={15} />
-          </button>
-        </div>
+      {label && <label style={styles.label}>{label}</label>}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: label ? 4 : 0 }}>
+        <button type="button" style={{ ...btn, fontWeight: 800, fontSize: 15 }} onClick={() => toggleWrap("**")} title="Fett (markierten Text)" aria-label="Fett">B</button>
+        <button type="button" style={{ ...btn, fontSize: 15, textDecoration: "underline" }} onClick={() => toggleWrap("__")} title="Unterstrichen (markierten Text)" aria-label="Unterstrichen">U</button>
+        <button type="button" style={{ ...btn, fontSize: 15, fontStyle: "italic", fontFamily: "Georgia, serif" }} onClick={() => toggleWrap("*")} title="Kursiv (markierten Text)" aria-label="Kursiv">I</button>
+        <button type="button" style={btn} onClick={insertBullet} title="Aufzählung" aria-label="Aufzählung"><BulletListIcon size={15} /></button>
+        <button type="button" style={btn} onClick={insertNumbered} title="Nummerierte Liste" aria-label="Nummerierte Liste"><NumberedListIcon size={15} /></button>
+        <button type="button" style={btn} onClick={() => fileRef.current && fileRef.current.click()} title="Bild einfügen" aria-label="Bild einfügen" disabled={ladeBild}><ImageIcon size={15} /></button>
+        {ladeBild && <span style={{ fontSize: 12, color: "var(--muted)" }}>Bild wird hochgeladen …</span>}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files && e.target.files[0];
+            e.target.value = "";
+            if (f) fuegeBildEin(f);
+          }}
+        />
       </div>
       <textarea
         ref={ref}
         style={{ ...styles.textarea, marginTop: 6 }}
         rows={rows}
         placeholder={placeholder}
-        value={value}
+        value={text}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
+        onPaste={onPaste}
       />
-      <div style={{ fontSize: 11.5, color: "var(--muted-2)", marginTop: 4 }}>Fett: Text markieren und „B“ tippen. Aufzählung: „•“ tippen, Enter führt die Liste fort.</div>
+      {bildFehler && <div style={{ fontSize: 12, color: "var(--danger-text)", marginTop: 4 }}>{bildFehler}</div>}
+      {hatBild && (
+        <div style={{ marginTop: 8, padding: 10, border: "1px dashed var(--border-strong)", borderRadius: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Vorschau</div>
+          <FormatierterText text={text} />
+        </div>
+      )}
+      {hint && <div style={{ fontSize: 11.5, color: "var(--muted-2)", marginTop: 4 }}>Format: Text markieren und B / U / I tippen. Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
     </div>
   );
 }
 
 function SpieltagNotizen({ value, onSave }) {
   const [text, setText] = useState(value || "");
-  const textareaRef = useRef(null);
 
   useEffect(() => {
     setText(value || "");
@@ -3428,46 +3570,9 @@ function SpieltagNotizen({ value, onSave }) {
 
   const dirty = text !== (value || "");
 
-  const insertBullet = () => {
-    const el = textareaRef.current;
-    const start = el ? el.selectionStart : text.length;
-    const end = el ? el.selectionEnd : text.length;
-    const before = text.slice(0, start);
-    const after = text.slice(end);
-    const needsNewline = before.length > 0 && !before.endsWith("\n");
-    const insertion = (needsNewline ? "\n" : "") + "• ";
-    const next = before + insertion + after;
-    setText(next);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
-      const pos = (before + insertion).length;
-      el.setSelectionRange(pos, pos);
-    });
-  };
-
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <label style={styles.label}>Notizen</label>
-        <button
-          type="button"
-          style={{ ...styles.iconBtn, flexShrink: 0 }}
-          onClick={insertBullet}
-          title="Aufzählungspunkt einfügen"
-          aria-label="Aufzählungspunkt einfügen"
-        >
-          <BulletListIcon size={15} />
-        </button>
-      </div>
-      <textarea
-        ref={textareaRef}
-        style={{ ...styles.textarea, marginTop: 6 }}
-        rows={4}
-        placeholder="Beobachtungen zu diesem Spieltag …"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
+      <FormatTextarea label="Notizen" value={text} onChange={setText} rows={4} placeholder="Beobachtungen zu diesem Spieltag …" />
       {dirty && (
         <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={() => onSave(text)}>
           Speichern
