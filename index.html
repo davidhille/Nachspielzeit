@@ -1010,6 +1010,7 @@ function App() {
             onAddTrainingUebung={addTrainingUebung}
             onRemoveTrainingUebung={(id) => wrapAction(() => dbDelete("training_uebungen", id))}
             onMoveTrainingUebung={moveTrainingUebung}
+            onSaveTerminNotiz={(id, notizen) => wrapAction(() => dbUpdate("trainingstermine", id, { notizen }), "Notiz gespeichert")}
             trashPlayers={trashPlayers}
             trashGegner={trashGegner}
             trashSpieltage={trashSpieltage}
@@ -3561,7 +3562,7 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
   );
 }
 
-function SpieltagNotizen({ value, onSave }) {
+function SpieltagNotizen({ value, onSave, label = "Notizen", placeholder = "Beobachtungen zu diesem Spieltag …", rows = 4 }) {
   const [text, setText] = useState(value || "");
 
   useEffect(() => {
@@ -3572,7 +3573,7 @@ function SpieltagNotizen({ value, onSave }) {
 
   return (
     <div style={{ marginBottom: 14 }}>
-      <FormatTextarea label="Notizen" value={text} onChange={setText} rows={4} placeholder="Beobachtungen zu diesem Spieltag …" />
+      <FormatTextarea label={label} value={text} onChange={setText} rows={rows} placeholder={placeholder} />
       {dirty && (
         <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={() => onSave(text)}>
           Speichern
@@ -4076,6 +4077,7 @@ function Verwaltung({
   onAddTrainingUebung,
   onRemoveTrainingUebung,
   onMoveTrainingUebung,
+  onSaveTerminNotiz,
   trashPlayers,
   trashGegner,
   trashSpieltage,
@@ -4142,6 +4144,7 @@ function Verwaltung({
           onAddTrainingUebung={onAddTrainingUebung}
           onRemoveTrainingUebung={onRemoveTrainingUebung}
           onMoveTrainingUebung={onMoveTrainingUebung}
+          onSaveTerminNotiz={onSaveTerminNotiz}
         />
       )}
       {subTab === "uebungen" && <UebungenBereich uebungen={uebungen} onSave={onSaveUebung} onRemove={onRemoveUebung} />}
@@ -4710,8 +4713,9 @@ function TrainingsplanBereich({
   onAddTrainingUebung,
   onRemoveTrainingUebung,
   onMoveTrainingUebung,
+  onSaveTerminNotiz,
 }) {
-  const uebungProps = { uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung };
+  const uebungProps = { uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung, onSaveTerminNotiz };
   const [wochentage, setWochentage] = useState([2, 4]);
   const [wochen, setWochen] = useState(8);
   const [startDatum, setStartDatum] = useState(todayISO());
@@ -4905,7 +4909,7 @@ function TrainingsplanBereich({
   );
 }
 
-function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung }) {
+function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung, onSaveTerminNotiz }) {
   const abgesagt = termin.status === "abgesagt";
   const istHalle = termin.typ === "hallentraining";
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -4991,6 +4995,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
             onAdd={onAddTrainingUebung}
             onRemove={onRemoveTrainingUebung}
             onMove={onMoveTrainingUebung}
+            onSaveNotiz={onSaveTerminNotiz}
           />
         </div>
       )}
@@ -5329,7 +5334,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
   );
 }
 
-function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }) {
+function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, onSaveNotiz }) {
   const [offen, setOffen] = useState(false);
   const [ausgeblendet, setAusgeblendet] = useState([]);
   const [pickerAblaufId, setPickerAblaufId] = useState(null);
@@ -5353,11 +5358,18 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove }
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
       <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setOffen(!offen)}>
-        <ChevronIcon open={offen} /> Übungen{liste.length > 0 ? ` (${liste.length})` : ""}
+        <ChevronIcon open={offen} /> Übungen{liste.length > 0 ? ` (${liste.length})` : ""}{termin.notizen && termin.notizen.trim() ? " · Notiz" : ""}
       </button>
 
       {offen && (
         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+          <SpieltagNotizen
+            value={termin.notizen}
+            onSave={(text) => onSaveNotiz && onSaveNotiz(termin.id, text)}
+            label="Notizen zum Training"
+            placeholder="Schwerpunkt, Ablauf, Material, Hinweise …"
+            rows={4}
+          />
           {liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Übungen für dieses Training geplant.</div>}
           {liste.map((e, i) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
