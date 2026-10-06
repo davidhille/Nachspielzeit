@@ -3478,7 +3478,11 @@ function TrainerNotizen({ trainings, players, month }) {
 
 function SpieltagAnwesenheit({ spieltage, players, month }) {
   const saison = seasonKeyOf(month);
-  const spieltageDerSaison = spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison);
+  // Nur Spieltage, die schon stattgefunden haben (heute oder früher)
+  const heuteISO = todayISO();
+  const spieltageDerSaison = spieltage.filter(
+    (s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO
+  );
   const gesamt = spieltageDerSaison.length;
 
   const rows = players
@@ -3751,7 +3755,15 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   const anwesend = saisonTrainings.filter(
     (t) => t.teilnahme === "anwesend" || t.teilnahme === "anwesend_nicht_angemeldet"
   ).length;
-  const quote = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
+  const quoteTraining = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
+  // Spieltag-Quote: nur bereits stattgefundene Spieltage der Saison
+  const heuteISO = todayISO();
+  const vergangeneSpieltage = spieltage.filter(
+    (s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO
+  );
+  const spieltagDabeiAnzahl = vergangeneSpieltage.filter((s) => s.teilnehmer.includes(player.id)).length;
+  const quoteSpieltage = vergangeneSpieltage.length > 0 ? (spieltagDabeiAnzahl / vergangeneSpieltage.length) * 100 : null;
+  const quote = historieTab === "spieltage" ? quoteSpieltage : quoteTraining;
 
   const spieltageDabei = spieltage
     .filter((s) => s.teilnehmer.includes(player.id))
