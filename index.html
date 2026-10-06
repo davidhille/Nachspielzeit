@@ -3763,11 +3763,11 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   );
   const spieltagDabeiAnzahl = vergangeneSpieltage.filter((s) => s.teilnehmer.includes(player.id)).length;
   const quoteSpieltage = vergangeneSpieltage.length > 0 ? (spieltagDabeiAnzahl / vergangeneSpieltage.length) * 100 : null;
-  const quote = historieTab === "spieltage" ? quoteSpieltage : quoteTraining;
 
   const spieltageDabei = spieltage
     .filter((s) => s.teilnehmer.includes(player.id))
     .sort((a, b) => b.date.localeCompare(a.date));
+  const spieltagNr = spieltagNummern(spieltage);
   const toreGesamt = spieltage
     .flatMap((s) => s.spiele)
     .flatMap((sp) => sp.scorers)
@@ -3792,7 +3792,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
           { value: basisAktuell.toFixed(2), label: "BASIS" },
-          { value: quote != null ? quote.toFixed(0) + "%" : "–", label: "ANW" },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW TRAINING" },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW SPIELTAG" },
           { value: toreGesamt, label: "TORE" },
         ]}
       />
@@ -3854,7 +3855,10 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                 .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
               return (
                 <div key={s.id} style={styles.spielRow}>
-                  <div>{formatTerminLabel(s.date)}</div>
+                  <div>
+                    {formatTerminLabel(s.date)}
+                    <span style={{ color: "var(--muted)", marginLeft: 8, fontSize: 13 }}>{spieltagLabel(s, spieltagNr.get(s.id))}</span>
+                  </div>
                   <div>{toreAnDiesemTag > 0 ? `${toreAnDiesemTag} Tor(e)` : ""}</div>
                 </div>
               );
