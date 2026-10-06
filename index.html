@@ -3859,7 +3859,13 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                     {formatTerminLabel(s.date)}
                     <span style={{ color: "var(--muted)", marginLeft: 8, fontSize: 13 }}>{spieltagLabel(s, spieltagNr.get(s.id))}</span>
                   </div>
-                  <div>{toreAnDiesemTag > 0 ? `${toreAnDiesemTag} Tor(e)` : ""}</div>
+                  <div>
+                    {toreAnDiesemTag > 0 && (
+                      <span style={{ ...styles.pill, background: "var(--pos-bg)", color: "var(--pos-text)" }}>
+                        ⚽ {toreAnDiesemTag} {toreAnDiesemTag === 1 ? "Tor" : "Tore"}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
