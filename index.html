@@ -5280,7 +5280,6 @@ function TrainingsplanBereich({
 }
 
 function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung, onSaveTerminNotiz }) {
-  const fUebungenTermin = useFeature("uebungen");
   const abgesagt = termin.status === "abgesagt";
   const istHalle = termin.typ === "hallentraining";
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -5357,7 +5356,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
         </div>
       )}
 
-      {!abgesagt && fUebungenTermin && (
+      {!abgesagt && (
         <div style={{ flexBasis: "100%" }}>
           <TerminUebungen
             termin={termin}
@@ -5706,6 +5705,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove }) {
 }
 
 function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, onSaveNotiz }) {
+  const mitUebungen = useFeature("uebungen");
   const [offen, setOffen] = useState(false);
   const [ausgeblendet, setAusgeblendet] = useState([]);
   const [pickerAblaufId, setPickerAblaufId] = useState(null);
@@ -5729,7 +5729,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
       <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setOffen(!offen)}>
-        <ChevronIcon open={offen} /> Übungen{liste.length > 0 ? ` (${liste.length})` : ""}{termin.notizen && termin.notizen.trim() ? " · Notiz" : ""}
+        <ChevronIcon open={offen} /> {mitUebungen ? "Übungen" : "Notizen"}{mitUebungen && liste.length > 0 ? ` (${liste.length})` : ""}{mitUebungen && termin.notizen && termin.notizen.trim() ? " · Notiz" : ""}
       </button>
 
       {offen && (
@@ -5741,8 +5741,8 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
             placeholder="Schwerpunkt, Ablauf des Trainings, allgemeine Themen neben den Übungen …"
             rows={4}
           />
-          {liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Übungen für dieses Training geplant.</div>}
-          {liste.map((e, i) => (
+          {mitUebungen && liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Übungen für dieses Training geplant.</div>}
+          {mitUebungen && liste.map((e, i) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
               <UebungBild url={e.uebung.bildUrl} size={72} titel={e.uebung.titel} zoom />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -5775,7 +5775,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
             </div>
           ))}
 
-          {!waehlen ? (
+          {!mitUebungen ? null : !waehlen ? (
             <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
           ) : (
             <div style={{ ...styles.card, background: "var(--bg, #F7F4F3)" }}>
