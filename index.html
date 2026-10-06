@@ -129,17 +129,38 @@ let CURRENT_TEAM = (() => {
   } catch {}
   return "u8";
 })();
-const TEAM_TABLES = ["players", "trainingstermine", "gegner", "spieltage", "uebungen", "material_bestand", "app_features"];
-let TEAM_COL_OK = null;
+const TEAM_TABLES = [
+  "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele", "torschuetzen",
+  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features",
+];
+const TEAM_COL_FEHLT = new Set(); // Tabellen, in denen die Spalte team_id (noch) nicht existiert
+const teamFilterAktiv = (table) => TEAM_TABLES.includes(table) && !TEAM_COL_FEHLT.has(table);
 const mitTeamId = (table, rowOrRows) => {
-  if (!TEAM_TABLES.includes(table) || TEAM_COL_OK === false) return rowOrRows;
+  if (!teamFilterAktiv(table)) return rowOrRows;
   const tag = (r) => (r.team_id === undefined ? { ...r, team_id: CURRENT_TEAM } : r);
   return Array.isArray(rowOrRows) ? rowOrRows.map(tag) : tag(rowOrRows);
 };
 
+let ACCESS_INFO = null; // { ok, team_id }  (team_id leer = Admin mit Zugriff auf alle Teams)
+async function pruefeZugang(code) {
+  const res = await fetch(REST + "rpc/check_access", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ code }) });
+  if (res.ok) {
+    const j = await res.json();
+    return { ok: !!(j && j.ok), team_id: (j && j.team_id) || null };
+  }
+  // Datenbank noch nicht umgestellt: alter Einzelcode gilt als Admin-Code
+  if (res.status === 404 || res.status === 400) return { ok: await verifyAccessCode(code), team_id: null };
+  throw new Error("Zugang konnte nicht geprüft werden");
+}
+function zugangFehler(info) {
+  if (IS_ADMIN_HOST) return info.team_id ? "Dieser Code hat keinen Zugriff auf die Administration." : "";
+  if (info.team_id && info.team_id !== CURRENT_TEAM) return "Dieser Code gehört zu einem anderen Team.";
+  return "";
+}
+
 async function dbSelect(table, opts = {}) {
   const SEITE = 1000;
-  const filter = !opts.alle && TEAM_TABLES.includes(table) && TEAM_COL_OK !== false;
+  const filter = !opts.alle && teamFilterAktiv(table);
   let alle = [];
   for (let von = 0; ; von += SEITE) {
     const res = await fetch(REST + table + "?select=*" + (filter ? `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}` : ""), {
@@ -148,12 +169,11 @@ async function dbSelect(table, opts = {}) {
     if (!res.ok) {
       const txt = await res.text();
       if (filter && /team_id/.test(txt)) {
-        TEAM_COL_OK = false;
+        TEAM_COL_FEHLT.add(table);
         return dbSelect(table, opts);
       }
       throw new Error(`Laden von "${table}" fehlgeschlagen: ${txt}`);
     }
-    if (filter) TEAM_COL_OK = true;
     const teil = await res.json();
     alle = alle.concat(teil);
     if (teil.length < SEITE) break;
@@ -170,11 +190,21 @@ async function dbInsert(table, rowOrRows) {
   return res.json();
 }
 async function dbUpsert(table, row, conflictCol) {
-  const res = await fetch(`${REST}${table}?on_conflict=${conflictCol}`, {
+  // Tabellen mit team_id: Konflikt-Schlüssel enthält das Team (Fallback auf den alten Schlüssel, solange die DB noch nicht umgestellt ist)
+  const mitTeam = teamFilterAktiv(table) && conflictCol !== "id" && conflictCol !== "player_id";
+  const col = mitTeam ? `team_id,${conflictCol}` : conflictCol;
+  let res = await fetch(`${REST}${table}?on_conflict=${col}`, {
     method: "POST",
     headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
     body: JSON.stringify(mitTeamId(table, row)),
   });
+  if (!res.ok && mitTeam) {
+    res = await fetch(`${REST}${table}?on_conflict=${conflictCol}`, {
+      method: "POST",
+      headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
+      body: JSON.stringify(mitTeamId(table, row)),
+    });
+  }
   if (!res.ok) throw new Error(`Speichern in "${table}" fehlgeschlagen: ${await res.text()}`);
   return res.json();
 }
@@ -192,6 +222,7 @@ async function dbDelete(table, id, idCol = "id") {
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
 async function dbDeleteWhere(table, qs) {
+  if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
   const res = await fetch(`${REST}${table}?${qs}`, { method: "DELETE", headers: dbHeaders() });
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
@@ -247,7 +278,7 @@ async function uploadProfilbild(playerId, file) {
 
 async function uploadTeamFoto(file) {
   const blob = await resizeImageFile(file, 1200, 0.85);
-  const path = `team/foto.jpg`;
+  const path = CURRENT_TEAM === "u8" ? `team/foto.jpg` : `team/foto-${CURRENT_TEAM}.jpg`;
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
@@ -473,22 +504,25 @@ function aktuelleBasis(playerId, basis, entwicklungen, biMonatKeyExklusiv) {
 
 /* ---------- Zugangscode-Gate ---------- */
 
-function Gate({ onUnlock }) {
+function Gate({ onUnlock, hinweis = "" }) {
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
-  const [fehler, setFehler] = useState("");
+  const [fehler, setFehler] = useState(hinweis);
 
   const pruefen = async () => {
     if (!code.trim()) return;
     setChecking(true);
     setFehler("");
     try {
-      const ok = await verifyAccessCode(code.trim());
-      if (ok) {
-        localStorage.setItem("nsz_access_code", code.trim());
-        onUnlock(code.trim());
-      } else {
+      const info = await pruefeZugang(code.trim());
+      if (!info.ok) {
         setFehler("Zugangscode ist falsch.");
+      } else if (zugangFehler(info)) {
+        setFehler(zugangFehler(info));
+      } else {
+        localStorage.setItem("nsz_access_code", code.trim());
+        ACCESS_INFO = info;
+        onUnlock(code.trim());
       }
     } catch (e) {
       setFehler("Verbindung fehlgeschlagen. Internet prüfen und erneut versuchen.");
@@ -759,6 +793,243 @@ function SqlHinweis({ fehler }) {
   );
 }
 
+const SQL_ZUGAENGE = `-- Nachspielzeit: Zugangscodes pro Team + Team-Zuordnung aller Daten
+-- Vorher: unten bei DEIN-AKTUELLER-CODE deinen bisherigen Zugangscode eintragen (zweimal!).
+-- Das Skript ist wiederholbar (kann mehrfach ausgeführt werden).
+
+-- 1) Zugangscodes (team_id leer = Admin mit Zugriff auf alle Teams)
+create table if not exists access_codes (
+  code text primary key,
+  team_id text,
+  label text,
+  active boolean not null default true,
+  created_at timestamptz default now()
+);
+alter table access_codes enable row level security;
+insert into access_codes (code, team_id, label) values ('DEIN-AKTUELLER-CODE', null, 'Admin') on conflict (code) do nothing;
+
+create or replace function nsz_header_code() returns text language sql stable as $$
+  select nullif(current_setting('request.headers', true), '')::json ->> 'x-access-code'
+$$;
+create or replace function nsz_code_ok(t text default null) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and (team_id is null or t is null or team_id = t))
+$$;
+create or replace function nsz_is_admin() returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and team_id is null)
+$$;
+create or replace function check_access(code text) returns json language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select json_build_object('ok', true, 'team_id', a.team_id) from access_codes a where a.code = check_access.code and a.active limit 1),
+    json_build_object('ok', false))
+$$;
+grant execute on function check_access(text) to anon, authenticated;
+
+-- Sicherung: nicht fortfahren, solange der Platzhalter-Code der einzige Admin-Code ist
+do $$ begin
+  if not exists (select 1 from access_codes where team_id is null and active and code <> 'DEIN-AKTUELLER-CODE') then
+    raise exception 'Bitte zuerst DEIN-AKTUELLER-CODE durch deinen echten Zugangscode ersetzen.';
+  end if;
+end $$;
+
+-- 2) Alle Datentabellen: team_id + Zugriff nur mit passendem Code
+do $$
+declare t text; p record;
+begin
+  foreach t in array array['players','basisqualitaet','trainingstermine','trainings','entwicklungen','gegner','spieltage','spiele','torschuetzen','spieltag_gegner','spieltag_teilnehmer','material_bestand','uebungen','training_uebungen','app_features'] loop
+    execute format('alter table public.%I add column if not exists team_id text not null default %L', t, 'u8');
+    execute format('alter table public.%I enable row level security', t);
+    for p in select policyname from pg_policies where schemaname = 'public' and tablename = t loop
+      execute format('drop policy %I on public.%I', p.policyname, t);
+    end loop;
+    execute format('create policy "access via code" on public.%I for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id))', t);
+  end loop;
+end $$;
+
+-- team_settings (alte Einzeltabelle fürs Mannschaftsfoto): für jeden gültigen Code lesbar
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname = 'public' and tablename = 'team_settings' loop
+    execute format('drop policy %I on public.team_settings', p.policyname);
+  end loop;
+end $$;
+create policy "access via code" on team_settings for all to public using (nsz_code_ok()) with check (nsz_code_ok());
+
+-- 3) Schlüssel pro Team
+alter table app_features drop constraint if exists app_features_pkey;
+alter table app_features add primary key (team_id, key);
+do $$
+declare c record;
+begin
+  for c in select conname from pg_constraint
+    where conrelid = 'public.material_bestand'::regclass and contype = 'u'
+      and (select array_agg(attname::text order by attname) from pg_attribute where attrelid = conrelid and attnum = any(conkey)) = array['date','material']
+  loop
+    execute format('alter table public.material_bestand drop constraint %I', c.conname);
+  end loop;
+end $$;
+alter table material_bestand drop constraint if exists material_bestand_team_date_material_key;
+alter table material_bestand add constraint material_bestand_team_date_material_key unique (team_id, date, material);
+
+-- 4) Teams und Codes: wer darf was
+do $$
+declare p record;
+begin
+  for p in select policyname, tablename from pg_policies where schemaname = 'public' and tablename in ('teams', 'access_codes') loop
+    execute format('drop policy %I on public.%I', p.policyname, p.tablename);
+  end loop;
+end $$;
+create policy "teams lesen" on teams for select to public using (nsz_code_ok());
+create policy "teams aendern" on teams for update to public using (nsz_code_ok(id)) with check (nsz_code_ok(id));
+create policy "teams anlegen" on teams for insert to public with check (nsz_is_admin());
+create policy "teams loeschen" on teams for delete to public using (nsz_is_admin());
+create policy "nur admin" on access_codes for all to public using (nsz_is_admin()) with check (nsz_is_admin());
+
+-- 5) Bilder-Bucket: Schreiben nur mit gültigem Code (Lesen bleibt öffentlich)
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects'
+    and (coalesce(qual, '') || coalesce(with_check, '')) ilike '%profilbilder%' loop
+    execute format('drop policy %I on storage.objects', p.policyname);
+  end loop;
+end $$;
+create policy "profilbilder lesen" on storage.objects for select to public using (bucket_id = 'profilbilder');
+create policy "profilbilder schreiben" on storage.objects for insert to public with check (bucket_id = 'profilbilder' and public.nsz_code_ok());
+create policy "profilbilder aendern" on storage.objects for update to public using (bucket_id = 'profilbilder' and public.nsz_code_ok());
+create policy "profilbilder loeschen" on storage.objects for delete to public using (bucket_id = 'profilbilder' and public.nsz_code_ok());
+
+notify pgrst, 'reload schema';
+`;
+
+function neuerCode() {
+  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+}
+
+function ZugaengeVerwaltung({ teams }) {
+  const [codes, setCodes] = useState(null);
+  const [fehler, setFehler] = useState(null);
+  const [offen, setOffen] = useState({});
+  const [label, setLabel] = useState("");
+  const [teamId, setTeamId] = useState(teams[0] ? teams[0].id : "");
+  const [code, setCode] = useState(() => neuerCode());
+  const [meldung, setMeldung] = useState("");
+  const laden = async () => {
+    try {
+      setCodes((await dbSelect("access_codes", { alle: true })).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
+      setFehler(null);
+    } catch (e) {
+      setCodes([]);
+      setFehler(friendlyError(e));
+    }
+  };
+  useEffect(() => {
+    laden();
+  }, []);
+  const teamName = (id) => (id ? (teams.find((t) => t.id === id) || { name: id }).name : "Alle Teams (Admin)");
+  const anlegen = async () => {
+    const c = code.trim();
+    if (c.length < 6) return setMeldung("Der Code braucht mindestens 6 Zeichen.");
+    if (codes.some((x) => x.code === c)) return setMeldung("Diesen Code gibt es schon.");
+    try {
+      await dbInsert("access_codes", { code: c, team_id: teamId === "*" ? null : teamId, label: label.trim() || null, active: true });
+      setLabel("");
+      setCode(neuerCode());
+      setMeldung("Code angelegt. Jetzt an die Trainer des Teams weitergeben.");
+      await laden();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const umschalten = async (c) => {
+    if (c.code === ACCESS_CODE) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gesperrt werden.");
+    try {
+      await dbUpdate("access_codes", c.code, { active: !c.active }, "code");
+      await laden();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const loeschen = async (c) => {
+    if (c.code === ACCESS_CODE) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gelöscht werden.");
+    if (!window.confirm(`Code${c.label ? ` „${c.label}“` : ""} endgültig löschen?`)) return;
+    try {
+      await dbDelete("access_codes", c.code, "code");
+      await laden();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  return (
+    <section>
+      <h2 style={styles.h2}>Zugänge</h2>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+        Jedes Team hat eigene Zugangscodes und sieht nur seine Daten. Ein Code ohne Team („Alle Teams“) ist ein Admin-Code und funktioniert auch in der Administration.
+      </div>
+      {fehler && (
+        <div style={{ ...styles.editBanner, marginBottom: 12 }}>
+          <div style={{ marginBottom: 6 }}>{fehler}</div>
+          <div style={{ fontSize: 12 }}>Falls die Zugangs-Tabelle noch fehlt: SQL unten einmalig in Supabase (SQL Editor) ausführen, vorher DEIN-AKTUELLER-CODE ersetzen.</div>
+          <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_ZUGAENGE}</pre>
+        </div>
+      )}
+      {codes === null ? (
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
+      ) : (
+        <div style={styles.cardList}>
+          {codes.map((c) => (
+            <div key={c.code} style={{ ...styles.card, opacity: c.active ? 1 : 0.6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {c.label || "(ohne Bezeichnung)"}
+                    {c.active ? "" : " · gesperrt"}
+                    {c.code === ACCESS_CODE ? " · dein aktueller Code" : ""}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
+                  <div style={{ fontSize: 13, marginTop: 4, fontFamily: "monospace", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
+                </div>
+                <button style={styles.secondaryBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
+                  {offen[c.code] ? "Verbergen" : "Anzeigen"}
+                </button>
+                <button style={styles.secondaryBtnOutline} onClick={() => umschalten(c)}>
+                  {c.active ? "Sperren" : "Entsperren"}
+                </button>
+                <button style={styles.secondaryBtnOutline} onClick={() => loeschen(c)}>
+                  Löschen
+                </button>
+              </div>
+            </div>
+          ))}
+          {codes.length === 0 && !fehler && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Codes.</div>}
+        </div>
+      )}
+      {!fehler && codes !== null && (
+        <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Neuen Code anlegen</div>
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <select style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+            <option value="*">Alle Teams (Admin)</option>
+          </select>
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box", fontFamily: "monospace" }} value={code} onChange={(e) => setCode(e.target.value)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={styles.primaryBtn} onClick={anlegen}>Code anlegen</button>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TeamEinstellungen({ team, teamRow, onSaved }) {
   const cfg = (teamRow && teamRow.config) || {};
   const [name, setName] = useState(teamRow ? teamRow.name : "");
@@ -890,7 +1161,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
   );
 }
 
-const ADMIN_TABS = ["backup", "funktionen", "einstellungen", "import", "teams"];
+const ADMIN_TABS = ["backup", "funktionen", "einstellungen", "import", "teams", "zugaenge"];
 
 function AdminApp() {
   const [tab, setTabState] = useState(() => {
@@ -974,7 +1245,7 @@ function AdminApp() {
   const schalte = async (key, an) => {
     setSpeichert(key);
     try {
-      await dbUpsert("app_features", { key, enabled: an, updated_at: new Date().toISOString() }, TEAM_COL_OK === false ? "key" : "team_id,key");
+      await dbUpsert("app_features", { key, enabled: an, updated_at: new Date().toISOString() }, "key");
       setFeatures((f) => ({ ...f, [key]: an }));
       setFeatureFehler(null);
     } catch (e) {
@@ -1063,7 +1334,7 @@ notify pgrst, 'reload schema';`;
           </button>
         </div>
         <nav style={styles.nav}>
-          {[["backup", "Backup"], ["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"], ["teams", "Teams"]].map(([key, label]) => (
+          {[["backup", "Backup"], ["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"], ["teams", "Teams"], ["zugaenge", "Zugänge"]].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}>
               {label}
             </button>
@@ -1102,6 +1373,7 @@ notify pgrst, 'reload schema';`;
 
         {tab === "import" && <SpielerImport key={team} />}
         {tab === "einstellungen" && <TeamEinstellungen key={team} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
+        {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
         {tab === "teams" && <TeamsVerwaltung teams={teams} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
 
         {tab === "funktionen" && (
@@ -1162,10 +1434,31 @@ notify pgrst, 'reload schema';`;
 }
 
 function Root() {
-  const [unlocked, setUnlocked] = useState(!!ACCESS_CODE);
+  const [unlocked, setUnlocked] = useState(false);
+  const [pruefung, setPruefung] = useState(!!ACCESS_CODE);
+  const [hinweis, setHinweis] = useState("");
+  useEffect(() => {
+    if (!ACCESS_CODE) return;
+    pruefeZugang(ACCESS_CODE)
+      .then((info) => {
+        const f = info.ok ? zugangFehler(info) : "";
+        if (info.ok && !f) {
+          ACCESS_INFO = info;
+          setUnlocked(true);
+        } else {
+          localStorage.removeItem("nsz_access_code");
+          ACCESS_CODE = "";
+          setHinweis(f || "Der Zugangscode ist nicht mehr gültig.");
+        }
+      })
+      .catch(() => setUnlocked(true)) // offline: wie bisher durchlassen, die App zeigt ihren eigenen Fehler
+      .finally(() => setPruefung(false));
+  }, []);
+  if (pruefung) return <div style={styles.loadingScreen}>Lade …</div>;
   if (!unlocked) {
     return (
       <Gate
+        hinweis={hinweis}
         onUnlock={(code) => {
           ACCESS_CODE = code;
           setUnlocked(true);
@@ -1526,7 +1819,8 @@ function App() {
             onUploadTeamFoto={(file) =>
               wrapAction(async () => {
                 const url = await uploadTeamFoto(file);
-                await dbUpsert("team_settings", { id: 1, team_photo_url: url }, "id");
+                if (teamInfo) await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo.config || {}), team_photo_url: url } });
+                else await dbUpsert("team_settings", { id: 1, team_photo_url: url }, "id");
               }, "Mannschaftsfoto aktualisiert")
             }
             selectedPlayerId={selectedPlayerId}
@@ -2698,7 +2992,7 @@ function Dashboard({
     <section>
       {fMannschaftsbild && (
         <TeamHero
-          photoUrl={teamSettings?.team_photo_url || null}
+          photoUrl={teamInfo?.config?.team_photo_url || (CURRENT_TEAM === "u8" ? teamSettings?.team_photo_url : null) || null}
           teamName={`SV Heimstetten ${teamInfo?.name || "U8"}`}
           seasonLabel={season ? season.replace("-", "/") : ""}
           onUploadFoto={onUploadTeamFoto}
