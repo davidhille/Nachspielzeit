@@ -5968,40 +5968,42 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
           return (
             <div key={s.id} style={styles.card}>
               <div
-                style={{ ...styles.cardHead, cursor: "pointer" }}
+                style={{ cursor: "pointer" }}
                 onClick={() => {
                   setGegnerHinzufuegen(false);
                   setOpenSpieltagId(open ? null : s.id);
                 }}
               >
-                <span style={styles.cardName}>
-                  {nummern.get(s.id) && <>{spieltagLabel(s, nummern.get(s.id))} · </>}
-                  {formatTerminLabel(s.date)}
-                  {s.zeit && <span style={styles.mutedTag}> · {s.zeit} Uhr</span>}
-                  {s.ort && <span style={styles.mutedTag}> · {s.ort}</span>}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {!open && zugeordnet.length === 0 && <span style={styles.hint}>kein Gegner</span>}
-                  {!open && zugeordnet.length > 0 && (
-                    <div style={{ display: "flex", gap: 4 }}>
-                      {zugeordnet.slice(0, 2).map((g) => (
-                        <span key={g.id} style={styles.tag}>{g.name}</span>
-                      ))}
-                      {zugeordnet.length > 2 && <span style={styles.tag}>+{zugeordnet.length - 2}</span>}
-                    </div>
-                  )}
-                  <button
-                    aria-label="Spieltag entfernen"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      confirmAnd(`Spieltag ${formatTerminLabel(s.date)} in den Papierkorb verschieben?`, () => onRemoveSpieltag(s.id));
-                    }}
-                    style={{ ...styles.linkBtn, color: "var(--danger-text)", padding: 0 }}
-                  >
-                    <TrashIcon size={14} />
-                  </button>
-                  <ChevronIcon open={open} />
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ ...styles.cardName, flex: 1, minWidth: 0 }}>
+                    {nummern.get(s.id) && <>{spieltagLabel(s, nummern.get(s.id))} · </>}
+                    {formatTerminLabel(s.date)}
+                    {s.zeit && <span style={styles.mutedTag}> · {s.zeit} Uhr</span>}
+                    {s.ort && <span style={styles.mutedTag}> · {s.ort}</span>}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <button
+                      aria-label="Spieltag entfernen"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmAnd(`Spieltag ${formatTerminLabel(s.date)} in den Papierkorb verschieben?`, () => onRemoveSpieltag(s.id));
+                      }}
+                      style={{ ...styles.linkBtn, color: "var(--danger-text)", padding: 0 }}
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                    <ChevronIcon open={open} />
+                  </div>
                 </div>
+                {!open && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                    {zugeordnet.length === 0 && <span style={styles.hint}>kein Gegner</span>}
+                    {zugeordnet.slice(0, 2).map((g) => (
+                      <span key={g.id} style={styles.tag}>{g.name}</span>
+                    ))}
+                    {zugeordnet.length > 2 && <span style={styles.tag}>+{zugeordnet.length - 2}</span>}
+                  </div>
+                )}
               </div>
 
               {open && (
