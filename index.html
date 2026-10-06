@@ -1130,7 +1130,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
               <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{t.id}.nachspielzeit.app</div>
             </div>
             {t.id !== aktuellesTeam && (
-              <button style={styles.secondaryBtnOutline} onClick={() => onSelect(t.id)}>Auswählen</button>
+              <button style={styles.secondaryBtnOutline} onClick={() => onSelect(t.id)}>Öffnen</button>
             )}
             {!fehler && t.id !== "u8" && (
               <button style={styles.secondaryBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
@@ -1161,10 +1161,13 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
   );
 }
 
-const ADMIN_TABS = ["backup", "funktionen", "einstellungen", "import", "teams", "zugaenge"];
+const ADMIN_SCOPE = "__admin__";
+const ADMIN_TABS_ALLGEMEIN = [["backup", "Backup"], ["teams", "Teams"], ["zugaenge", "Zugänge"]];
+const ADMIN_TABS_TEAM = [["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"]];
+const ADMIN_TABS = [...ADMIN_TABS_ALLGEMEIN, ...ADMIN_TABS_TEAM].map((t) => t[0]);
 
 function AdminApp() {
-  const [tab, setTabState] = useState(() => {
+  const [tabWahl, setTabState] = useState(() => {
     const h = window.location.hash.replace("#", "");
     if (ADMIN_TABS.includes(h)) return h;
     try {
@@ -1181,15 +1184,15 @@ function AdminApp() {
     } catch {}
   };
   const [team, setTeamState] = useState(() => {
-    let t = "u8";
+    let t = ADMIN_SCOPE;
     try {
-      t = localStorage.getItem("nsz_admin_team") || "u8";
+      t = localStorage.getItem("nsz_admin_team") || ADMIN_SCOPE;
     } catch {}
-    CURRENT_TEAM = t;
+    if (t !== ADMIN_SCOPE) CURRENT_TEAM = t;
     return t;
   });
   const setTeam = (t) => {
-    CURRENT_TEAM = t;
+    if (t !== ADMIN_SCOPE) CURRENT_TEAM = t;
     try {
       localStorage.setItem("nsz_admin_team", t);
     } catch {}
@@ -1203,7 +1206,6 @@ function AdminApp() {
       const rows = (await dbSelect("teams")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
       if (rows.length > 0) setTeams(rows);
       setTeamsFehler(null);
-      if (waehle) setTeam(waehle);
     } catch (e) {
       setTeamsFehler(friendlyError(e));
     }
@@ -1213,6 +1215,9 @@ function AdminApp() {
   }, []);
   const teamRow = teams.find((t) => t.id === team && t.created_at !== undefined) || null;
   const teamName = (teams.find((t) => t.id === team) || { name: team }).name;
+  const imAdminBereich = team === ADMIN_SCOPE;
+  const tabListe = imAdminBereich ? ADMIN_TABS_ALLGEMEIN : ADMIN_TABS_TEAM;
+  const tab = tabListe.some((t) => t[0] === tabWahl) ? tabWahl : tabListe[0][0];
   const [features, setFeatures] = useState(null);
   const [featureFehler, setFeatureFehler] = useState(null);
   const [speichert, setSpeichert] = useState(null);
@@ -1239,7 +1244,7 @@ function AdminApp() {
     }
   };
   useEffect(() => {
-    ladeFeatures();
+    if (team !== ADMIN_SCOPE) ladeFeatures();
   }, [team]);
 
   const schalte = async (key, an) => {
@@ -1307,13 +1312,14 @@ notify pgrst, 'reload schema';`;
           <div style={{ flex: 1 }}>
             <div style={styles.title}>Nachspielzeit Admin</div>
             <div style={{ ...styles.subtitle, display: "flex", alignItems: "center", gap: 6 }}>
-              <span>Team</span>
+              <span>Bereich</span>
               <select
                 value={team}
                 onChange={(e) => setTeam(e.target.value)}
                 aria-label="Team auswählen"
                 style={{ font: "inherit", fontWeight: 700, background: "transparent", color: "inherit", border: "1px solid var(--border-strong)", borderRadius: 8, padding: "1px 4px" }}
               >
+                <option value={ADMIN_SCOPE}>Admin</option>
                 {teams.filter((t) => !t.archived || t.id === team).map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -1334,7 +1340,7 @@ notify pgrst, 'reload schema';`;
           </button>
         </div>
         <nav style={styles.nav}>
-          {[["backup", "Backup"], ["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"], ["teams", "Teams"], ["zugaenge", "Zugänge"]].map(([key, label]) => (
+          {tabListe.map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}>
               {label}
             </button>
