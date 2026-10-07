@@ -991,6 +991,7 @@ function UebungenAdmin({ teams }) {
   const [vorschau, setVorschau] = useState(null);
   const [meldung, setMeldung] = useState("");
   const [suche, setSuche] = useState("");
+  const [kwFilter, setKwFilter] = useState([]);
   const [offenId, setOffenId] = useState(null);
   const [bearbeite, setBearbeite] = useState(null);
   const laden = async () => {
@@ -1091,7 +1092,8 @@ function UebungenAdmin({ teams }) {
       />
     );
   }
-  const gefiltert = (alle || []).filter((u) => !suche.trim() || String(u.titel).toLowerCase().includes(suche.trim().toLowerCase()));
+  const normiert = (alle || []).map((u) => ({ ...u, keywords: Array.isArray(u.keywords) ? u.keywords : [], beschreibung: u.beschreibung || "" }));
+  const gefiltert = filterUebungen(normiert, suche, kwFilter);
   return (
     <section>
       <h2 style={styles.h2}>Übungen</h2>
@@ -1148,7 +1150,7 @@ function UebungenAdmin({ teams }) {
       </div>
 
       <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Alle Übungen {alle ? `(${alle.length})` : ""}</div>
-      <input style={{ ...styles.input, width: "100%", boxSizing: "border-box", marginBottom: 10 }} placeholder="Suchen …" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      {alle !== null && <UebungFilterLeiste uebungen={normiert} suche={suche} setSuche={setSuche} filter={kwFilter} setFilter={setKwFilter} />}
       {alle === null ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
       ) : (
