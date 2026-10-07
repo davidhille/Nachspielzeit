@@ -1116,7 +1116,7 @@ function UebungenAdmin({ teams }) {
           }}
         />
         <textarea
-          style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 90, fontFamily: "monospace", fontSize: 12 }}
+          style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 90, fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13 }}
           placeholder="… oder den Inhalt der Datei hier einfügen"
           value={text}
           onChange={(e) => lesen(e.target.value)}
@@ -1270,7 +1270,7 @@ function ZugaengeVerwaltung({ teams }) {
                     {c.code === ACCESS_CODE ? " · dein aktueller Code" : ""}
                   </div>
                   <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
-                  <div style={{ fontSize: 13, marginTop: 4, fontFamily: "monospace", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
+                  <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, letterSpacing: "0.02em", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
                 </div>
                 <button style={styles.secondaryBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
                   {offen[c.code] ? "Verbergen" : "Anzeigen"}
@@ -1299,7 +1299,7 @@ function ZugaengeVerwaltung({ teams }) {
             ))}
             <option value="*">Alle Teams (Admin)</option>
           </select>
-          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box", fontFamily: "monospace" }} value={code} onChange={(e) => setCode(e.target.value)} />
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={code} onChange={(e) => setCode(e.target.value)} />
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button style={styles.primaryBtn} onClick={anlegen}>Code anlegen</button>
             <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
