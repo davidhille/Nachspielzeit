@@ -4252,20 +4252,22 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete, onSa
               </div>
 
               <div style={styles.fieldRow}>
-                <label style={styles.label}>Besonderes Vorkommnis</label>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.25}
-                  value={row.vorkommnis}
-                  onChange={(e) => setRow(p.id, { vorkommnis: Number(e.target.value) })}
-                  style={styles.range}
-                />
-                <span style={styles.rangeValue}>
-                  {row.vorkommnis > 0 ? "+" : ""}
-                  {Number(row.vorkommnis).toFixed(2)}
-                </span>
+                <label style={{ ...styles.label, flexBasis: "100%" }}>Besonderes Vorkommnis</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 100%" }}>
+                  <input
+                    type="range"
+                    min={-1}
+                    max={1}
+                    step={0.25}
+                    value={row.vorkommnis}
+                    onChange={(e) => setRow(p.id, { vorkommnis: Number(e.target.value) })}
+                    style={styles.range}
+                  />
+                  <span style={styles.rangeValue}>
+                    {row.vorkommnis > 0 ? "+" : ""}
+                    {Number(row.vorkommnis).toFixed(2)}
+                  </span>
+                </div>
               </div>
 
               <div style={styles.fieldRow}>
