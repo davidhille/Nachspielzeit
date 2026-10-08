@@ -379,6 +379,7 @@ const TEILNAHME = {
   anwesend: 0.5,
   anwesend_nicht_angemeldet: 0.25, // 0,5 Anwesenheit − 0,25 Abzug
   verspaetet: 0.25, // 0,5 Anwesenheit − 0,25 Abzug
+  verspaetet_nicht_angemeldet: 0, // 0,5 − 0,25 (verspätet) − 0,25 (nicht angemeldet)
   unentschuldigt: -0.25,
   entschuldigt: 0,
 };
@@ -386,6 +387,7 @@ const TEILNAHME_LABEL = {
   anwesend: "Anwesend",
   anwesend_nicht_angemeldet: "Anwesend (nicht angemeldet)",
   verspaetet: "Verspätet",
+  verspaetet_nicht_angemeldet: "Verspätet und nicht angemeldet",
   unentschuldigt: "Unentschuldigt gefehlt",
   entschuldigt: "Abgemeldet",
 };
@@ -3404,11 +3406,12 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
       const eigene = trainings.filter((t) => t.playerId === p.id && seasonKeyOf(t.date.slice(0, 7)) === saison);
       const gesamt = eigene.length;
       const anwesend = eigene.filter((t) => t.teilnahme === "anwesend").length;
-      const nichtAngemeldet = eigene.filter((t) => t.teilnahme === "anwesend_nicht_angemeldet").length;
-      const verspaetet = eigene.filter((t) => t.teilnahme === "verspaetet").length;
+      const beides = eigene.filter((t) => t.teilnahme === "verspaetet_nicht_angemeldet").length;
+      const nichtAngemeldet = eigene.filter((t) => t.teilnahme === "anwesend_nicht_angemeldet").length + beides;
+      const verspaetet = eigene.filter((t) => t.teilnahme === "verspaetet").length + beides;
       const unentschuldigt = eigene.filter((t) => t.teilnahme === "unentschuldigt").length;
       const abgemeldet = eigene.filter((t) => t.teilnahme === "entschuldigt").length;
-      const quote = gesamt > 0 ? ((anwesend + nichtAngemeldet) / gesamt) * 100 : null;
+      const quote = gesamt > 0 ? ((anwesend + nichtAngemeldet) / gesamt) * 100 : null; // nichtAngemeldet enthält auch „verspätet und nicht angemeldet“
       return { id: p.id, name: p.name, gesamt, anwesend, nichtAngemeldet, verspaetet, unentschuldigt, abgemeldet, quote };
     })
     .filter((r) => r.gesamt > 0)
@@ -3756,7 +3759,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   const basisAktuell = aktuelleBasis(player.id, basis, entwicklungen, month);
   const gesamt = saisonTrainings.length;
   const anwesend = saisonTrainings.filter(
-    (t) => t.teilnahme === "anwesend" || t.teilnahme === "anwesend_nicht_angemeldet"
+    (t) => t.teilnahme === "anwesend" || t.teilnahme === "anwesend_nicht_angemeldet" || t.teilnahme === "verspaetet_nicht_angemeldet"
   ).length;
   const quoteTraining = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
   // Spieltag-Quote: nur bereits stattgefundene Spieltage der Saison
