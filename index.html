@@ -3431,7 +3431,7 @@ function Dashboard({
                     <tr key={r.id} style={!r.active ? { opacity: 0.5 } : undefined}>
                       <td style={styles.tdName}>
                         <span style={styles.rank}>{i + 1}</span>
-                        <Avatar name={r.name} size={26} photoUrl={r.photoUrl} />
+                        <Avatar name={r.name} size={36} photoUrl={r.photoUrl} />
                         <button style={styles.playerNameBtn} onClick={() => onSelectPlayer(r.id)}>
                           {r.name}
                         </button>
@@ -3463,6 +3463,16 @@ function Dashboard({
         </>
       )}
     </section>
+  );
+}
+
+function SpielerLink({ id, name, players, onOpen }) {
+  const p = (players || []).find((x) => x.id === id);
+  return (
+    <>
+      <Avatar name={name} size={36} photoUrl={p?.photo_url || null} />
+      <button style={styles.playerNameBtn} onClick={() => onOpen(id)}>{name}</button>
+    </>
   );
 }
 
@@ -3507,7 +3517,7 @@ function AnwesenheitsStatistik({ trainings, players, month, onOpenPlayer }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td style={styles.tdName}><button style={styles.playerNameBtn} onClick={() => onOpenPlayer(r.id)}>{r.name}</button></td>
+                  <td style={styles.tdName}><SpielerLink id={r.id} name={r.name} players={players} onOpen={onOpenPlayer} /></td>
                   <td style={styles.td}>{r.anwesend}</td>
                   <td style={styles.td}>{r.nichtAngemeldet}</td>
                   <td style={styles.td}>{r.verspaetet}</td>
@@ -3629,7 +3639,7 @@ function SpieltagAnwesenheit({ spieltage, players, month, onOpenPlayer }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td style={styles.tdName}><button style={styles.playerNameBtn} onClick={() => onOpenPlayer(r.id)}>{r.name}</button></td>
+                  <td style={styles.tdName}><SpielerLink id={r.id} name={r.name} players={players} onOpen={onOpenPlayer} /></td>
                   <td style={styles.td}>
                     {r.dabei} / {r.gesamt}
                   </td>
@@ -4101,7 +4111,7 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
                       <tr key={t.playerId}>
                         <td style={styles.tdName}>
                           <span style={styles.rank}>{i + 1}</span>
-                          <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(t.playerId)}>{spielerName(t.playerId)}</button>
+                          <SpielerLink id={t.playerId} name={spielerName(t.playerId)} players={players} onOpen={onOpenPlayer} />
                         </td>
                         <td style={{ ...styles.td, textAlign: "right", fontWeight: 700 }}>{t.tore}</td>
                       </tr>
@@ -4206,7 +4216,7 @@ function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month, onO
             return (
               <div key={p.id} style={styles.sparkCard}>
                 <div style={styles.sparkHead}>
-                  <button style={{ ...styles.playerNameBtn, ...styles.cardName }} onClick={() => onOpenPlayer(p.id)}>{p.name}</button>
+                  <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 10 }}><SpielerLink id={p.id} name={p.name} players={players} onOpen={onOpenPlayer} /></span>
                   <span style={styles.sparkValue}>{letzterWert.toFixed(2)}</span>
                 </div>
                 <Sparkline values={werte} />
@@ -4367,8 +4377,8 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
           return (
             <div key={p.id} style={styles.card}>
               <div style={styles.cardHead}>
-                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
-                  <Avatar name={p.name} size={26} photoUrl={p.photo_url} />
+                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar name={p.name} size={36} photoUrl={p.photo_url} />
                   {p.name}
                 </span>
                 <div
@@ -4652,7 +4662,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
                 <div key={p.id} style={styles.card}>
                   <div style={styles.cardHead}>
                     <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
-                      <Avatar name={p.name} size={26} photoUrl={player?.photo_url} />
+                      <Avatar name={p.name} size={36} photoUrl={player?.photo_url} />
                       <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
                         {p.name}
                       </button>
@@ -6272,8 +6282,8 @@ function SpielerBereich({
           return (
             <div key={p.id} style={styles.card}>
               <div style={styles.cardHead}>
-                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
-                  <Avatar name={p.name} size={26} photoUrl={p.photo_url} />
+                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar name={p.name} size={36} photoUrl={p.photo_url} />
                   <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
                     {p.name}
                   </button>
