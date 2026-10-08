@@ -3526,26 +3526,66 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
 
 function TrainerNotizen({ trainings, players, month }) {
   const saison = seasonKeyOf(month);
-  const spielerName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
+  const [offen, setOffen] = useState({});
   const notizen = trainings
     .filter((t) => t.kommentar && t.kommentar.trim() !== "" && seasonKeyOf(t.date.slice(0, 7)) === saison)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   if (notizen.length === 0) return null;
 
+  // Gruppiert pro Spieler, Spieler mit der neuesten Notiz zuerst
+  const gruppen = [];
+  notizen.forEach((n) => {
+    let g = gruppen.find((x) => x.id === n.playerId);
+    if (!g) {
+      const p = players.find((pl) => pl.id === n.playerId);
+      g = { id: n.playerId, name: p?.name || "Unbekannt", photoUrl: p?.photo_url || null, notizen: [] };
+      gruppen.push(g);
+    }
+    g.notizen.push(n);
+  });
+  const vorschau = (t) => t.replace(/!\[[^\]]*\]\([^)]*\)/g, "[Bild]").replace(/[*_#>`-]/g, "").replace(/\s+/g, " ").trim();
+
   return (
     <div style={{ marginTop: 28 }}>
       <h3 style={styles.h3}>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</h3>
       <div className="card-list" style={styles.cardList}>
-        {notizen.map((n) => (
-          <div key={n.id} style={styles.card}>
-            <div style={styles.cardHead}>
-              <span style={styles.cardName}>{spielerName(n.playerId)}</span>
-              <span style={styles.mutedTag}>{formatTerminLabel(n.date)}</span>
+        {gruppen.map((g) => {
+          const isOpen = !!offen[g.id];
+          return (
+            <div key={g.id} style={styles.card}>
+              <button
+                onClick={() => setOffen((o) => ({ ...o, [g.id]: !o[g.id] }))}
+                aria-expanded={isOpen}
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
+              >
+                <Avatar name={g.name} size={36} photoUrl={g.photoUrl} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={styles.cardName}>{g.name}</span>
+                    <span style={styles.mutedTag}>{g.notizen.length} {g.notizen.length === 1 ? "Notiz" : "Notizen"}</span>
+                  </div>
+                  {!isOpen && (
+                    <div style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {formatTerminLabel(g.notizen[0].date)}: {vorschau(g.notizen[0].kommentar)}
+                    </div>
+                  )}
+                </div>
+                <span style={{ color: "var(--muted)", fontSize: 14, transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
+              </button>
+              {isOpen && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {g.notizen.map((n) => (
+                    <div key={n.id} style={{ borderTop: "1px solid var(--border, #eadede)", paddingTop: 8 }}>
+                      <div style={{ ...styles.mutedTag, marginBottom: 4 }}>{formatTerminLabel(n.date)}</div>
+                      <FormatierterText text={n.kommentar} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <FormatierterText text={n.kommentar} />
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -3833,6 +3873,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
 
   const saison = seasonKeyOf(month);
   const eigeneTrainings = trainings.filter((t) => t.playerId === player.id).sort((a, b) => b.date.localeCompare(a.date));
+  const notizenAlle = eigeneTrainings.filter((t) => t.kommentar && t.kommentar.trim() !== "");
   const saisonTrainings = eigeneTrainings.filter((t) => seasonKeyOf(t.date.slice(0, 7)) === saison);
   const monatsPunkte = saisonTrainings
     .filter((t) => t.date.slice(0, 7) === month)
@@ -3899,7 +3940,29 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         >
           Spieltag-Teilnahmen
         </button>
+        <button
+          onClick={() => setHistorieTab("notizen")}
+          style={{ ...styles.subNavBtn, ...(historieTab === "notizen" ? styles.subNavBtnActive : {}) }}
+        >
+          Notizen{notizenAlle.length > 0 ? ` (${notizenAlle.length})` : ""}
+        </button>
       </div>
+
+      {historieTab === "notizen" &&
+        (notizenAlle.length === 0 ? (
+          <EmptyState text="Noch keine Notizen zu diesem Spieler." />
+        ) : (
+          <div className="card-list" style={styles.cardList}>
+            {notizenAlle.map((t) => (
+              <div key={t.id} style={styles.card}>
+                <div style={styles.cardHead}>
+                  <span style={styles.cardName}>{formatTerminLabel(t.date)}</span>
+                </div>
+                <FormatierterText text={t.kommentar} />
+              </div>
+            ))}
+          </div>
+        ))}
 
       {historieTab === "training" &&
         (saisonTrainings.length === 0 ? (
