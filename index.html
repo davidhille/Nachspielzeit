@@ -87,7 +87,7 @@
   /* Desktop: volle Breite nutzen, Karten in mehreren Spalten */
   .spieler-slider { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 2px 2px 14px 2px; scrollbar-width: thin; }
   .spieler-karte { flex: 0 0 auto; width: 220px; padding: 0; border: none; background: none; scroll-snap-align: start; cursor: pointer; font: inherit; text-align: left; }
-  .spieler-karte > div { margin-top: 0 !important; }
+  .spieler-karte > div { margin-top: 0 !important; height: 100%; }
   .termin-extra { display: none; }
   @media (min-width: 900px) {
     .termin-extra { display: block; }
@@ -3707,18 +3707,20 @@ function PlayerCard({ player, stats }) {
               textTransform: "uppercase",
             }}
           >
-            {player.name}
-            {player.nachname ? ` ${player.nachname}` : ""}
+            <div>{player.name}</div>
+            <div style={{ minHeight: "1.2em" }}>{player.nachname || "\u00A0"}</div>
           </div>
           <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
             SV HEIMSTETTEN U8
           </div>
-          {player.geburtsdatum && (
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 6 }}>
-              Geboren am {formatGeburtsdatum(player.geburtsdatum)}
-              {alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10)) != null ? ` · ${alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10))} Jahre` : ""}
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 6, lineHeight: 1.5 }}>
+            <div>{player.geburtsdatum ? `Geboren am ${formatGeburtsdatum(player.geburtsdatum)}` : "\u00A0"}</div>
+            <div>
+              {player.geburtsdatum && alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10)) != null
+                ? `${alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10))} Jahre`
+                : "\u00A0"}
             </div>
-          )}
+          </div>
         </div>
 
         {stats.length > 0 && (
