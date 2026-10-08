@@ -91,14 +91,19 @@
   .termin-extra { display: none; }
   @media (min-width: 900px) {
     .termin-extra { display: block; }
-    .termine-label { padding-top: 36px; }
-    .termine-grid { display: grid !important; grid-template-columns: repeat(3, 1fr); }
+    .termine-grid { display: grid !important; grid-template-columns: repeat(6, 1fr); }
     .app-main { max-width: 1200px !important; padding: 24px 40px !important; }
     .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
     .team-hero { max-width: 520px; margin-left: auto; margin-right: auto; }
-    /* Übersicht: Mannschaftsbild links, Termine/Hinweise rechts daneben */
-    .dash-top { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 28px; align-items: start; margin-bottom: 8px; }
+    /* Übersicht: Mannschaftsbild links, Spieler-Slider rechts (gleiche Höhe), Termine darunter */
+    .dash-top { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 28px; align-items: stretch; margin-bottom: 8px; }
     .dash-top .team-hero { max-width: none; margin: 0 0 12px 0; }
+    .dash-top .spieler-wrap { display: flex; flex-direction: column; min-width: 0; margin: 0 0 12px 0 !important; }
+    .dash-top .spieler-label { padding-top: 36px; }
+    .dash-top .spieler-slider { flex: 1; min-height: 0; padding-bottom: 0; }
+    .dash-top .spieler-karte { width: calc(50% - 7px); height: 100%; }
+    .dash-top .spieler-karte > div { max-width: none !important; }
+    .dash-top .spieler-karte > div > div { height: 100%; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; }
     .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); align-items: start; }
   }
   #root { min-height: 100vh; }
@@ -3348,13 +3353,13 @@ function Dashboard({
           />
         )}
         </div>
-        <div className="dash-side">
-          <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
-          {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
-          <SaisonwechselHinweis seasons={seasons} />
-        </div>
+        <SpielerSlider rows={rows} players={players} onSelect={onSelectPlayer} />
       </div>
-      <SpielerSlider rows={rows} players={players} onSelect={onSelectPlayer} />
+      <div className="dash-side">
+        <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
+        {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
+        <SaisonwechselHinweis seasons={seasons} />
+      </div>
 
       <div style={styles.segmentedControl}>
         <button
@@ -3631,8 +3636,8 @@ function SpielerSlider({ rows, players, onSelect }) {
     .sort((a, b) => (a.p.trikotnummer ?? 999) - (b.p.trikotnummer ?? 999) || a.name.localeCompare(b.name, "de"));
   if (liste.length === 0) return null;
   return (
-    <div style={{ marginBottom: 12, marginTop: 8 }}>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+    <div className="spieler-wrap" style={{ marginBottom: 12, marginTop: 8 }}>
+      <div className="spieler-label" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
         Spieler
       </div>
       <div className="spieler-slider">
