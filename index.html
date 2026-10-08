@@ -3998,7 +3998,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           <EmptyState text="Noch keine Notizen zu diesem Spieler." />
         ) : (
           <>
-          <div style={{ margin: "4px 2px 10px" }}><KartenZaehler eintraege={notizenAlle} /></div>
+          <div style={{ margin: "4px 2px 10px" }}><KartenZaehler eintraege={saisonTrainings} /></div>
           <div className="card-list" style={styles.cardList}>
             {notizenAlle.map((t) => (
               <div key={t.id} style={styles.card}>
