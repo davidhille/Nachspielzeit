@@ -3918,7 +3918,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
 
   const saison = seasonKeyOf(month);
   const eigeneTrainings = trainings.filter((t) => t.playerId === player.id).sort((a, b) => b.date.localeCompare(a.date));
-  const notizenAlle = eigeneTrainings.filter(hatNotiz);
+  const notizenAlle = eigeneTrainings.filter((t) => hatNotiz(t) && seasonKeyOf(t.date.slice(0, 7)) === saison);
   const saisonTrainings = eigeneTrainings.filter((t) => seasonKeyOf(t.date.slice(0, 7)) === saison);
   const monatsPunkte = saisonTrainings
     .filter((t) => t.date.slice(0, 7) === month)
@@ -3995,10 +3995,10 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
 
       {historieTab === "notizen" &&
         (notizenAlle.length === 0 ? (
-          <EmptyState text="Noch keine Notizen zu diesem Spieler." />
+          <EmptyState text="Noch keine Notizen in dieser Saison." />
         ) : (
           <>
-          <div style={{ margin: "4px 2px 10px" }}><KartenZaehler eintraege={saisonTrainings} /></div>
+          <div style={{ margin: "4px 2px 10px" }}><KartenZaehler eintraege={notizenAlle} /></div>
           <div className="card-list" style={styles.cardList}>
             {notizenAlle.map((t) => (
               <div key={t.id} style={styles.card}>
