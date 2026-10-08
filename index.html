@@ -89,6 +89,9 @@
     .app-main { max-width: 1200px !important; padding: 24px 40px !important; }
     .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
     .team-hero { max-width: 520px; margin-left: auto; margin-right: auto; }
+    /* Übersicht: Mannschaftsbild links, Termine/Hinweise rechts daneben */
+    .dash-top { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 28px; align-items: start; margin-bottom: 8px; }
+    .dash-top .team-hero { max-width: none; margin: 0 0 12px 0; }
     .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); align-items: start; }
   }
   #root { min-height: 100vh; }
@@ -3291,17 +3294,21 @@ function Dashboard({
 
   return (
     <section>
-      {fMannschaftsbild && (
-        <TeamHero
-          photoUrl={teamInfo?.config?.team_photo_url || (CURRENT_TEAM === "u8" ? teamSettings?.team_photo_url : null) || null}
-          teamName={`SV Heimstetten ${teamInfo?.name || "U8"}`}
-          seasonLabel={season ? season.replace("-", "/") : ""}
-          onUploadFoto={onUploadTeamFoto}
-        />
-      )}
-      <TermineLeiste termine={termine} spieltage={spieltage} />
-      {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
-      <SaisonwechselHinweis seasons={seasons} />
+      <div className={fMannschaftsbild ? "dash-top" : undefined}>
+        {fMannschaftsbild && (
+          <TeamHero
+            photoUrl={teamInfo?.config?.team_photo_url || (CURRENT_TEAM === "u8" ? teamSettings?.team_photo_url : null) || null}
+            teamName={`SV Heimstetten ${teamInfo?.name || "U8"}`}
+            seasonLabel={season ? season.replace("-", "/") : ""}
+            onUploadFoto={onUploadTeamFoto}
+          />
+        )}
+        <div className="dash-side">
+          <TermineLeiste termine={termine} spieltage={spieltage} />
+          {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
+          <SaisonwechselHinweis seasons={seasons} />
+        </div>
+      </div>
 
       <div style={styles.segmentedControl}>
         <button
