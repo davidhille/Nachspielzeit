@@ -377,8 +377,8 @@ const LOGO_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMYAAADwCAY
 const KARTEN = { keine: 0, gelb: -0.5, blau: -1.0, rot: -2.0 };
 const TEILNAHME = {
   anwesend: 0.5,
-  anwesend_nicht_angemeldet: -0.25,
-  verspaetet: -0.25,
+  anwesend_nicht_angemeldet: 0.25, // 0,5 Anwesenheit − 0,25 Abzug
+  verspaetet: 0.25, // 0,5 Anwesenheit − 0,25 Abzug
   unentschuldigt: -0.25,
   entschuldigt: 0,
 };
