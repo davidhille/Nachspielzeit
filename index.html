@@ -86,9 +86,10 @@
   }
   /* Desktop: volle Breite nutzen, Karten in mehreren Spalten */
   @media (min-width: 900px) {
-    .app-main { max-width: none !important; padding: 24px 40px !important; }
-    .app-header { padding-left: 40px !important; padding-right: 40px !important; }
-    .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); align-items: start; }
+    .app-main { max-width: 1200px !important; padding: 24px 40px !important; }
+    .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
+    .team-hero { max-width: 520px; margin-left: auto; margin-right: auto; }
+    .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); align-items: start; }
   }
   #root { min-height: 100vh; }
 </style>
@@ -2878,6 +2879,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
   return (
     <>
     <div
+      className="team-hero"
       onClick={() => photoUrl && setLightboxOpen(true)}
       style={{
         position: "relative",
