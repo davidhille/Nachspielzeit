@@ -84,6 +84,12 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
+  /* Desktop: volle Breite nutzen, Karten in mehreren Spalten */
+  @media (min-width: 900px) {
+    .app-main { max-width: none !important; padding: 24px 40px !important; }
+    .app-header { padding-left: 40px !important; padding-right: 40px !important; }
+    .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); align-items: start; }
+  }
   #root { min-height: 100vh; }
 </style>
 </head>
@@ -736,7 +742,7 @@ notify pgrst, 'reload schema';`;
       )}
       {zeilen && (
         <div style={{ marginTop: 14 }}>
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {vorschau.map((v) => (
               <div key={v.i} style={{ ...styles.card, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <input type="checkbox" checked={aktiv(v)} onChange={(e) => setAuswahl((a) => ({ ...a, [v.i]: e.target.checked }))} aria-label="Übernehmen" />
@@ -1156,7 +1162,7 @@ function UebungenAdmin({ teams }) {
       {alle === null ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
       ) : (
-        <div style={styles.cardList}>
+        <div className="card-list" style={styles.cardList}>
           {gefiltert.map((u) => (
             <div key={u.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <button
@@ -1263,7 +1269,7 @@ function ZugaengeVerwaltung({ teams }) {
       {codes === null ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
       ) : (
-        <div style={styles.cardList}>
+        <div className="card-list" style={styles.cardList}>
           {codes.map((c) => (
             <div key={c.code} style={{ ...styles.card, opacity: c.active ? 1 : 0.6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1402,7 +1408,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
         Jedes Team hat eigene Spieler, Trainings, Spieltage und Übungen sowie eigene Funktionen und Einstellungen. Die App eines Teams läuft unter <b>kürzel.nachspielzeit.app</b>.
       </div>
       {fehler && <SqlHinweis fehler={fehler} />}
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {teams.map((t) => (
           <div key={t.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, opacity: t.archived ? 0.6 : 1 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1631,7 +1637,7 @@ notify pgrst, 'reload schema';`;
           ))}
         </nav>
       </header>
-      <main style={styles.main}>
+      <main className="app-main" style={styles.main}>
         {tab === "backup" && (
           <section>
             <h2 style={styles.h2}>Backup</h2>
@@ -1684,7 +1690,7 @@ notify pgrst, 'reload schema';`;
             {features === null ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
             ) : (
-              <div style={styles.cardList}>
+              <div className="card-list" style={styles.cardList}>
                 {FEATURES.map((f) => {
                   const an = features[f.key] !== false;
                   return (
@@ -2097,7 +2103,7 @@ function App() {
     <FeatureCtx.Provider value={features}>
     <div style={styles.app}>
       <Header tab={tab} setTab={setTab} />
-      <main style={styles.main}>
+      <main className="app-main" style={styles.main}>
         {tab === "dashboard" && (
           <Dashboard
             players={players}
@@ -3469,7 +3475,7 @@ function TrainerNotizen({ trainings, players, month }) {
   return (
     <div style={{ marginTop: 28 }}>
       <h3 style={styles.h3}>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</h3>
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {notizen.map((n) => (
           <div key={n.id} style={styles.card}>
             <div style={styles.cardHead}>
@@ -3547,7 +3553,7 @@ function SpieltagNotizenUebersicht({ spieltage, month }) {
   return (
     <div style={{ marginTop: 28 }}>
       <h3 style={styles.h3}>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {notizen.map((s) => (
           <div key={s.id} style={styles.card}>
             <div style={styles.cardHead}>
@@ -3825,7 +3831,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         (saisonTrainings.length === 0 ? (
           <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison." />
         ) : (
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {saisonTrainings.map((t) => (
               <div key={t.id} style={styles.card}>
                 <div style={styles.cardHead}>
@@ -3855,7 +3861,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         (spieltageDabei.length === 0 ? (
           <EmptyState text="Noch an keinem Spieltag teilgenommen." />
         ) : (
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {spieltageDabei.map((s) => {
               const toreAnDiesemTag = s.spiele
                 .flatMap((sp) => sp.scorers)
@@ -4213,7 +4219,7 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete, onSa
         );
       })()}
 
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {players.map((p) => {
           const row = getRow(p.id);
           const punkte = trainingPunkte(row);
@@ -4353,7 +4359,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
       {players.length === 0 && <EmptyState text="Noch keine aktiven Spieler vorhanden." />}
 
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {players.map((p) => (
           <div key={p.id} style={styles.card}>
             <div style={styles.cardHead}>
@@ -4447,7 +4453,7 @@ function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, o
             <EmptyState text="Noch keine Spieltage angelegt. Lege sie unter „Verwaltung → Spieltage“ an." />
           )}
 
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {sorted.map((s) => (
               <SpieltagCard
                 key={s.id}
@@ -4498,7 +4504,7 @@ function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, o
           </div>
           {uebersicht.length === 0 && <EmptyState text="Noch keine Daten vorhanden." />}
           {uebersicht.length > 0 && (
-            <div style={styles.cardList}>
+            <div className="card-list" style={styles.cardList}>
               {uebersicht.map((p) => {
                 const player = players.find((pl) => pl.id === p.id);
                 return (
@@ -5724,7 +5730,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
       {trashPlayers.length > 0 && (
         <>
           <div style={styles.subheading}>Spieler</div>
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {trashPlayers.map((p) => (
               <div key={p.id} style={styles.card}>
                 <div style={styles.cardHead}>
@@ -5757,7 +5763,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
       {trashGegner.length > 0 && (
         <>
           <div style={styles.subheading}>Gegner</div>
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {trashGegner.map((g) => (
               <div key={g.id} style={styles.card}>
                 <div style={styles.cardHead}>
@@ -5790,7 +5796,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
       {trashSpieltage.length > 0 && (
         <>
           <div style={styles.subheading}>Spieltage</div>
-          <div style={styles.cardList}>
+          <div className="card-list" style={styles.cardList}>
             {trashSpieltage.map((s) => (
               <div key={s.id} style={styles.card}>
                 <div style={styles.cardHead}>
@@ -5898,7 +5904,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
         ))}
       </div>
 
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {items.map(([key, label]) => {
           const bestand = aktuellerBestand(key);
           const offen = openKey === key;
@@ -6118,7 +6124,7 @@ function SpielerBereich({
 
       {players.length === 0 && <EmptyState text="Noch keine Spieler angelegt." />}
 
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {players.map((p) => {
           const wert = Number(basis[p.id]) || 0;
           const open = openId === p.id;
@@ -6417,7 +6423,7 @@ function TrainingsplanBereich({
 
           {terminTab === "kommende" &&
             (kommende.length > 0 ? (
-              <div style={styles.cardList}>
+              <div className="card-list" style={styles.cardList}>
                 {kommende.map((t) => (
                   <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} {...uebungProps} />
                 ))}
@@ -6428,7 +6434,7 @@ function TrainingsplanBereich({
 
           {terminTab === "vergangene" &&
             (vergangene.length > 0 ? (
-              <div style={styles.cardList}>
+              <div className="card-list" style={styles.cardList}>
                 {vergangene.map((t) => (
                   <TerminRow key={t.id} termin={t} onToggleAbsage={onToggleAbsage} onRemoveTermin={onRemoveTermin} onUpdateZeit={onUpdateZeit} {...uebungProps} />
                 ))}
@@ -7128,7 +7134,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
       {sorted.length === 0 && <EmptyState text="Noch keine Spieltage angelegt." />}
 
-      <div style={styles.cardList}>
+      <div className="card-list" style={styles.cardList}>
         {sorted.map((s) => {
           const open = openSpieltagId === s.id;
           const zugeordnet = gegner.filter((g) => s.zugeordneteGegner.includes(g.id));
