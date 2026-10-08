@@ -85,7 +85,10 @@
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
   /* Desktop: volle Breite nutzen, Karten in mehreren Spalten */
+  .termin-extra { display: none; }
   @media (min-width: 900px) {
+    .termin-extra { display: block; }
+    .termine-grid { display: grid !important; grid-template-columns: repeat(3, 1fr); }
     .app-main { max-width: 1200px !important; padding: 24px 40px !important; }
     .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
     .team-hero { max-width: 520px; margin-left: auto; margin-right: auto; }
@@ -3045,7 +3048,7 @@ function TermineLeiste({ termine, spieltage }) {
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
       .map((s) => ({ id: `s-${s.id}`, date: s.date, typ: s.typ === "turnier" ? "turnier" : "spieltag", zeit: s.zeit || null }));
-    return [...trainingsEintraege, ...spieltagEintraege].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+    return [...trainingsEintraege, ...spieltagEintraege].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   }, [termine, spieltage, heute]);
 
   const TYP_INFO = {
@@ -3117,12 +3120,13 @@ function TermineLeiste({ termine, spieltage }) {
       {kommende.length === 0 ? (
         <EmptyState text="Keine anstehenden Termine." />
       ) : (
-        <div style={{ display: "flex", gap: 8 }}>
-          {kommende.map((eintrag) => {
+        <div className="termine-grid" style={{ display: "flex", gap: 8 }}>
+          {kommende.map((eintrag, idx) => {
             const info = TYP_INFO[eintrag.typ];
             return (
               <div
                 key={eintrag.id}
+                className={idx >= 3 ? "termin-extra" : undefined}
                 style={{
                   flex: 1,
                   background: "var(--surface)",
