@@ -85,9 +85,10 @@
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
   /* Desktop: volle Breite nutzen, Karten in mehreren Spalten */
-  .spieler-slider { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 2px 2px 14px 2px; scrollbar-width: thin; }
+  .spieler-slider { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 2px 2px 14px 2px; scrollbar-width: thin; scrollbar-color: rgba(120,90,90,0.45) transparent; background: transparent; }
+  .spieler-slider::-webkit-scrollbar-track { background: transparent; }
   .spieler-karte { flex: 0 0 auto; width: 220px; padding: 0; border: none; background: none; scroll-snap-align: start; cursor: pointer; font: inherit; text-align: left; }
-  .spieler-karte > div { margin-top: 0 !important; height: 100%; }
+  .spieler-karte > div { margin-top: 0 !important; height: 100%; box-shadow: none !important; }
   .termin-extra { display: none; }
   @media (min-width: 900px) {
     .termin-extra { display: block; }
