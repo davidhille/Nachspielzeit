@@ -91,7 +91,7 @@
   .termin-extra { display: none; }
   @media (min-width: 900px) {
     .termin-extra { display: block; }
-    .termine-label { font-family: 'Space Grotesk', sans-serif; font-size: 22px !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--text) !important; min-height: 56px; margin-bottom: 0 !important; }
+    .termine-label { min-height: 36px; }
     .termine-grid { display: grid !important; grid-template-columns: repeat(3, 1fr); }
     .app-main { max-width: 1200px !important; padding: 24px 40px !important; }
     .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
@@ -2903,11 +2903,9 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
     <>
     <div className={titleAbove ? "team-hero" : undefined} style={titleAbove ? { marginBottom } : undefined}>
     {titleAbove && (
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: titleSize, fontWeight: 700, color: "var(--text)" }}>{teamName}</div>
-        {(seasonLabel || subtitle) && (
-          <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{subtitle ? subtitle : `Saison ${seasonLabel}`}</div>
-        )}
+      <div className="hero-kopf" style={{ height: 36, marginBottom: 8, fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px" }}>
+        <div>{teamName}</div>
+        {(seasonLabel || subtitle) && <div>{subtitle ? subtitle : `Saison ${seasonLabel}`}</div>}
       </div>
     )}
     <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))", boxShadow: "0 12px 26px rgba(142,20,22,0.35)" } : undefined}>
@@ -3143,7 +3141,7 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div className="termine-label" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+      <div className="termine-label" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
         Nächste Termine
       </div>
       {kommende.length === 0 ? (
