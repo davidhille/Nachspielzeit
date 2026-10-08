@@ -2891,7 +2891,7 @@ function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
   );
 }
 
-function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, height = 360, marginBottom = 20, titleSize = 22 }) {
+function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, height = 360, marginBottom = 20, titleSize = 22, titleAbove = false }) {
   const fileInputRef = useRef(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [cropAspect, setCropAspect] = useState(null);
@@ -2900,8 +2900,18 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
 
   return (
     <>
+    <div className={titleAbove ? "team-hero" : undefined} style={titleAbove ? { marginBottom } : undefined}>
+    {titleAbove && (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: titleSize, fontWeight: 700, color: "var(--text)" }}>{teamName}</div>
+        {(seasonLabel || subtitle) && (
+          <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{subtitle ? subtitle : `Saison ${seasonLabel}`}</div>
+        )}
+      </div>
+    )}
+    <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))", boxShadow: "0 12px 26px rgba(142,20,22,0.35)" } : undefined}>
     <div
-      className="team-hero"
+      className={titleAbove ? undefined : "team-hero"}
       onClick={() => photoUrl && setLightboxOpen(true)}
       style={{
         position: "relative",
@@ -2909,7 +2919,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         aspectRatio: bannerAspect,
         borderRadius: 18,
         overflow: "hidden",
-        marginBottom,
+        marginBottom: titleAbove ? 0 : marginBottom,
         background: photoUrl ? `#000` : "var(--header-grad)",
         cursor: photoUrl ? "zoom-in" : "default",
       }}
@@ -2934,12 +2944,12 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         style={{
           position: "absolute",
           inset: 0,
-          background: photoUrl
+          background: photoUrl && !titleAbove
             ? "linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.45) 100%)"
             : "transparent",
         }}
       />
-      <div style={{ position: "absolute", left: 20, bottom: 14, right: 20 }}>
+      <div style={{ position: "absolute", left: 20, bottom: 14, right: 20, display: titleAbove ? "none" : "block" }}>
         <div
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
@@ -3000,6 +3010,8 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
           </button>
         </>
       )}
+    </div>
+    </div>
     </div>
     {pendingFile && (
       <ImageCropModal
@@ -3329,6 +3341,7 @@ function Dashboard({
             teamName={`SV Heimstetten ${teamInfo?.name || "U8"}`}
             seasonLabel={season ? season.replace("-", "/") : ""}
             onUploadFoto={onUploadTeamFoto}
+            titleAbove
           />
         )}
         </div>
