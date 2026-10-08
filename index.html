@@ -3988,7 +3988,6 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                   {TEILNAHME_LABEL[t.teilnahme]}
                   {t.karte !== "keine" && ` · Karte: ${t.karte[0].toUpperCase() + t.karte.slice(1)}`}
                 </div>
-                {t.kommentar && <FormatierterText text={t.kommentar} style={{ marginTop: 6 }} />}
               </div>
             ))}
           </div>
