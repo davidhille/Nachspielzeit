@@ -1783,6 +1783,7 @@ function App() {
       return "dashboard";
     }
   });
+  const [ziel, setZiel] = useState(null); // Sprung von der Terminkachel: { typ: "training", date } | { typ: "spieltag", id }
   const [players, setPlayers] = useState([]);
   const [basis, setBasis] = useState({});
   const [trainings, setTrainings] = useState([]);
@@ -2109,7 +2110,7 @@ function App() {
   return (
     <FeatureCtx.Provider value={features}>
     <div style={styles.app}>
-      <Header tab={tab} setTab={setTab} />
+      <Header tab={tab} setTab={(k) => { setZiel(null); setTab(k); }} />
       <main className="app-main" style={styles.main}>
         {tab === "dashboard" && (
           <Dashboard
@@ -2122,6 +2123,16 @@ function App() {
             teamSettings={teamSettings}
             teamInfo={teamInfo}
             termine={termine}
+            onOpenTermin={(e) => {
+              if (e.typ === "spieltag" || e.typ === "turnier") {
+                if (features.spieltage === false) return;
+                setZiel({ typ: "spieltag", id: e.spieltagId });
+                setTab("spieltage");
+              } else {
+                setZiel({ typ: "training", date: e.date });
+                setTab("training");
+              }
+            }}
             onUploadTeamFoto={(file) =>
               wrapAction(async () => {
                 const url = await uploadTeamFoto(file);
@@ -2136,6 +2147,7 @@ function App() {
         )}
         {tab === "training" && (
           <TrainingBewertung
+            zielDatum={ziel?.typ === "training" ? ziel.date : null}
             players={activePlayers}
             trainings={trainings}
             termine={termine}
@@ -2181,6 +2193,7 @@ function App() {
         )}
         {tab === "spieltage" && features.spieltage !== false && (
           <Spieltage
+            zielSpieltagId={ziel?.typ === "spieltag" ? ziel.id : null}
             players={players}
             gegner={gegner}
             spieltage={spieltage}
@@ -3032,7 +3045,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
   );
 }
 
-function TermineLeiste({ termine, spieltage }) {
+function TermineLeiste({ termine, spieltage, onOpen }) {
   const heute = todayISO();
 
   const kommende = useMemo(() => {
@@ -3047,7 +3060,7 @@ function TermineLeiste({ termine, spieltage }) {
       }));
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
-      .map((s) => ({ id: `s-${s.id}`, date: s.date, typ: s.typ === "turnier" ? "turnier" : "spieltag", zeit: s.zeit || null }));
+      .map((s) => ({ id: `s-${s.id}`, spieltagId: s.id, date: s.date, typ: s.typ === "turnier" ? "turnier" : "spieltag", zeit: s.zeit || null }));
     return [...trainingsEintraege, ...spieltagEintraege].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   }, [termine, spieltage, heute]);
 
@@ -3127,7 +3140,13 @@ function TermineLeiste({ termine, spieltage }) {
               <div
                 key={eintrag.id}
                 className={idx >= 3 ? "termin-extra" : undefined}
+                role={onOpen ? "button" : undefined}
+                tabIndex={onOpen ? 0 : undefined}
+                onClick={onOpen ? () => onOpen(eintrag) : undefined}
+                onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(eintrag); } } : undefined}
+                title={onOpen ? (eintrag.typ === "spieltag" || eintrag.typ === "turnier" ? "Spieltag öffnen" : "Training bewerten") : undefined}
                 style={{
+                  cursor: onOpen ? "pointer" : "default",
                   flex: 1,
                   background: "var(--surface)",
                   border: "1px solid var(--border)",
@@ -3202,6 +3221,7 @@ function Dashboard({
   teamSettings,
   teamInfo,
   termine,
+  onOpenTermin,
   onUploadTeamFoto,
   selectedPlayerId,
   onSelectPlayer,
@@ -3308,7 +3328,7 @@ function Dashboard({
           />
         )}
         <div className="dash-side">
-          <TermineLeiste termine={termine} spieltage={spieltage} />
+          <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
           {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
           <SaisonwechselHinweis seasons={seasons} />
         </div>
@@ -4117,7 +4137,7 @@ function Sparkline({ values, width = 220, height = 46 }) {
 
 /* ---------- Training bewerten ---------- */
 
-function TrainingBewertung({ players, trainings, termine, onSave, onDelete, onSaveTerminNotiz }) {
+function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onDelete, onSaveTerminNotiz }) {
   const geplanteTermine = useMemo(
     () =>
       termine
@@ -4137,7 +4157,9 @@ function TrainingBewertung({ players, trainings, termine, onSave, onDelete, onSa
     return liste.find((t) => t.date <= today)?.date || liste[0]?.date || "";
   };
 
-  const [date, setDate] = useState(() => ermittleDefaultDate(geplanteTermine, bewerteteDaten));
+  const [date, setDate] = useState(() =>
+    zielDatum && geplanteTermine.some((t) => t.date === zielDatum) ? zielDatum : ermittleDefaultDate(geplanteTermine, bewerteteDaten)
+  );
   const [rows, setRows] = useState({});
 
   useEffect(() => {
@@ -4410,8 +4432,8 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onOpenPlayer }) {
-  const [openSpieltag, setOpenSpieltag] = useState(null);
+function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onOpenPlayer }) {
+  const [openSpieltag, setOpenSpieltag] = useState(zielSpieltagId || null);
   const [subTab, setSubTab] = useState("liste");
   const [uebersichtSort, setUebersichtSort] = useState("spiele");
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
