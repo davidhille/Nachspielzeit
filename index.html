@@ -91,6 +91,7 @@
   .termin-extra { display: none; }
   @media (min-width: 900px) {
     .termin-extra { display: block; }
+    .termine-label { font-family: 'Space Grotesk', sans-serif; font-size: 22px !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--text) !important; min-height: 56px; margin-bottom: 0 !important; }
     .termine-grid { display: grid !important; grid-template-columns: repeat(3, 1fr); }
     .app-main { max-width: 1200px !important; padding: 24px 40px !important; }
     .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
@@ -3142,7 +3143,7 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+      <div className="termine-label" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
         Nächste Termine
       </div>
       {kommende.length === 0 ? (
