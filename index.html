@@ -3411,7 +3411,9 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
       const verspaetet = eigene.filter((t) => t.teilnahme === "verspaetet").length + beides;
       const unentschuldigt = eigene.filter((t) => t.teilnahme === "unentschuldigt").length;
       const abgemeldet = eigene.filter((t) => t.teilnahme === "entschuldigt").length;
-      const quote = gesamt > 0 ? ((anwesend + nichtAngemeldet) / gesamt) * 100 : null; // nichtAngemeldet enthält auch „verspätet und nicht angemeldet“
+      // Anwesend = pünktlich, nicht angemeldet, verspätet oder beides (Beides steckt in nichtAngemeldet und verspaetet, daher einmal abziehen)
+      const dabei = anwesend + nichtAngemeldet + verspaetet - beides;
+      const quote = gesamt > 0 ? (dabei / gesamt) * 100 : null;
       return { id: p.id, name: p.name, gesamt, anwesend, nichtAngemeldet, verspaetet, unentschuldigt, abgemeldet, quote };
     })
     .filter((r) => r.gesamt > 0)
@@ -3759,7 +3761,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   const basisAktuell = aktuelleBasis(player.id, basis, entwicklungen, month);
   const gesamt = saisonTrainings.length;
   const anwesend = saisonTrainings.filter(
-    (t) => t.teilnahme === "anwesend" || t.teilnahme === "anwesend_nicht_angemeldet" || t.teilnahme === "verspaetet_nicht_angemeldet"
+    (t) => ["anwesend", "anwesend_nicht_angemeldet", "verspaetet", "verspaetet_nicht_angemeldet"].includes(t.teilnahme)
   ).length;
   const quoteTraining = gesamt > 0 ? (anwesend / gesamt) * 100 : null;
   // Spieltag-Quote: nur bereits stattgefundene Spieltage der Saison
