@@ -3331,7 +3331,6 @@ function Dashboard({
             onUploadFoto={onUploadTeamFoto}
           />
         )}
-          <SpielerSlider rows={rows} players={players} onSelect={onSelectPlayer} />
         </div>
         <div className="dash-side">
           <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
@@ -3339,6 +3338,7 @@ function Dashboard({
           <SaisonwechselHinweis seasons={seasons} />
         </div>
       </div>
+      <SpielerSlider rows={rows} players={players} trainings={trainings} spieltage={spieltage} month={month} onSelect={onSelectPlayer} />
 
       <div style={styles.segmentedControl}>
         <button
@@ -3607,15 +3607,34 @@ function SpieltagNotizenUebersicht({ spieltage, month }) {
 }
 
 /* Spieler als horizontal wischbare Karten (Übersicht) */
-function SpielerSlider({ rows, players, onSelect }) {
+function SpielerSlider({ rows, players, trainings, spieltage, month, onSelect }) {
+  const saison = seasonKeyOf(month);
+  const heuteISO = todayISO();
+  const vergangene = (spieltage || []).filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO);
   const liste = rows
     .filter((r) => r.active)
     .map((r) => ({ ...r, p: players.find((p) => p.id === r.id) }))
     .filter((r) => r.p)
     .sort((a, b) => (a.p.trikotnummer ?? 999) - (b.p.trikotnummer ?? 999) || a.name.localeCompare(b.name, "de"));
   if (liste.length === 0) return null;
+  const quoteTraining = (id) => {
+    const t = (trainings || []).filter((x) => x.playerId === id && seasonKeyOf(x.date.slice(0, 7)) === saison);
+    const a = t.filter((x) => ["anwesend", "anwesend_nicht_angemeldet", "verspaetet", "verspaetet_nicht_angemeldet"].includes(x.teilnahme)).length;
+    return t.length > 0 ? ((a / t.length) * 100).toFixed(0) + "%" : "–";
+  };
+  const quoteSpiel = (id) =>
+    vergangene.length > 0 ? ((vergangene.filter((x) => x.teilnehmer.includes(id)).length / vergangene.length) * 100).toFixed(0) + "%" : "–";
+  const tore = (id) =>
+    (spieltage || [])
+      .flatMap((x) => x.spiele)
+      .flatMap((sp) => sp.scorers)
+      .filter((sc) => sc.playerId === id)
+      .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: 12, marginTop: 8 }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+        Spieler
+      </div>
       <div className="spieler-slider">
         {liste.map((r) => (
           <button key={r.id} className="spieler-karte" onClick={() => onSelect(r.id)} aria-label={`${r.name} öffnen`}>
@@ -3626,6 +3645,9 @@ function SpielerSlider({ rows, players, onSelect }) {
                 { value: r.saisonPunkte.toFixed(2), label: "PKT SAISON" },
                 { value: r.basisAktuell.toFixed(2), label: "BASIS" },
                 { value: r.gesamtMonat.toFixed(2), label: "GESAMT" },
+                { value: quoteTraining(r.id), label: "ANW TRAINING" },
+                { value: quoteSpiel(r.id), label: "ANW SPIELTAG" },
+                { value: tore(r.id), label: "TORE" },
               ]}
             />
           </button>
