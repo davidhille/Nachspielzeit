@@ -3448,17 +3448,17 @@ function Dashboard({
             </div>
           )}
 
-          <AnwesenheitsStatistik trainings={trainings} players={players} month={month} />
-          <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} />
-          <TrainerNotizen trainings={trainings} players={players} month={month} />
+          <AnwesenheitsStatistik trainings={trainings} players={players} month={month} onOpenPlayer={onSelectPlayer} />
+          <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} onOpenPlayer={onSelectPlayer} />
+          <TrainerNotizen trainings={trainings} players={players} month={month} onOpenPlayer={onSelectPlayer} />
         </>
       )}
 
       {uebersichtTab === "saison" && (
         <>
-          <SaisonBilanz spieltage={spieltage} players={players} month={month} />
+          <SaisonBilanz spieltage={spieltage} players={players} month={month} onOpenPlayer={onSelectPlayer} />
           <GegnerBilanzTabelle spieltage={spieltage} gegner={gegner} />
-          <SpieltagAnwesenheit spieltage={spieltage} players={players} month={month} />
+          <SpieltagAnwesenheit spieltage={spieltage} players={players} month={month} onOpenPlayer={onSelectPlayer} />
           <SpieltagNotizenUebersicht spieltage={spieltage} month={month} />
         </>
       )}
@@ -3466,7 +3466,7 @@ function Dashboard({
   );
 }
 
-function AnwesenheitsStatistik({ trainings, players, month }) {
+function AnwesenheitsStatistik({ trainings, players, month, onOpenPlayer }) {
   const saison = seasonKeyOf(month);
   const rows = players
     .map((p) => {
@@ -3507,7 +3507,7 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td style={styles.tdName}>{r.name}</td>
+                  <td style={styles.tdName}><button style={styles.playerNameBtn} onClick={() => onOpenPlayer(r.id)}>{r.name}</button></td>
                   <td style={styles.td}>{r.anwesend}</td>
                   <td style={styles.td}>{r.nichtAngemeldet}</td>
                   <td style={styles.td}>{r.verspaetet}</td>
@@ -3524,7 +3524,7 @@ function AnwesenheitsStatistik({ trainings, players, month }) {
   );
 }
 
-function TrainerNotizen({ trainings, players, month }) {
+function TrainerNotizen({ trainings, players, month, onOpenPlayer }) {
   const saison = seasonKeyOf(month);
   const [offen, setOffen] = useState({});
   const notizen = trainings
@@ -3575,6 +3575,9 @@ function TrainerNotizen({ trainings, players, month }) {
               </button>
               {isOpen && (
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <button style={{ ...styles.linkBtn, alignSelf: "flex-start", padding: 0 }} onClick={() => onOpenPlayer(g.id)}>
+                    Spielerprofil öffnen →
+                  </button>
                   {g.notizen.map((n) => (
                     <div key={n.id} style={{ borderTop: "1px solid var(--border, #eadede)", paddingTop: 8 }}>
                       <div style={{ ...styles.mutedTag, marginBottom: 4 }}>{formatTerminLabel(n.date)}</div>
@@ -3591,7 +3594,7 @@ function TrainerNotizen({ trainings, players, month }) {
   );
 }
 
-function SpieltagAnwesenheit({ spieltage, players, month }) {
+function SpieltagAnwesenheit({ spieltage, players, month, onOpenPlayer }) {
   const saison = seasonKeyOf(month);
   // Nur Spieltage, die schon stattgefunden haben (heute oder früher)
   const heuteISO = todayISO();
@@ -3626,7 +3629,7 @@ function SpieltagAnwesenheit({ spieltage, players, month }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td style={styles.tdName}>{r.name}</td>
+                  <td style={styles.tdName}><button style={styles.playerNameBtn} onClick={() => onOpenPlayer(r.id)}>{r.name}</button></td>
                   <td style={styles.td}>
                     {r.dabei} / {r.gesamt}
                   </td>
@@ -4025,7 +4028,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   );
 }
 
-function SaisonBilanz({ spieltage, players, month }) {
+function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
   const saison = seasonKeyOf(month);
 
   const spieleDerSaison = useMemo(
@@ -4098,7 +4101,7 @@ function SaisonBilanz({ spieltage, players, month }) {
                       <tr key={t.playerId}>
                         <td style={styles.tdName}>
                           <span style={styles.rank}>{i + 1}</span>
-                          {spielerName(t.playerId)}
+                          <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(t.playerId)}>{spielerName(t.playerId)}</button>
                         </td>
                         <td style={{ ...styles.td, textAlign: "right", fontWeight: 700 }}>{t.tore}</td>
                       </tr>
@@ -4184,7 +4187,7 @@ function GegnerBilanzTabelle({ spieltage, gegner }) {
   );
 }
 
-function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month }) {
+function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month, onOpenPlayer }) {
   const saison = seasonKeyOf(month);
   const saisonMonate = useMemo(() => months.filter((m) => seasonKeyOf(m) === saison).sort(), [months, saison]);
 
@@ -4203,7 +4206,7 @@ function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month }) {
             return (
               <div key={p.id} style={styles.sparkCard}>
                 <div style={styles.sparkHead}>
-                  <span style={styles.cardName}>{p.name}</span>
+                  <button style={{ ...styles.playerNameBtn, ...styles.cardName }} onClick={() => onOpenPlayer(p.id)}>{p.name}</button>
                   <span style={styles.sparkValue}>{letzterWert.toFixed(2)}</span>
                 </div>
                 <Sparkline values={werte} />
