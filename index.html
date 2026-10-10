@@ -2548,6 +2548,179 @@ function truncateCanvasText(ctx, text, maxWidth) {
   return t + "…";
 }
 
+// Sammelkarte (Trading Card) eines Spielers als PNG, 750x1050 (Format 63x88 mm)
+async function generateSammelkarte(player, stats, saisonLabel, teamName) {
+  try {
+    await Promise.all([
+      document.fonts.load("800 64px 'Space Grotesk'"),
+      document.fonts.load("700 40px 'Space Grotesk'"),
+      document.fonts.load("700 26px 'Inter'"),
+    ]);
+  } catch (e) {}
+
+  const W = 750;
+  const H = 1050;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.textBaseline = "alphabetic";
+
+  const goldGrad = ctx.createLinearGradient(0, 0, W, H);
+  goldGrad.addColorStop(0, "#F7C65C");
+  goldGrad.addColorStop(0.5, "#F2A93B");
+  goldGrad.addColorStop(1, "#E08C1E");
+
+  // Rahmen + Hintergrund
+  roundRectPath(ctx, 0, 0, W, H, 44);
+  ctx.fillStyle = goldGrad;
+  ctx.fill();
+  roundRectPath(ctx, 14, 14, W - 28, H - 28, 34);
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#A3181C");
+  bg.addColorStop(1, "#4E0A0C");
+  ctx.fillStyle = bg;
+  ctx.fill();
+
+  // Foto-Fenster
+  const px = 48, py = 48, pw = W - 96, ph = 536;
+  ctx.save();
+  roundRectPath(ctx, px, py, pw, ph, 26);
+  ctx.clip();
+  let fotoOk = false;
+  if (player.photo_url) {
+    try {
+      const img = await loadImageCrossOrigin(player.photo_url);
+      const scale = Math.max(pw / img.naturalWidth, ph / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      ctx.drawImage(img, px + (pw - dw) / 2, py + (ph - dh) / 2, dw, dh);
+      fotoOk = true;
+    } catch (e) {}
+  }
+  if (!fotoOk) {
+    const g = ctx.createLinearGradient(px, py, px + pw, py + ph);
+    g.addColorStop(0, "#C4271F");
+    g.addColorStop(1, "#8E1416");
+    ctx.fillStyle = g;
+    ctx.fillRect(px, py, pw, ph);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.textAlign = "center";
+    ctx.font = "800 260px 'Space Grotesk', sans-serif";
+    ctx.fillText((player.name || "?").slice(0, 1).toUpperCase(), px + pw / 2, py + ph / 2 + 90);
+  }
+  // Verlauf unten im Foto
+  const vl = ctx.createLinearGradient(0, py + ph - 200, 0, py + ph);
+  vl.addColorStop(0, "rgba(20,8,8,0)");
+  vl.addColorStop(1, "rgba(20,8,8,0.55)");
+  ctx.fillStyle = vl;
+  ctx.fillRect(px, py + ph - 200, pw, 200);
+  ctx.restore();
+  roundRectPath(ctx, px, py, pw, ph, 26);
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = goldGrad;
+  ctx.stroke();
+
+  // Trikotnummer (Badge oben links im Foto)
+  if (player.trikotnummer != null) {
+    const bx = px + 22, by = py + 22, bw = 118, bh = 118;
+    roundRectPath(ctx, bx, by, bw, bh, 24);
+    ctx.fillStyle = "rgba(78,10,12,0.82)";
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = goldGrad;
+    ctx.stroke();
+    ctx.fillStyle = "#F2A93B";
+    ctx.textAlign = "center";
+    ctx.font = "800 68px 'Space Grotesk', sans-serif";
+    ctx.fillText(String(player.trikotnummer), bx + bw / 2, by + 78);
+    ctx.font = "700 17px 'Inter', sans-serif";
+    ctx.fillText("TRIKOT", bx + bw / 2, by + 104);
+  }
+
+  // Vereinslogo oben rechts im Foto
+  try {
+    const logo = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = LOGO_DATA_URI;
+    });
+    const lh = 104;
+    const lw = Math.round(lh * (logo.naturalWidth / logo.naturalHeight));
+    ctx.drawImage(logo, px + pw - lw - 24, py + 22, lw, lh);
+  } catch (e) {}
+
+  // Namensband
+  const ny = py + ph + 26;
+  const nh = 132;
+  roundRectPath(ctx, px, ny, pw, nh, 22);
+  ctx.fillStyle = goldGrad;
+  ctx.fill();
+  ctx.fillStyle = "#3A2304";
+  ctx.textAlign = "center";
+  const vor = (player.name || "").toUpperCase();
+  const nach = (player.nachname || "").toUpperCase();
+  ctx.font = "800 54px 'Space Grotesk', sans-serif";
+  ctx.fillText(truncateCanvasText(ctx, vor, pw - 40), W / 2, ny + (nach ? 62 : 82));
+  if (nach) {
+    ctx.font = "700 40px 'Space Grotesk', sans-serif";
+    ctx.fillText(truncateCanvasText(ctx, nach, pw - 40), W / 2, ny + 110);
+  }
+
+  // Untertitel: Geburtsdatum / Alter
+  let untertitel = "SV HEIMSTETTEN " + teamName;
+  if (player.geburtsdatum) {
+    const alter = alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10));
+    untertitel = `Geboren ${formatGeburtsdatum(player.geburtsdatum)}` + (alter != null ? ` · ${alter} Jahre` : "");
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = "600 25px 'Inter', sans-serif";
+  ctx.fillText(untertitel, W / 2, ny + nh + 40);
+
+  // Werte (2 x 2)
+  const sy = ny + nh + 70;
+  const cols = 2;
+  const cellW = pw / cols;
+  const cellH = 78;
+  stats.slice(0, 4).forEach((st, i) => {
+    const cx = px + (i % cols) * cellW;
+    const cy = sy + Math.floor(i / cols) * cellH;
+    roundRectPath(ctx, cx + 6, cy, cellW - 12, cellH - 10, 16);
+    ctx.fillStyle = "rgba(255,255,255,0.09)";
+    ctx.fill();
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#F2A93B";
+    ctx.font = "800 38px 'Space Grotesk', sans-serif";
+    ctx.fillText(String(st.value), cx + 26, cy + 46);
+    const vw = ctx.measureText(String(st.value)).width;
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = "700 19px 'Inter', sans-serif";
+    ctx.fillText(st.label, cx + 26 + vw + 12, cy + 45);
+  });
+
+  // Fußzeile
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = "700 20px 'Inter', sans-serif";
+  ctx.fillText(`SV HEIMSTETTEN ${teamName}${saisonLabel ? " · SAISON " + saisonLabel : ""}`, W / 2, H - 38);
+
+  // Glanzeffekt
+  ctx.save();
+  roundRectPath(ctx, 14, 14, W - 28, H - 28, 34);
+  ctx.clip();
+  const shine = ctx.createLinearGradient(0, 0, W, H * 0.7);
+  shine.addColorStop(0, "rgba(255,255,255,0.14)");
+  shine.addColorStop(0.35, "rgba(255,255,255,0)");
+  ctx.fillStyle = shine;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  return await new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Sammelkarte konnte nicht erstellt werden."))), "image/png")
+  );
+}
+
 // Erzeugt das WhatsApp-Teilen-Bild eines Spieltags (nur Mannschaftsfoto + Ergebnisse),
 // Hochformat 1080px breit, Höhe passt sich der Anzahl der Spiele an.
 async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players) {
@@ -3336,6 +3509,7 @@ function Dashboard({
         month={month}
         onClose={() => onSelectPlayer(null)}
         onOpenSettings={onOpenSettings}
+        teamName={teamInfo?.name || "U8"}
       />
     );
   }
@@ -3902,8 +4076,10 @@ function PlayerStammdaten({ player, onSave }) {
   );
 }
 
-function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings }) {
+function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings, teamName = "U8" }) {
   const [historieTab, setHistorieTab] = useState("training");
+  const [kartenLaeuft, setKartenLaeuft] = useState(false);
+  const [kartenFehler, setKartenFehler] = useState(null);
 
   if (!player) {
     return (
@@ -3948,18 +4124,55 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
     .filter((sc) => sc.playerId === player.id)
     .reduce((sum, sc) => sum + Number(sc.tore || 0), 0);
 
+  const handleSammelkarte = async () => {
+    setKartenLaeuft(true);
+    setKartenFehler(null);
+    try {
+      const blob = await generateSammelkarte(
+        player,
+        [
+          { value: toreGesamt, label: "TORE" },
+          { value: `${spieltagDabeiAnzahl}`, label: "SPIELTAGE" },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "TRAINING" },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG" },
+        ],
+        saison ? saison.replace("-", "/") : "",
+        teamName
+      );
+      const dateiname = `sammelkarte-${(player.name + (player.nachname ? "-" + player.nachname : "")).toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-")}.png`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = dateiname;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) {
+      setKartenFehler((e && e.message) || "Sammelkarte konnte nicht erstellt werden.");
+    } finally {
+      setKartenLaeuft(false);
+    }
+  };
+
   return (
     <section>
       <div style={styles.rowBetween}>
         <button style={styles.linkBtn} onClick={onClose}>
           ← Zurück zur Übersicht
         </button>
-        {onOpenSettings && (
-          <button style={styles.linkBtn} onClick={() => onOpenSettings(player.id)}>
-            Einstellungen
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <button style={styles.linkBtn} onClick={handleSammelkarte} disabled={kartenLaeuft}>
+            {kartenLaeuft ? "Erstelle Karte…" : "Sammelkarte laden"}
           </button>
-        )}
+          {onOpenSettings && (
+            <button style={styles.linkBtn} onClick={() => onOpenSettings(player.id)}>
+              Einstellungen
+            </button>
+          )}
+        </div>
       </div>
+      {kartenFehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 6 }}>{kartenFehler}</div>}
       <PlayerCard
         player={player}
         stats={[
