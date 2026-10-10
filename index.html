@@ -287,6 +287,7 @@ async function resizeImageFile(file, maxSize = 320, quality = 0.82) {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(image, 0, 0, w, h);
   const blob = await new Promise((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Bild konnte nicht verarbeitet werden."))), "image/jpeg", quality);
@@ -295,20 +296,29 @@ async function resizeImageFile(file, maxSize = 320, quality = 0.82) {
 }
 
 async function uploadProfilbild(playerId, file) {
+  // Kleine Version für Listen/Avatare, zusätzlich hochauflösend (-hd) für die Sammelkarte
   const blob = await resizeImageFile(file);
+  const blobHd = await resizeImageFile(file, 1000, 0.9);
   const path = `players/${playerId}.jpg`;
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
-      "x-upsert": "true",
-      "Content-Type": "image/jpeg",
-    },
-    body: blob,
-  });
+  const put = (p, b) =>
+    fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${p}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "x-access-code": ACCESS_CODE,
+        "x-upsert": "true",
+        "Content-Type": "image/jpeg",
+      },
+      body: b,
+    });
+  const res = await put(path, blob);
   if (!res.ok) throw new Error(`Hochladen des Profilbilds fehlgeschlagen: ${await res.text()}`);
+  try {
+    await put(`players/${playerId}-hd.jpg`, blobHd);
+  } catch (e) {
+    // HD ist optional; die Sammelkarte nutzt sonst die kleine Version
+  }
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}?t=${Date.now()}`;
 }
 
@@ -2590,7 +2600,15 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   let fotoOk = false;
   if (player.photo_url) {
     try {
-      const img = await loadImageCrossOrigin(player.photo_url);
+      let img;
+      const hdUrl = String(player.photo_url).replace(/\/players\/([^/?]+)\.jpg/, "/players/$1-hd.jpg");
+      try {
+        img = hdUrl !== player.photo_url ? await loadImageCrossOrigin(hdUrl) : null;
+      } catch (e) {
+        img = null;
+      }
+      if (!img) img = await loadImageCrossOrigin(player.photo_url);
+      ctx.imageSmoothingQuality = "high";
       const scale = Math.max(pw / img.naturalWidth, ph / img.naturalHeight);
       const dw = img.naturalWidth * scale;
       const dh = img.naturalHeight * scale;
