@@ -473,7 +473,7 @@ function spieltagNummern(spieltage) {
   return map;
 }
 const spieltagLabel = (spieltag, nummer) => {
-  const bezeichnung = spieltag.typ === "turnier" ? "Turnier" : "Spieltag";
+  const bezeichnung = spieltag.typ === "hallenturnier" ? "Hallenturnier" : spieltag.typ === "turnier" ? "Turnier" : "Spieltag";
   return nummer ? `${bezeichnung} ${nummer}` : bezeichnung;
 };
 let _confirmHandler = null;
@@ -2045,7 +2045,7 @@ function App() {
         id: newId,
         date,
         zeit: zeit || null,
-        typ: typ === "turnier" ? "turnier" : "spieltag",
+        typ: typ === "turnier" ? "turnier" : typ === "hallenturnier" ? "hallenturnier" : "spieltag",
         ort: ort || null,
       });
       const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -2144,7 +2144,7 @@ function App() {
             teamInfo={teamInfo}
             termine={termine}
             onOpenTermin={(e) => {
-              if (e.typ === "spieltag" || e.typ === "turnier") {
+              if (e.typ === "spieltag" || e.typ === "turnier" || e.typ === "hallenturnier") {
                 if (features.spieltage === false) return;
                 setZiel({ typ: "spieltag", id: e.spieltagId });
                 setTab("spieltage");
@@ -3275,7 +3275,7 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
       }));
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
-      .map((s) => ({ id: `s-${s.id}`, spieltagId: s.id, date: s.date, typ: s.typ === "turnier" ? "turnier" : "spieltag", zeit: s.zeit || null }));
+      .map((s) => ({ id: `s-${s.id}`, spieltagId: s.id, date: s.date, typ: s.typ === "turnier" ? "turnier" : s.typ === "hallenturnier" ? "hallenturnier" : "spieltag", zeit: s.zeit || null }));
     return [...trainingsEintraege, ...spieltagEintraege].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   }, [termine, spieltage, heute]);
 
@@ -3330,6 +3330,21 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
         </svg>
       ),
     },
+    hallenturnier: {
+      label: "Hallenturnier",
+      color: "var(--gold-2)",
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M2 9l10-6 10 6" />
+          <path d="M9 10h6v3a3 3 0 0 1-6 0v-3z" />
+          <path d="M9 11H7a2 2 0 0 0 2 2.5" />
+          <path d="M15 11h2a2 2 0 0 1-2 2.5" />
+          <path d="M12 16v2" />
+          <path d="M9 21h6" />
+          <path d="M10 18h4l.7 3H9.3z" />
+        </svg>
+      ),
+    },
   };
 
   const kurzDatum = (dateStr) => {
@@ -3359,7 +3374,7 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
                 tabIndex={onOpen ? 0 : undefined}
                 onClick={onOpen ? () => onOpen(eintrag) : undefined}
                 onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(eintrag); } } : undefined}
-                title={onOpen ? (eintrag.typ === "spieltag" || eintrag.typ === "turnier" ? "Spieltag öffnen" : "Training bewerten") : undefined}
+                title={onOpen ? (eintrag.typ === "spieltag" || eintrag.typ === "turnier" || eintrag.typ === "hallenturnier" ? "Spieltag öffnen" : "Training bewerten") : undefined}
                 style={{
                   cursor: onOpen ? "pointer" : "default",
                   flex: 1,
@@ -7527,6 +7542,12 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
           >
             Turnier
           </button>
+          <button
+            onClick={(e) => { setNeuerTyp("hallenturnier"); e.currentTarget.blur(); }}
+            style={{ ...styles.chip, ...(neuerTyp === "hallenturnier" ? styles.chipActive : {}) }}
+          >
+            Hallenturnier
+          </button>
         </div>
         <div style={{ ...styles.addRow, flexWrap: "wrap", rowGap: 8, marginTop: 8 }}>
           <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
@@ -7549,7 +7570,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
             Anlegen
           </button>
         </div>
-        <div style={{ ...styles.hint, marginTop: 6, marginBottom: 0 }}>Spieltage und Turniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</div>
+        <div style={{ ...styles.hint, marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere und Hallenturniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</div>
       </div>
 
       {/* Spieltag-Liste mit Gegner-Zuordnung */}
