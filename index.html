@@ -4927,12 +4927,13 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
           {uebersicht.length === 0 && <EmptyState text="Noch keine Daten vorhanden." />}
           {uebersicht.length > 0 && (
             <div className="card-list" style={styles.cardList}>
-              {uebersicht.map((p) => {
+              {uebersicht.map((p, idx) => {
                 const player = players.find((pl) => pl.id === p.id);
                 return (
                 <div key={p.id} style={styles.card}>
                   <div style={styles.cardHead}>
-                    <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={styles.rank}>{idx + 1}</span>
                       <Avatar name={p.name} size={36} photoUrl={player?.photo_url} />
                       <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
                         {p.name}
