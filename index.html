@@ -5428,6 +5428,8 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
   const fokus = () => {
     const el = ref.current;
     if (!el) return;
+    // Ist der Editor schon fokussiert, Auswahl nicht zurücksetzen (sonst geht am Handy der "Format an/aus"-Zustand bei leerem Cursor verloren)
+    if (document.activeElement === el) return;
     el.focus();
     const r = gemerkterBereich.current;
     if (r) {
@@ -5440,6 +5442,15 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
   const cmd = (name) => {
     fokus();
     document.execCommand(name, false, null);
+    try {
+      setAktiv({
+        bold: document.queryCommandState("bold"),
+        underline: document.queryCommandState("underline"),
+        italic: document.queryCommandState("italic"),
+        ul: document.queryCommandState("insertUnorderedList"),
+        ol: document.queryCommandState("insertOrderedList"),
+      });
+    } catch (e) {}
     sync();
   };
 
