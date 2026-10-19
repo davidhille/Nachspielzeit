@@ -2739,7 +2739,7 @@ function KartenSeite({ token }) {
       </header>
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 8, alignItems: "start" }}>
           {daten.spieler.map((sp) => (
             <div key={sp.id}>
               <PlayerCard
@@ -4298,7 +4298,7 @@ function PlayerCard({ player, stats }) {
               <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 700, color: "var(--gold)" }}>
                 {s.value}
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                 {s.label}
               </span>
             </div>
