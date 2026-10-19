@@ -2660,8 +2660,8 @@ function kartenStats(sp) {
   return [
     { value: sp.tore, label: "TORE" },
     { value: `${sp.spieltage}`, label: "SPIELTAGE" },
-    { value: sp.training != null ? sp.training + "%" : "–", label: "TRAINING" },
-    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG" },
+    { value: sp.training != null ? sp.training + "%" : "–", label: "TRAINING", icon: "schuh" },
+    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", icon: "pokal" },
   ];
 }
 async function veroeffentlicheKarten(token, snapshot) {
@@ -2832,6 +2832,39 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
       )}
     </div>
   );
+}
+
+/* Kleine Linien-Icons für die Kennzahlen (24x24): Fußballschuh = Training, Pokal = Spieltag */
+const STAT_ICONS = {
+  schuh: { fill: "M3 6h6l1.5 3.5 6.5 1.5c2.5.6 4 1.8 4 3.5V16H3z", lines: ["M6 16v3", "M10.5 16v3", "M15 16v3", "M19 16v2.5", "M11.5 12l1.5-1.5", "M14.5 12.8l1.5-1.5"] },
+  pokal: { fill: "M7 3h10v5.5a5 5 0 0 1-10 0z", lines: ["M7 5H4v2a3 3 0 0 0 3 3", "M17 5h3v2a3 3 0 0 1-3 3", "M12 13.5V18", "M10 18h4", "M8.5 21h7"] },
+};
+function StatIcon({ name, size = 15, color = "var(--gold)" }) {
+  const d = STAT_ICONS[name];
+  if (!d) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flexShrink: 0 }} aria-hidden="true">
+      <path d={d.fill} fill={color} fillOpacity="0.25" />
+      {d.lines.map((l, i) => <path key={i} d={l} />)}
+    </svg>
+  );
+}
+function zeichneStatIcon(ctx, name, x, y, size, farbe = "#F7C65C") {
+  const d = STAT_ICONS[name];
+  if (!d) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = farbe;
+  ctx.fillStyle = "rgba(247,198,92,0.25)";
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const f = new Path2D(d.fill);
+  ctx.fill(f);
+  ctx.stroke(f);
+  d.lines.forEach((l) => ctx.stroke(new Path2D(l)));
+  ctx.restore();
 }
 
 async function generateSammelkarte(player, stats, saisonLabel, teamName) {
@@ -3007,9 +3040,13 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
     ctx.font = "800 38px 'Space Grotesk', sans-serif";
     ctx.fillText(String(st.value), cx + 26, cy + 46);
     const vw = ctx.measureText(String(st.value)).width;
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.font = "700 19px 'Inter', sans-serif";
-    ctx.fillText(st.label, cx + 26 + vw + 12, cy + 45);
+    if (st.icon) {
+      zeichneStatIcon(ctx, st.icon, cx + 26 + vw + 12, cy + 12, 34);
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "700 19px 'Inter', sans-serif";
+      ctx.fillText(st.label, cx + 26 + vw + 12, cy + 45);
+    }
   });
 
   // Fußzeile
@@ -4359,9 +4396,13 @@ function PlayerCard({ player, stats }) {
               <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 700, color: "var(--gold)" }}>
                 {s.value}
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
-                {s.label}
-              </span>
+              {s.icon ? (
+                <span title={s.label} style={{ alignSelf: "center" }}><StatIcon name={s.icon} size={16} /></span>
+              ) : (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                  {s.label}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -4492,8 +4533,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         [
           { value: toreGesamt, label: "TORE" },
           { value: `${spieltagDabeiAnzahl}`, label: "SPIELTAGE" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "TRAINING" },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG" },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "TRAINING", icon: "schuh" },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", icon: "pokal" },
         ],
         saison ? saison.replace("-", "/") : "",
         teamName
@@ -4548,8 +4589,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
           { value: basisAktuell.toFixed(2), label: "BASIS" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW TRAINING" },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW SPIELTAG" },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW TRAINING", icon: "schuh" },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW SPIELTAG", icon: "pokal" },
           { value: toreGesamt, label: "TORE" },
         ]}
       />
