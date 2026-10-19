@@ -3532,8 +3532,23 @@ function Dashboard({
 
   if (selectedPlayerId) {
     const player = players.find((p) => p.id === selectedPlayerId);
+    // Reihenfolge wie im Spieler-Slider (Trikotnummer), nur aktive Spieler
+    const reihe = rows
+      .filter((r) => r.active || r.id === selectedPlayerId)
+      .map((r) => players.find((p) => p.id === r.id))
+      .filter(Boolean)
+      .sort((a, b) => (a.trikotnummer ?? 999) - (b.trikotnummer ?? 999) || (a.name || "").localeCompare(b.name || "", "de"));
+    const idx = reihe.findIndex((p) => p.id === selectedPlayerId);
+    const gehe = (p) => {
+      onSelectPlayer(p.id);
+      window.scrollTo({ top: 0 });
+    };
     return (
       <SpielerDetail
+        key={selectedPlayerId}
+        vorheriger={reihe.length > 1 && idx >= 0 ? reihe[(idx - 1 + reihe.length) % reihe.length] : null}
+        naechster={reihe.length > 1 && idx >= 0 ? reihe[(idx + 1) % reihe.length] : null}
+        onNavigate={gehe}
         player={player}
         trainings={trainings}
         entwicklungen={entwicklungen}
@@ -4109,7 +4124,7 @@ function PlayerStammdaten({ player, onSave }) {
   );
 }
 
-function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings, teamName = "U8" }) {
+function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings, teamName = "U8", vorheriger, naechster, onNavigate }) {
   const [historieTab, setHistorieTab] = useState("training");
   const [kartenLaeuft, setKartenLaeuft] = useState(false);
   const [kartenFehler, setKartenFehler] = useState(null);
@@ -4206,6 +4221,16 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         </div>
       </div>
       {kartenFehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 6 }}>{kartenFehler}</div>}
+      {(vorheriger || naechster) && onNavigate && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 10 }}>
+          <button style={{ ...styles.linkBtn, textAlign: "left" }} onClick={() => onNavigate(vorheriger)} aria-label={`Vorheriger Spieler: ${vorheriger.name}`}>
+            ‹ {vorheriger.name}
+          </button>
+          <button style={{ ...styles.linkBtn, textAlign: "right" }} onClick={() => onNavigate(naechster)} aria-label={`Nächster Spieler: ${naechster.name}`}>
+            {naechster.name} ›
+          </button>
+        </div>
+      )}
       <PlayerCard
         player={player}
         stats={[
