@@ -3449,6 +3449,97 @@ function KartenSeitePlus({ token }) {
   );
 }
 
+/* ---------- Auto-Sync der Lyrics: Spracherkennung (Whisper) läuft im Browser, danach Abgleich mit dem bekannten Text ---------- */
+const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+const lrcNorm = (w) => (w || "").toLowerCase().replace(/[^a-zäöüß0-9]/g, "");
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+const wortAehnlich = (a, b) => (a === b ? 1 : !a || !b ? 0 : 1 - levenshtein(a, b) / Math.max(a.length, b.length));
+const lrcZeit = (t) => `[${String(Math.floor(t / 60)).padStart(2, "0")}:${(t % 60).toFixed(2).padStart(5, "0")}]`;
+function reinerLiedtext(text) {
+  return (text || "")
+    .split(/\r?\n/)
+    .map((z) => z.replace(/^\s*\[\d+:\d+(?:[.,]\d+)?\]\s*/, "").trim())
+    .filter((z) => z && !/^\[[^\]]*\]$/.test(z));
+}
+/* Ordnet die erkannten Wörter dem Liedtext zu (Sequenz-Alignment) und berechnet je Zeile die Startzeit */
+function lyricsAusrichten(zeilen, erkannt) {
+  const L = [];
+  zeilen.forEach((z, zi) => { let pos = 0; z.split(/\s+/).forEach((w) => { const n = lrcNorm(w); if (n) L.push({ n, zi, pos: pos++ }); }); });
+  const R = erkannt.map((e) => ({ n: lrcNorm(e.text), start: e.start })).filter((e) => e.n && e.start != null);
+  const N = L.length, M = R.length;
+  const GAP = -0.6;
+  const sim = Array.from({ length: N }, (_, i) => Array.from({ length: M }, (_, j) => wortAehnlich(L[i].n, R[j].n)));
+  const sc = Array.from({ length: N + 1 }, () => new Float32Array(M + 1));
+  for (let i = 1; i <= N; i++) sc[i][0] = i * GAP;
+  for (let j = 1; j <= M; j++) sc[0][j] = j * GAP;
+  const pt = (x) => (x >= 0.6 ? 3 * x : -1.5);
+  for (let i = 1; i <= N; i++)
+    for (let j = 1; j <= M; j++)
+      sc[i][j] = Math.max(sc[i - 1][j - 1] + pt(sim[i - 1][j - 1]), sc[i - 1][j] + GAP, sc[i][j - 1] + GAP);
+  const zuordnung = new Array(N).fill(null);
+  let i = N, j = M;
+  while (i > 0 && j > 0) {
+    if (Math.abs(sc[i][j] - (sc[i - 1][j - 1] + pt(sim[i - 1][j - 1]))) < 1e-4) {
+      if (sim[i - 1][j - 1] >= 0.6) zuordnung[i - 1] = R[j - 1].start;
+      i--; j--;
+    } else if (Math.abs(sc[i][j] - (sc[i - 1][j] + GAP)) < 1e-4) i--;
+    else j--;
+  }
+  const zeit = new Array(zeilen.length).fill(null);
+  for (let k = 0; k < N; k++) if (zuordnung[k] != null && zeit[L[k].zi] == null) zeit[L[k].zi] = zuordnung[k] - 0.4 * L[k].pos;
+  const bekannt = zeit.map((t, k) => (t != null ? k : -1)).filter((k) => k >= 0);
+  if (bekannt.length === 0) return { zeiten: null, treffer: 0 };
+  const out = zeit.slice();
+  for (let k = 0; k < out.length; k++) {
+    if (out[k] != null) continue;
+    const vor = [...bekannt].reverse().find((b) => b < k);
+    const nach = bekannt.find((b) => b > k);
+    if (vor != null && nach != null) out[k] = zeit[vor] + ((zeit[nach] - zeit[vor]) * (k - vor)) / (nach - vor);
+    else if (vor != null) out[k] = zeit[vor] + 4 * (k - vor);
+    else out[k] = Math.max(0, zeit[nach] - 4 * (nach - k));
+  }
+  for (let k = 1; k < out.length; k++) if (out[k] <= out[k - 1]) out[k] = out[k - 1] + 0.3;
+  return { zeiten: out.map((t) => Math.max(0, t - 0.15)), treffer: bekannt.length };
+}
+async function lyricsAutoSync(audioUrl, text, modell, status) {
+  const zeilen = reinerLiedtext(text);
+  if (zeilen.length === 0) throw new Error("Bitte zuerst den Liedtext in das Textfeld eintragen.");
+  status("Lade Spracherkennung …");
+  const tf = await import(TRANSFORMERS_URL);
+  tf.env.allowLocalModels = false;
+  const asr = await tf.pipeline("automatic-speech-recognition", modell, {
+    progress_callback: (p) => { if (p && p.status === "progress" && p.progress != null) status(`Lade Modell … ${Math.round(p.progress)} %`); },
+  });
+  status("Lese Song …");
+  const buf = await (await fetch(audioUrl)).arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ac = new AC();
+  const dec = await ac.decodeAudioData(buf);
+  ac.close && ac.close();
+  const off = new OfflineAudioContext(1, Math.ceil(dec.duration * 16000), 16000);
+  const quelle = off.createBufferSource();
+  quelle.buffer = dec;
+  quelle.connect(off.destination);
+  quelle.start();
+  const mono = (await off.startRendering()).getChannelData(0);
+  status("Analysiere Gesang … (das dauert ein paar Minuten, Seite bitte offen lassen)");
+  const res = await asr(mono, { language: "german", task: "transcribe", chunk_length_s: 30, stride_length_s: 5, return_timestamps: "word" });
+  const erkannt = (res.chunks || []).map((c) => ({ text: c.text, start: c.timestamp ? c.timestamp[0] : null }));
+  const { zeiten, treffer } = lyricsAusrichten(zeilen, erkannt);
+  if (!zeiten) throw new Error("Es konnten keine Wörter zugeordnet werden (erkannt: " + erkannt.length + " Wörter).");
+  const lrc = zeilen.map((z, k) => lrcZeit(zeiten[k]) + z).join("\n");
+  return { lrc, treffer, zeilen: zeilen.length, erkannt: erkannt.length };
+}
+
 /* Verwaltung → Spieler: Link für die Eltern erzeugen, kopieren, aktualisieren, sperren */
 function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy, songs = [], onSongAdd, onSongChange }) {
   const [kopiert, setKopiert] = useState(false);
@@ -3456,6 +3547,24 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
   const urlPlus = token ? kartenLinkUrlPlus(token) : "";
   const [kopiertPlus, setKopiertPlus] = useState(false);
   const [textEdit, setTextEdit] = useState(null);
+  const [sync, setSync] = useState(null);
+  const [syncModell, setSyncModell] = useState("Xenova/whisper-small");
+  const autoSync = async (i) => {
+    const x = songs[i];
+    if (!x || !(x.text || "").trim()) {
+      setSync({ i, msg: "Bitte zuerst über „Text“ den Liedtext eintragen und speichern.", fehler: true });
+      return;
+    }
+    setSync({ i, msg: "Starte …" });
+    try {
+      const r = await lyricsAutoSync(songUrl(x.pfad), x.text, syncModell, (m) => setSync({ i, msg: m }));
+      setTextEdit({ i, val: r.lrc });
+      setSync({ i, msg: `Fertig: ${r.treffer} von ${r.zeilen} Zeilen sicher erkannt (${r.erkannt} Wörter gehört). Bitte unten prüfen und „Speichern“ tippen.`, fertig: true });
+    } catch (e) {
+      console.error(e);
+      setSync({ i, msg: "Fehler: " + ((e && e.message) || e), fehler: true });
+    }
+  };
   const kopierenPlus = async () => {
     try {
       await navigator.clipboard.writeText(urlPlus);
@@ -3512,9 +3621,26 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
                 <button style={styles.linkBtn} disabled={busy || i === songs.length - 1} onClick={() => onSongChange(i, "runter")}>↓</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => onSongChange(i, "umbenennen")}>Umbenennen</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => { setTextEdit(textEdit && textEdit.i === i ? null : { i, val: x.text || "" }); }}>{x.text ? "Text ✓" : "Text"}</button>
+                <button style={styles.linkBtn} disabled={busy || (sync && !sync.fertig && !sync.fehler)} onClick={() => autoSync(i)}>Auto-Sync</button>
                 <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} disabled={busy} onClick={() => onSongChange(i, "loeschen")}>Löschen</button>
               </div>
             ))}
+            {sync && (
+              <div style={{ fontSize: 12.5, margin: "6px 0", color: sync.fehler ? "var(--danger-text)" : "var(--muted)" }}>
+                {songs[sync.i] ? `„${songs[sync.i].titel}“: ` : ""}{sync.msg}
+                {(!sync.fertig && !sync.fehler) ? null : (
+                  <button style={{ ...styles.linkBtn, marginLeft: 8 }} onClick={() => setSync(null)}>OK</button>
+                )}
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "4px 0" }}>
+              Auto-Sync: Modell{" "}
+              <select value={syncModell} onChange={(e) => setSyncModell(e.target.value)} style={{ fontSize: 12.5 }}>
+                <option value="Xenova/whisper-small">genau (small, ca. 250 MB)</option>
+                <option value="Xenova/whisper-base">schnell (base, ca. 80 MB)</option>
+              </select>
+              {" "}– Liedtext zuerst über „Text“ eintragen, am besten am Laptop.
+            </div>
             {textEdit && songs[textEdit.i] && (
               <div style={{ margin: "6px 0 8px" }}>
                 <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 4 }}>Text zu „{songs[textEdit.i].titel}“ – normal oder mit Zeitstempeln [mm:ss.xx] pro Zeile (dann läuft der Text im Player mit)</div>
