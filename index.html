@@ -2039,7 +2039,7 @@ function App() {
   );
   const kartenHash = kartenSnapshot ? JSON.stringify(kartenSnapshot) : null;
   const kartenPlus = useMemo(
-    () => (kartenToken && !loading ? berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8") : null),
+    () => (kartenToken && !loading ? berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs) : null),
     [kartenToken, loading, spieltage, gegner, players, teamInfo]
   );
   const kartenPlusJson = kartenPlus ? JSON.stringify(kartenPlus) : null;
@@ -2061,7 +2061,7 @@ function App() {
     wrapAction(async () => {
       const neu = neuerKartenToken();
       const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll);
-      await veroeffentlicheKarten(neu, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8"));
+      await veroeffentlicheKarten(neu, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs));
       await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu } });
       if (kartenToken) await loescheKarten(kartenToken);
     }, "Karten-Link erstellt");
@@ -2072,6 +2072,36 @@ function App() {
       await dbUpdate("teams", CURRENT_TEAM, { config: cfg });
       if (kartenToken) await loescheKarten(kartenToken);
     }, "Karten-Link gesperrt");
+  const songsSpeichern = async (songs) => {
+    await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), songs } });
+  };
+  const songHinzufuegen = (files) =>
+    wrapAction(async () => {
+      let liste = [...(teamInfo?.config?.songs || [])];
+      for (const f of files) {
+        const pfad = await ladeSongHoch(f);
+        liste = [...liste, { titel: f.name.replace(/\.[^.]+$/, ""), pfad }];
+        await songsSpeichern(liste);
+      }
+    }, "Song hochgeladen");
+  const songAendern = (i, aktion) =>
+    wrapAction(async () => {
+      const liste = [...(teamInfo?.config?.songs || [])];
+      if (aktion === "hoch" && i > 0) [liste[i - 1], liste[i]] = [liste[i], liste[i - 1]];
+      else if (aktion === "runter" && i < liste.length - 1) [liste[i + 1], liste[i]] = [liste[i], liste[i + 1]];
+      else if (aktion === "umbenennen") {
+        const t = window.prompt("Titel", liste[i].titel);
+        if (!t || !t.trim()) return;
+        liste[i] = { ...liste[i], titel: t.trim() };
+      } else if (aktion === "loeschen") {
+        if (!window.confirm(`„${liste[i].titel}“ löschen?`)) return;
+        const [weg] = liste.splice(i, 1);
+        await songsSpeichern(liste);
+        await loescheSongDatei(weg.pfad);
+        return;
+      }
+      await songsSpeichern(liste);
+    }, "Songs angepasst");
   const kartenVollUmschalten = () =>
     wrapAction(async () => {
       const voll = !teamInfo?.config?.share_voll;
@@ -2079,7 +2109,7 @@ function App() {
     }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
-      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll), berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8"));
+      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll), berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs));
     }, "Karten aktualisiert");
 
   const softDelete = (table, id, entityLabel) =>
@@ -2332,7 +2362,7 @@ function App() {
           <Verwaltung
             kartenBox={
               teamInfo ? (
-                <KartenLinkBox token={kartenToken} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} />
+                <KartenLinkBox token={kartenToken} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} songs={teamInfo?.config?.songs || []} onSongAdd={songHinzufuegen} onSongChange={songAendern} />
               ) : null
             }
             players={players}
@@ -2627,6 +2657,35 @@ function neuerKartenToken() {
 function kartenLinkUrl(token) {
   return `${window.location.origin}/?karten=${token}`;
 }
+function songUrl(pfad) {
+  return `${KARTEN_OBJ}/public/${PHOTO_BUCKET}/${pfad}`;
+}
+async function ladeSongHoch(file) {
+  const endung = (file.name.match(/\.([a-z0-9]{2,4})$/i) || [, "mp3"])[1].toLowerCase();
+  const pfad = `songs/${uid()}.${endung}`;
+  const res = await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "x-access-code": ACCESS_CODE,
+      "x-upsert": "true",
+      "cache-control": "max-age=31536000",
+      "Content-Type": file.type || "audio/mpeg",
+    },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`Song konnte nicht hochgeladen werden: ${await res.text()}`);
+  return pfad;
+}
+async function loescheSongDatei(pfad) {
+  try {
+    await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE },
+    });
+  } catch (e) {}
+}
 function kartenLinkUrlPlus(token) {
   return `${window.location.origin}/?karten=${token}&seite=erweitert`;
 }
@@ -2726,7 +2785,7 @@ function kurzHash(str) {
   return String(h);
 }
 /* Erweiterter Snapshot: Spieltagskarten, Saisonbilanz, Bilanz pro Gegner */
-function berechneKartenPlus(spieltage, gegner, players, teamName) {
+function berechneKartenPlus(spieltage, gegner, players, teamName, songs) {
   const heute = todayISO();
   const saison = seasonKeyOf(heute.slice(0, 7));
   const nr = spieltagNummern(spieltage);
@@ -2778,7 +2837,7 @@ function berechneKartenPlus(spieltage, gegner, players, teamName) {
     else b.unentschieden++;
   });
   const gegnerBilanz = Object.values(gmap).sort((a, b) => b.spiele - a.spiele || a.name.localeCompare(b.name, "de"));
-  return { version: 1, team: teamName, saison: saison ? saison.replace("-", "/") : "", spieltage: tage, saisonBilanz: bil, torschuetzen, gegnerBilanz };
+  return { version: 1, team: teamName, saison: saison ? saison.replace("-", "/") : "", spieltage: tage, saisonBilanz: bil, torschuetzen, gegnerBilanz, songs: (songs || []).map((x) => ({ titel: x.titel, url: songUrl(x.pfad) })) };
 }
 async function ladeKartenSnapshot(token, suffix = "") {
   const res = await fetch(`${KARTEN_OBJ}/public/${PHOTO_BUCKET}/karten/${encodeURIComponent(token)}${suffix}.json?t=${Date.now()}`, { cache: "no-store" });
@@ -2957,6 +3016,57 @@ function SpieltagKartenBild({ tag, team, onFehler, minH }) {
   );
 }
 
+function SongPlayer({ songs }) {
+  const [aktiv, setAktiv] = useState(0);
+  const [laeuft, setLaeuft] = useState(false);
+  const ref = useRef(null);
+  const start = useRef(false);
+  useEffect(() => {
+    if (start.current && ref.current) ref.current.play().catch(() => setLaeuft(false));
+  }, [aktiv]);
+  const wahl = (i) => {
+    start.current = true;
+    if (i === aktiv && ref.current) {
+      if (ref.current.paused) ref.current.play().catch(() => {});
+      else ref.current.pause();
+    } else setAktiv(i);
+  };
+  const weiter = (d) => {
+    start.current = true;
+    setAktiv((a) => (a + d + songs.length) % songs.length);
+  };
+  const song = songs[aktiv] || songs[0];
+  return (
+    <div style={styles.card}>
+      <div style={{ fontWeight: 700, marginBottom: 8 }}>{song.titel}</div>
+      <audio
+        ref={ref}
+        src={song.url}
+        controls
+        preload="none"
+        style={{ width: "100%" }}
+        onPlay={() => setLaeuft(true)}
+        onPause={() => setLaeuft(false)}
+        onEnded={() => (songs.length > 1 ? weiter(1) : setLaeuft(false))}
+      />
+      <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+        <button style={styles.linkBtn} onClick={() => weiter(-1)} disabled={songs.length < 2}>⏮ Zurück</button>
+        <button style={styles.linkBtn} onClick={() => weiter(1)} disabled={songs.length < 2}>Weiter ⏭</button>
+      </div>
+      {songs.length > 1 && (
+        <div style={{ marginTop: 10, borderTop: "1px solid var(--border)" }}>
+          {songs.map((x, i) => (
+            <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 10, alignItems: "center", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid var(--border)", padding: "10px 4px", fontSize: 14.5, fontFamily: "inherit", cursor: "pointer", color: i === aktiv ? "var(--gold, #8E1416)" : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
+              <span style={{ width: 18 }}>{i === aktiv && laeuft ? "▶" : i + 1}</span>
+              <span>{x.titel}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KartenSeitePlus({ token }) {
   const [karten, setKarten] = useState(undefined);
   const [plus, setPlus] = useState(undefined);
@@ -3067,6 +3177,12 @@ function KartenSeitePlus({ token }) {
                 </div>
               </div>
             )}
+            {plus.songs && plus.songs.length > 0 && (
+              <>
+                {kopf("Mannschaftssongs")}
+                <SongPlayer songs={plus.songs} />
+              </>
+            )}
             {plus.spieltage.length > 0 && (
               <>
                 {kopf("Spieltagskarten")}
@@ -3091,7 +3207,7 @@ function KartenSeitePlus({ token }) {
 }
 
 /* Verwaltung → Spieler: Link für die Eltern erzeugen, kopieren, aktualisieren, sperren */
-function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy }) {
+function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy, songs = [], onSongAdd, onSongChange }) {
   const [kopiert, setKopiert] = useState(false);
   const url = token ? kartenLinkUrl(token) : "";
   const urlPlus = token ? kartenLinkUrlPlus(token) : "";
@@ -3144,6 +3260,21 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
               <button style={styles.linkBtn} onClick={kopierenPlus}>{kopiertPlus ? "Kopiert ✓" : "Link kopieren"}</button>
               <button style={styles.linkBtn} onClick={() => window.open(urlPlus, "_blank")}>Öffnen</button>
             </div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, margin: "14px 0 4px" }}>Mannschaftssongs (Player auf der erweiterten Seite)</div>
+            {songs.map((x, i) => (
+              <div key={x.pfad} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13.5, padding: "4px 0" }}>
+                <span style={{ flex: 1, minWidth: 120 }}>{i + 1}. {x.titel}</span>
+                <button style={styles.linkBtn} disabled={busy || i === 0} onClick={() => onSongChange(i, "hoch")}>↑</button>
+                <button style={styles.linkBtn} disabled={busy || i === songs.length - 1} onClick={() => onSongChange(i, "runter")}>↓</button>
+                <button style={styles.linkBtn} disabled={busy} onClick={() => onSongChange(i, "umbenennen")}>Umbenennen</button>
+                <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} disabled={busy} onClick={() => onSongChange(i, "loeschen")}>Löschen</button>
+              </div>
+            ))}
+            <label style={{ ...styles.linkBtn, display: "inline-block", marginTop: 6, cursor: "pointer" }}>
+              + Song hochladen (MP3)
+              <input type="file" accept="audio/*,.mp3,.m4a,.wav" multiple style={{ display: "none" }} disabled={busy}
+                onChange={(e) => { const f = Array.from(e.target.files || []); e.target.value = ""; if (f.length) onSongAdd(f); }} />
+            </label>
           </div>
         </>
       ) : (
