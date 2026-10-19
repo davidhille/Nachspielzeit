@@ -2727,13 +2727,16 @@ function KartenSeite({ token }) {
   };
   const stand = daten.stand ? new Date(daten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
-      <header style={{ background: "linear-gradient(135deg, #B01E1E, #8E1416)", color: "#fff", padding: "18px 16px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700 }}>SV Heimstetten {daten.team || "U8"}</div>
-          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 2 }}>
-            Sammelkarten · Saison {daten.saison}
-            {stand ? ` · Stand ${stand}` : ""}
+    <div style={styles.app}>
+      <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
+        <div style={{ ...styles.headerTop, maxWidth: 1100, margin: "0 auto" }}>
+          <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
+          <div style={{ flex: 1 }}>
+            <div style={styles.title}>Sammelkarten</div>
+            <div style={styles.subtitle}>
+              SV Heimstetten {daten.team || "U8"} · Saison {daten.saison}
+              {stand ? ` · Stand ${stand}` : ""}
+            </div>
           </div>
         </div>
       </header>
