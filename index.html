@@ -3574,8 +3574,9 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
     setSync({ i, msg: "Starte …" });
     try {
       const r = await lyricsAutoSync(songUrl(x.pfad), x.text, syncModell, (m) => setSync({ i, msg: m }));
+      await onSongChange(i, "text", r.lrc);
       setTextEdit({ i, val: r.lrc });
-      setSync({ i, msg: `Fertig: ${r.treffer} von ${r.zeilen} Zeilen sicher erkannt (${r.erkannt} Wörter gehört). Bitte unten prüfen und „Speichern“ tippen.`, fertig: true });
+      setSync({ i, msg: `Fertig und gespeichert: ${r.treffer} von ${r.zeilen} Zeilen sicher erkannt (${r.erkannt} Wörter gehört). Im Textfeld unten kannst du die Zeiten bei Bedarf prüfen und korrigieren.`, fertig: true });
     } catch (e) {
       console.error(e);
       setSync({ i, msg: "Fehler: " + ((e && e.message) || e), fehler: true });
