@@ -3019,6 +3019,7 @@ function SpieltagKartenBild({ tag, team, onFehler, minH }) {
 function SongPlayer({ songs }) {
   const [aktiv, setAktiv] = useState(0);
   const [laeuft, setLaeuft] = useState(false);
+  const [offen, setOffen] = useState(false);
   const ref = useRef(null);
   const start = useRef(false);
   useEffect(() => {
@@ -3054,7 +3055,13 @@ function SongPlayer({ songs }) {
         <button style={styles.linkBtn} onClick={() => weiter(1)} disabled={songs.length < 2}>Weiter ⏭</button>
       </div>
       {songs.length > 1 && (
-        <div style={{ marginTop: 10, borderTop: "1px solid var(--border)" }}>
+        <button onClick={() => setOffen((o) => !o)} aria-expanded={offen} style={{ ...styles.linkBtn, display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)", fontWeight: 600 }}>
+          <span>Playlist · {songs.length} Songs</span>
+          <span style={{ transition: "transform 0.2s", transform: offen ? "rotate(180deg)" : "none" }}>▾</span>
+        </button>
+      )}
+      {songs.length > 1 && offen && (
+        <div style={{ marginTop: 4, borderTop: "1px solid var(--border)" }}>
           {songs.map((x, i) => (
             <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 10, alignItems: "center", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid var(--border)", padding: "10px 4px", fontSize: 14.5, fontFamily: "inherit", cursor: "pointer", color: i === aktiv ? "var(--gold, #8E1416)" : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
               <span style={{ width: 18 }}>{i === aktiv && laeuft ? "▶" : i + 1}</span>
