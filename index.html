@@ -2034,7 +2034,7 @@ function App() {
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenSnapshot = useMemo(
-    () => (kartenToken && !loading ? berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8") : null),
+    () => (kartenToken && !loading ? berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll) : null),
     [kartenToken, loading, players, trainings, spieltage, teamInfo]
   );
   const kartenHash = kartenSnapshot ? JSON.stringify(kartenSnapshot) : null;
@@ -2055,7 +2055,7 @@ function App() {
   const kartenLinkErzeugen = () =>
     wrapAction(async () => {
       const neu = neuerKartenToken();
-      const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8");
+      const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll);
       await veroeffentlicheKarten(neu, snap);
       await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu } });
       if (kartenToken) await loescheKarten(kartenToken);
@@ -2067,9 +2067,14 @@ function App() {
       await dbUpdate("teams", CURRENT_TEAM, { config: cfg });
       if (kartenToken) await loescheKarten(kartenToken);
     }, "Karten-Link gesperrt");
+  const kartenVollUmschalten = () =>
+    wrapAction(async () => {
+      const voll = !teamInfo?.config?.share_voll;
+      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_voll: voll } });
+    }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
-      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8"));
+      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll));
     }, "Karten aktualisiert");
 
   const softDelete = (table, id, entityLabel) =>
@@ -2322,7 +2327,7 @@ function App() {
           <Verwaltung
             kartenBox={
               teamInfo ? (
-                <KartenLinkBox token={kartenToken} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} busy={busy} />
+                <KartenLinkBox token={kartenToken} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} />
               ) : null
             }
             players={players}
@@ -2617,7 +2622,7 @@ function neuerKartenToken() {
 function kartenLinkUrl(token) {
   return `${window.location.origin}/?karten=${token}`;
 }
-function berechneKartenSnapshot(players, trainings, spieltage, teamName) {
+function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = false) {
   const heute = todayISO();
   const saison = seasonKeyOf(heute.slice(0, 7));
   const vergangene = spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heute);
@@ -2640,6 +2645,8 @@ function berechneKartenSnapshot(players, trainings, spieltage, teamName) {
         name: p.name,
         trikot: p.trikotnummer ?? null,
         foto: p.photo_url || null,
+        alter: p.geburtsdatum ? alterVonGeburtsdatum(String(p.geburtsdatum).slice(0, 10)) : null,
+        ...(voll ? { nachname: p.nachname || "", geburtsdatum: p.geburtsdatum ? String(p.geburtsdatum).slice(0, 10) : null } : {}),
         tore,
         spieltage: spieltage.filter((s) => s.teilnehmer.includes(p.id)).length,
         training: saisonTr.length > 0 ? Math.round((anwesend / saisonTr.length) * 100) : null,
@@ -2703,7 +2710,7 @@ function KartenBild({ sp, saison, team, onFehler }) {
     let alt = null;
     let weg = false;
     generateSammelkarte(
-      { name: sp.name, nachname: "", trikotnummer: sp.trikot, photo_url: sp.foto },
+      { name: sp.name, nachname: sp.nachname || "", geburtsdatum: sp.geburtsdatum || null, alter: sp.alter ?? null, trikotnummer: sp.trikot, photo_url: sp.foto },
       kartenStats(sp),
       saison,
       team
@@ -2786,7 +2793,7 @@ function KartenSeite({ token }) {
 }
 
 /* Verwaltung → Spieler: Link für die Eltern erzeugen, kopieren, aktualisieren, sperren */
-function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, busy }) {
+function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy }) {
   const [kopiert, setKopiert] = useState(false);
   const url = token ? kartenLinkUrl(token) : "";
   const kopieren = async () => {
@@ -2802,8 +2809,12 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, busy }) {
     <div style={{ ...styles.card, marginBottom: 16 }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>Karten-Link für Eltern</div>
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
-        Eine Seite mit den Sammelkarten aller aktiven Spieler (Vorname, Foto, Trikot, Kennzahlen – ohne Nachname und Geburtsdatum). Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
+        Eine Seite mit den Sammelkarten aller aktiven Spieler. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
       </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 10 }}>
+        <input type="checkbox" checked={voll} onChange={onToggleVoll} disabled={busy} />
+        Nachname und Geburtsdatum auf den Karten anzeigen (sonst nur Vorname und Alter)
+      </label>
       {token ? (
         <>
           <input readOnly value={url} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
@@ -2950,7 +2961,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   }
 
   // Untertitel: Geburtsdatum / Alter
-  let untertitel = "SV HEIMSTETTEN " + teamName;
+  let untertitel = player.alter != null ? `${player.alter} Jahre` : "SV HEIMSTETTEN " + teamName;
   if (player.geburtsdatum) {
     const alter = alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10));
     untertitel = `Geboren ${formatGeburtsdatum(player.geburtsdatum)}` + (alter != null ? ` · ${alter} Jahre` : "");
