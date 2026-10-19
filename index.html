@@ -2660,8 +2660,8 @@ function kartenStats(sp) {
   return [
     { value: sp.tore, label: "TORE" },
     { value: `${sp.spieltage}`, label: "SPIELTAGE" },
-    { value: sp.training != null ? sp.training + "%" : "–", label: "TRAINING", icon: "schuh", prozent: sp.training },
-    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", icon: "pokal", prozent: sp.spieltagQuote },
+    { value: sp.training != null ? sp.training + "%" : "–", label: "TRAINING", kurz: "TRAINING", icon: "schuh", prozent: sp.training },
+    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", kurz: "SPIELTAG", icon: "pokal", prozent: sp.spieltagQuote },
   ];
 }
 async function veroeffentlicheKarten(token, snapshot) {
@@ -3038,11 +3038,15 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
     if (st.icon && st.prozent != null) {
       // Anteil als 5 Icons (je 20 %)
       const voll = Math.max(0, Math.min(5, Math.round(st.prozent / 20)));
-      const isz = 34;
-      const gap = 8;
+      const isz = 28;
+      const gap = 12;
       const gesamt = 5 * isz + 4 * gap;
       const x0 = cx + (cellW - gesamt) / 2;
-      for (let k = 0; k < 5; k++) zeichneStatIcon(ctx, st.icon, x0 + k * (isz + gap), cy + 12, isz, k < voll);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "700 15px 'Inter', sans-serif";
+      ctx.fillText(st.kurz || st.label, cx + cellW / 2, cy + 21);
+      for (let k = 0; k < 5; k++) zeichneStatIcon(ctx, st.icon, x0 + k * (isz + gap), cy + 27, isz, k < voll);
       return;
     }
     ctx.textAlign = "left";
@@ -4399,10 +4403,13 @@ function PlayerCard({ player, stats }) {
         >
           {stats.map((s, i) =>
             s.icon && s.prozent != null ? (
-              <div key={i} title={`${s.label}: ${s.value}`} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                {[0, 1, 2, 3, 4].map((k) => (
-                  <StatIcon key={k} name={s.icon} size={15} aktiv={k < Math.max(0, Math.min(5, Math.round(s.prozent / 20)))} />
-                ))}
+              <div key={i} title={`${s.label}: ${s.value}`} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{s.kurz || s.label}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  {[0, 1, 2, 3, 4].map((k) => (
+                    <StatIcon key={k} name={s.icon} size={15} aktiv={k < Math.max(0, Math.min(5, Math.round(s.prozent / 20)))} />
+                  ))}
+                </div>
               </div>
             ) : (
               <div key={i} style={{ display: "flex", justifyContent: "flex-start", alignItems: "baseline", gap: 5 }}>
@@ -4543,8 +4550,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         [
           { value: toreGesamt, label: "TORE" },
           { value: `${spieltagDabeiAnzahl}`, label: "SPIELTAGE" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "TRAINING", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "TRAINING", kurz: "TRAINING", icon: "schuh", prozent: quoteTraining },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", kurz: "SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
         ],
         saison ? saison.replace("-", "/") : "",
         teamName
@@ -4599,8 +4606,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
           { value: basisAktuell.toFixed(2), label: "BASIS" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW TRAINING", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW TRAINING", kurz: "TRAINING", icon: "schuh", prozent: quoteTraining },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW SPIELTAG", kurz: "SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
           { value: toreGesamt, label: "TORE" },
         ]}
       />
