@@ -2038,25 +2038,30 @@ function App() {
     [kartenToken, loading, players, trainings, spieltage, teamInfo]
   );
   const kartenHash = kartenSnapshot ? JSON.stringify(kartenSnapshot) : null;
+  const kartenPlus = useMemo(
+    () => (kartenToken && !loading ? berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8") : null),
+    [kartenToken, loading, spieltage, gegner, players, teamInfo]
+  );
+  const kartenPlusJson = kartenPlus ? JSON.stringify(kartenPlus) : null;
   useEffect(() => {
     if (!kartenHash || !kartenToken) return;
     let last = null;
     try { last = localStorage.getItem("nsz_karten_hash"); } catch {}
-    if (last === kartenToken + kartenHash) return;
+    if (last === kartenToken + kurzHash(kartenHash + (kartenPlusJson || ""))) return;
     const timer = setTimeout(() => {
-      veroeffentlicheKarten(kartenToken, JSON.parse(kartenHash))
+      veroeffentlicheKarten(kartenToken, JSON.parse(kartenHash), kartenPlusJson ? JSON.parse(kartenPlusJson) : null)
         .then(() => {
-          try { localStorage.setItem("nsz_karten_hash", kartenToken + kartenHash); } catch {}
+          try { localStorage.setItem("nsz_karten_hash", kartenToken + kurzHash(kartenHash + (kartenPlusJson || ""))); } catch {}
         })
         .catch((e) => console.error(e));
     }, 3000);
     return () => clearTimeout(timer);
-  }, [kartenHash, kartenToken]);
+  }, [kartenHash, kartenPlusJson, kartenToken]);
   const kartenLinkErzeugen = () =>
     wrapAction(async () => {
       const neu = neuerKartenToken();
       const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll);
-      await veroeffentlicheKarten(neu, snap);
+      await veroeffentlicheKarten(neu, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8"));
       await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu } });
       if (kartenToken) await loescheKarten(kartenToken);
     }, "Karten-Link erstellt");
@@ -2074,7 +2079,7 @@ function App() {
     }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
-      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll));
+      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll), berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8"));
     }, "Karten aktualisiert");
 
   const softDelete = (table, id, entityLabel) =>
@@ -2622,6 +2627,9 @@ function neuerKartenToken() {
 function kartenLinkUrl(token) {
   return `${window.location.origin}/?karten=${token}`;
 }
+function kartenLinkUrlPlus(token) {
+  return `${window.location.origin}/?karten=${token}&seite=erweitert`;
+}
 function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = false) {
   const heute = todayISO();
   const saison = seasonKeyOf(heute.slice(0, 7));
@@ -2683,8 +2691,8 @@ function sammelkartenWerte({ tore, spieltage, training, spieltagQuote, monat, ka
 function kartenStats(sp) {
   return sammelkartenWerte({ tore: sp.tore, spieltage: sp.spieltage, training: sp.training, spieltagQuote: sp.spieltagQuote, monat: sp.monat, karten: sp.karten });
 }
-async function veroeffentlicheKarten(token, snapshot) {
-  const res = await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/karten/${token}.json`, {
+async function kartenPutJson(pfad, obj) {
+  const res = await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_KEY,
@@ -2694,20 +2702,86 @@ async function veroeffentlicheKarten(token, snapshot) {
       "cache-control": "max-age=60",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ ...snapshot, stand: new Date().toISOString() }),
+    body: JSON.stringify({ ...obj, stand: new Date().toISOString() }),
   });
   if (!res.ok) throw new Error(`Karten-Link konnte nicht aktualisiert werden: ${await res.text()}`);
 }
-async function loescheKarten(token) {
-  try {
-    await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/karten/${token}.json`, {
-      method: "DELETE",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE },
-    });
-  } catch (e) {}
+async function veroeffentlicheKarten(token, snapshot, plus) {
+  await kartenPutJson(`karten/${token}.json`, snapshot);
+  if (plus) await kartenPutJson(`karten/${token}-plus.json`, plus);
 }
-async function ladeKartenSnapshot(token) {
-  const res = await fetch(`${KARTEN_OBJ}/public/${PHOTO_BUCKET}/karten/${encodeURIComponent(token)}.json?t=${Date.now()}`, { cache: "no-store" });
+async function loescheKarten(token) {
+  for (const pfad of [`karten/${token}.json`, `karten/${token}-plus.json`]) {
+    try {
+      await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE },
+      });
+    } catch (e) {}
+  }
+}
+function kurzHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return String(h);
+}
+/* Erweiterter Snapshot: Spieltagskarten, Saisonbilanz, Bilanz pro Gegner */
+function berechneKartenPlus(spieltage, gegner, players, teamName) {
+  const heute = todayISO();
+  const saison = seasonKeyOf(heute.slice(0, 7));
+  const nr = spieltagNummern(spieltage);
+  const sName = (id) => players.find((p) => p.id === id)?.name || "Unbekannt";
+  const gName = (id) => gegner.find((g) => g.id === id)?.name || "Unbekannt";
+  const gespielt = spieltage
+    .filter((s) => s.spiele.length > 0 && s.date <= heute)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const tage = gespielt.map((s) => ({
+    id: s.id,
+    date: s.date,
+    zeit: s.zeit || null,
+    ort: s.ort || "",
+    typ: s.typ || "spieltag",
+    fotoUrl: s.fotoUrl || null,
+    nummer: nr.get(s.id),
+    spiele: s.spiele.map((sp) => ({
+      gegner: gName(sp.opponentId),
+      ourGoals: sp.ourGoals,
+      theirGoals: sp.theirGoals,
+      scorers: sp.scorers.map((sc) => ({ name: sName(sc.playerId), tore: Number(sc.tore) || 0 })),
+    })),
+  }));
+  const saisonSpiele = spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison).flatMap((s) => s.spiele);
+  const bil = { spiele: saisonSpiele.length, siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0 };
+  const tore = {};
+  saisonSpiele.forEach((sp) => {
+    bil.toreFuer += sp.ourGoals;
+    bil.toreGegen += sp.theirGoals;
+    if (sp.ourGoals > sp.theirGoals) bil.siege++;
+    else if (sp.ourGoals < sp.theirGoals) bil.niederlagen++;
+    else bil.unentschieden++;
+    sp.scorers.forEach((sc) => {
+      tore[sc.playerId] = (tore[sc.playerId] || 0) + Number(sc.tore || 0);
+    });
+  });
+  const torschuetzen = Object.entries(tore)
+    .map(([id, t]) => ({ name: sName(id), tore: t }))
+    .sort((a, b) => b.tore - a.tore);
+  const gmap = {};
+  spieltage.flatMap((s) => s.spiele).forEach((sp) => {
+    if (!sp.opponentId) return;
+    const b = (gmap[sp.opponentId] = gmap[sp.opponentId] || { name: gName(sp.opponentId), spiele: 0, siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0 });
+    b.spiele++;
+    b.toreFuer += sp.ourGoals;
+    b.toreGegen += sp.theirGoals;
+    if (sp.ourGoals > sp.theirGoals) b.siege++;
+    else if (sp.ourGoals < sp.theirGoals) b.niederlagen++;
+    else b.unentschieden++;
+  });
+  const gegnerBilanz = Object.values(gmap).sort((a, b) => b.spiele - a.spiele || a.name.localeCompare(b.name, "de"));
+  return { version: 1, team: teamName, saison: saison ? saison.replace("-", "/") : "", spieltage: tage, saisonBilanz: bil, torschuetzen, gegnerBilanz };
+}
+async function ladeKartenSnapshot(token, suffix = "") {
+  const res = await fetch(`${KARTEN_OBJ}/public/${PHOTO_BUCKET}/karten/${encodeURIComponent(token)}${suffix}.json?t=${Date.now()}`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -2812,10 +2886,199 @@ function KartenSeite({ token }) {
   );
 }
 
+/* Erweiterte Seite: Saisonbilanz, Bilanz pro Gegner, Spieltagskarten, Sammelkarten */
+function SpieltagKartenBild({ tag, team, onFehler }) {
+  const boxRef = useRef(null);
+  const [url, setUrl] = useState(null);
+  const [blob, setBlob] = useState(null);
+  const [sichtbar, setSichtbar] = useState(false);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return setSichtbar(true);
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && (setSichtbar(true), io.disconnect()), { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!sichtbar) return;
+    let alt = null;
+    let weg = false;
+    const gegnerListe = tag.spiele.map((sp, i) => ({ id: "g" + i, name: sp.gegner }));
+    const namen = [];
+    const spieler = (n) => {
+      let i = namen.indexOf(n);
+      if (i < 0) i = namen.push(n) - 1;
+      return "p" + i;
+    };
+    const st = {
+      date: tag.date, zeit: tag.zeit, ort: tag.ort, typ: tag.typ, fotoUrl: tag.fotoUrl,
+      spiele: tag.spiele.map((sp, i) => ({
+        opponentId: "g" + i, ourGoals: sp.ourGoals, theirGoals: sp.theirGoals,
+        scorers: sp.scorers.map((sc) => ({ playerId: spieler(sc.name), tore: sc.tore })),
+      })),
+    };
+    const pl = namen.map((n, i) => ({ id: "p" + i, name: n }));
+    generateSpieltagShareImage(st, tag.nummer, gegnerListe, pl)
+      .then((b) => {
+        if (weg) return;
+        alt = URL.createObjectURL(b);
+        setBlob(b);
+        setUrl(alt);
+      })
+      .catch((e) => onFehler((e && e.message) || "Spieltagskarte konnte nicht erstellt werden."));
+    return () => {
+      weg = true;
+      if (alt) URL.revokeObjectURL(alt);
+    };
+  }, [sichtbar, JSON.stringify(tag)]); // eslint-disable-line
+  const speichern = () => {
+    if (!blob) return;
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = u;
+    a.download = `${spieltagLabel(tag, tag.nummer).toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-")}-${tag.date}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 2000);
+  };
+  return (
+    <div ref={boxRef} style={{ width: "100%" }}>
+      <div style={{ minHeight: 200, borderRadius: 16, background: url ? "transparent" : "var(--surface-2)" }}>
+        {url && <img src={url} alt={spieltagLabel(tag, tag.nummer)} style={{ width: "100%", display: "block", borderRadius: 16, boxShadow: "0 6px 16px rgba(0,0,0,0.12)" }} />}
+      </div>
+      <div style={{ textAlign: "center", marginTop: 8 }}>
+        <button style={styles.linkBtn} onClick={speichern} disabled={!blob}>Karte speichern</button>
+      </div>
+    </div>
+  );
+}
+
+function KartenSeitePlus({ token }) {
+  const [karten, setKarten] = useState(undefined);
+  const [plus, setPlus] = useState(undefined);
+  const [fehler, setFehler] = useState(null);
+  useEffect(() => {
+    const m = document.createElement("meta");
+    m.name = "robots";
+    m.content = "noindex,nofollow";
+    document.head.appendChild(m);
+    ladeKartenSnapshot(token).then(setKarten).catch(() => setKarten(null));
+    ladeKartenSnapshot(token, "-plus").then(setPlus).catch(() => setPlus(null));
+    return () => m.remove();
+  }, [token]);
+  if (karten === undefined || plus === undefined) return <div style={styles.loadingScreen}>Lade …</div>;
+  if (!karten || !Array.isArray(karten.spieler)) {
+    return <div style={styles.loadingScreen}>Dieser Link ist nicht (mehr) gültig.</div>;
+  }
+  const stand = karten.stand ? new Date(karten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+  const b = plus && plus.saisonBilanz;
+  const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
+  const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
+  const kopf = (t) => <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "28px 0 10px" }}>{t}</h2>;
+  const diffFarbe = (d) => (d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "var(--muted)");
+  return (
+    <div style={styles.app}>
+      <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
+        <div style={{ ...styles.headerTop, maxWidth: 1100, margin: "0 auto" }}>
+          <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
+          <div style={{ flex: 1 }}>
+            <div style={styles.title}>Unsere Saison</div>
+            <div style={styles.subtitle}>
+              SV Heimstetten {karten.team || "U8"} · Saison {karten.saison}
+              {stand ? ` · Stand ${stand}` : ""}
+            </div>
+          </div>
+        </div>
+      </header>
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
+        {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
+        {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
+        {b && (
+          <>
+            {kopf("Saisonbilanz")}
+            <div style={styles.card}>
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "baseline" }}>
+                {[["Spiele", b.spiele], ["Siege", b.siege], ["Unentschieden", b.unentschieden], ["Niederlagen", b.niederlagen], ["Tore", `${b.toreFuer}:${b.toreGegen}`]].map(([l, v]) => (
+                  <div key={l} style={{ minWidth: 70 }}>
+                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 800 }}>{v}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{l}</div>
+                  </div>
+                ))}
+              </div>
+              {plus.torschuetzen.length > 0 && (
+                <div style={{ marginTop: 14, fontSize: 13.5 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Torschützen</div>
+                  {plus.torschuetzen.map((t) => `${t.name} (${t.tore})`).join(" · ")}
+                </div>
+              )}
+            </div>
+            {plus.gegnerBilanz.length > 0 && (
+              <>
+                {kopf("Bilanz pro Gegner")}
+                <div style={{ ...styles.card, overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...th, textAlign: "left" }}>Gegner</th>
+                        <th style={th}>Spiele</th><th style={th}>S</th><th style={th}>U</th><th style={th}>N</th><th style={th}>Tore</th><th style={th}>Diff.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plus.gegnerBilanz.map((g) => {
+                        const d = g.toreFuer - g.toreGegen;
+                        return (
+                          <tr key={g.name} style={{ borderTop: "1px solid var(--border)" }}>
+                            <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{g.name}</td>
+                            <td style={td}>{g.spiele}</td><td style={td}>{g.siege}</td><td style={td}>{g.unentschieden}</td><td style={td}>{g.niederlagen}</td>
+                            <td style={td}>{g.toreFuer}:{g.toreGegen}</td>
+                            <td style={{ ...td, fontWeight: 700, color: diffFarbe(d) }}>{d > 0 ? "+" : ""}{d}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+            {plus.spieltage.length > 0 && (
+              <>
+                {kopf("Spieltagskarten")}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
+                  {plus.spieltage.map((t) => (
+                    <SpieltagKartenBild key={t.id} tag={t} team={karten.team} onFehler={setFehler} />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+        {kopf("Sammelkarten")}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
+          {karten.spieler.map((sp) => (
+            <KartenBild key={sp.id} sp={sp} saison={karten.saison} team={karten.team || "U8"} onFehler={setFehler} />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 /* Verwaltung → Spieler: Link für die Eltern erzeugen, kopieren, aktualisieren, sperren */
 function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy }) {
   const [kopiert, setKopiert] = useState(false);
   const url = token ? kartenLinkUrl(token) : "";
+  const urlPlus = token ? kartenLinkUrlPlus(token) : "";
+  const [kopiertPlus, setKopiertPlus] = useState(false);
+  const kopierenPlus = async () => {
+    try {
+      await navigator.clipboard.writeText(urlPlus);
+      setKopiertPlus(true);
+      setTimeout(() => setKopiertPlus(false), 2000);
+    } catch (e) {
+      window.prompt("Link kopieren:", urlPlus);
+    }
+  };
   const kopieren = async () => {
     try {
       await navigator.clipboard.writeText(url);
@@ -2844,6 +3107,17 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
             <button style={styles.linkBtn} onClick={() => window.open(url, "_blank")}>Öffnen</button>
             <button style={styles.linkBtn} onClick={onCreate} disabled={busy}>Neuen Link erzeugen</button>
             <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={onRevoke} disabled={busy}>Link sperren</button>
+          </div>
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>Erweiterter Link (in Vorbereitung)</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
+              Zusätzlich zu den Sammelkarten: alle Spieltagskarten, Saisonbilanz und Bilanz pro Gegner. Gleicher geheimer Token, andere Seite – der normale Link bleibt unverändert.
+            </div>
+            <input readOnly value={urlPlus} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
+              <button style={styles.linkBtn} onClick={kopierenPlus}>{kopiertPlus ? "Kopiert ✓" : "Link kopieren"}</button>
+              <button style={styles.linkBtn} onClick={() => window.open(urlPlus, "_blank")}>Öffnen</button>
+            </div>
           </div>
         </>
       ) : (
@@ -8721,7 +8995,7 @@ document.head.appendChild(styleSheet);
 
 try {
   const kartenToken = new URLSearchParams(window.location.search).get("karten");
-  ReactDOM.createRoot(document.getElementById("root")).render(kartenToken ? <KartenSeite token={kartenToken} /> : <Root />);
+  ReactDOM.createRoot(document.getElementById("root")).render(kartenToken ? (new URLSearchParams(window.location.search).get("seite") === "erweitert" ? <KartenSeitePlus token={kartenToken} /> : <KartenSeite token={kartenToken} />) : <Root />);
   document.getElementById("root").dataset.rendered = "true";
 } catch (e) {
   document.getElementById("root").innerHTML =
