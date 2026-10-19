@@ -2887,7 +2887,24 @@ function KartenSeite({ token }) {
 }
 
 /* Erweiterte Seite: Saisonbilanz, Bilanz pro Gegner, Spieltagskarten, Sammelkarten */
-function SpieltagKartenBild({ tag, team, onFehler }) {
+function tagZuShare(tag) {
+  const gegnerListe = tag.spiele.map((sp, i) => ({ id: "g" + i, name: sp.gegner }));
+  const namen = [];
+  const spieler = (n) => {
+    let i = namen.indexOf(n);
+    if (i < 0) i = namen.push(n) - 1;
+    return "p" + i;
+  };
+  const st = {
+    date: tag.date, zeit: tag.zeit, ort: tag.ort, typ: tag.typ, fotoUrl: tag.fotoUrl,
+    spiele: tag.spiele.map((sp, i) => ({
+      opponentId: "g" + i, ourGoals: sp.ourGoals, theirGoals: sp.theirGoals,
+      scorers: sp.scorers.map((sc) => ({ playerId: spieler(sc.name), tore: sc.tore })),
+    })),
+  };
+  return { st, gegnerListe, pl: namen.map((n, i) => ({ id: "p" + i, name: n })) };
+}
+function SpieltagKartenBild({ tag, team, onFehler, minH }) {
   const boxRef = useRef(null);
   const [url, setUrl] = useState(null);
   const [blob, setBlob] = useState(null);
@@ -2903,22 +2920,8 @@ function SpieltagKartenBild({ tag, team, onFehler }) {
     if (!sichtbar) return;
     let alt = null;
     let weg = false;
-    const gegnerListe = tag.spiele.map((sp, i) => ({ id: "g" + i, name: sp.gegner }));
-    const namen = [];
-    const spieler = (n) => {
-      let i = namen.indexOf(n);
-      if (i < 0) i = namen.push(n) - 1;
-      return "p" + i;
-    };
-    const st = {
-      date: tag.date, zeit: tag.zeit, ort: tag.ort, typ: tag.typ, fotoUrl: tag.fotoUrl,
-      spiele: tag.spiele.map((sp, i) => ({
-        opponentId: "g" + i, ourGoals: sp.ourGoals, theirGoals: sp.theirGoals,
-        scorers: sp.scorers.map((sc) => ({ playerId: spieler(sc.name), tore: sc.tore })),
-      })),
-    };
-    const pl = namen.map((n, i) => ({ id: "p" + i, name: n }));
-    generateSpieltagShareImage(st, tag.nummer, gegnerListe, pl)
+    const { st, gegnerListe, pl } = tagZuShare(tag);
+    generateSpieltagShareImage(st, tag.nummer, gegnerListe, pl, { minH })
       .then((b) => {
         if (weg) return;
         alt = URL.createObjectURL(b);
@@ -2930,7 +2933,7 @@ function SpieltagKartenBild({ tag, team, onFehler }) {
       weg = true;
       if (alt) URL.revokeObjectURL(alt);
     };
-  }, [sichtbar, JSON.stringify(tag)]); // eslint-disable-line
+  }, [sichtbar, JSON.stringify(tag), minH]); // eslint-disable-line
   const speichern = () => {
     if (!blob) return;
     const u = URL.createObjectURL(blob);
@@ -2944,8 +2947,8 @@ function SpieltagKartenBild({ tag, team, onFehler }) {
   };
   return (
     <div ref={boxRef} style={{ width: "100%" }}>
-      <div style={{ minHeight: 200, borderRadius: 16, background: url ? "transparent" : "var(--surface-2)" }}>
-        {url && <img src={url} alt={spieltagLabel(tag, tag.nummer)} style={{ width: "100%", display: "block", borderRadius: 16, boxShadow: "0 6px 16px rgba(0,0,0,0.12)" }} />}
+      <div style={{ aspectRatio: minH ? `1080 / ${minH}` : undefined, minHeight: minH ? undefined : 200, borderRadius: 16, background: url ? "transparent" : "var(--surface-2)" }}>
+        {url && <img src={url} alt={spieltagLabel(tag, tag.nummer)} style={{ width: "100%", height: "100%", display: "block", borderRadius: 16, boxShadow: "0 6px 16px rgba(0,0,0,0.12)" }} />}
       </div>
       <div style={{ textAlign: "center", marginTop: 8 }}>
         <button style={styles.linkBtn} onClick={speichern} disabled={!blob}>Karte speichern</button>
@@ -2958,6 +2961,15 @@ function KartenSeitePlus({ token }) {
   const [karten, setKarten] = useState(undefined);
   const [plus, setPlus] = useState(undefined);
   const [fehler, setFehler] = useState(null);
+  const [maxH, setMaxH] = useState(null);
+  useEffect(() => {
+    if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
+    let weg = false;
+    Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true }); }))
+      .then((hs) => !weg && setMaxH(Math.max(...hs)))
+      .catch(() => {});
+    return () => { weg = true; };
+  }, [plus]);
   useEffect(() => {
     const m = document.createElement("meta");
     m.name = "robots";
@@ -3060,7 +3072,7 @@ function KartenSeitePlus({ token }) {
                 {kopf("Spieltagskarten")}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
                   {plus.spieltage.map((t) => (
-                    <SpieltagKartenBild key={t.id} tag={t} team={karten.team} onFehler={setFehler} />
+                    <SpieltagKartenBild key={t.id} tag={t} team={karten.team} onFehler={setFehler} minH={maxH} />
                   ))}
                 </div>
               </>
@@ -3436,7 +3448,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
 
 // Erzeugt das WhatsApp-Teilen-Bild eines Spieltags (nur Mannschaftsfoto + Ergebnisse),
 // Hochformat 1080px breit, Höhe passt sich der Anzahl der Spiele an.
-async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players) {
+async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players, opts) {
   try {
     await Promise.all([
       document.fonts.load("800 46px 'Space Grotesk'"),
@@ -3495,7 +3507,8 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players
     accY += h + gap;
   });
   const inhaltsEnde = anzahlSpiele > 0 ? accY - gap : photoH + 170;
-  const H = Math.max(1300, Math.round(inhaltsEnde + 44));
+  const H = Math.max(1300, Math.round(inhaltsEnde + 44), (opts && opts.minH) || 0);
+  if (opts && opts.nurHoehe) return H;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
