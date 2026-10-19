@@ -3556,6 +3556,85 @@ async function lyricsAutoSync(audioUrl, text, modell, status) {
   return { lrc, treffer, zeilen: zeilen.length, erkannt: erkannt.length };
 }
 
+/* Tap-Sync: Song läuft, bei jeder Zeile tippen → exakte Zeitstempel ohne Spracherkennung */
+function TapSync({ titel, url, text, onFertig, onAbbruch }) {
+  const zeilen = useMemo(() => reinerLiedtext(text), [text]);
+  const audioRef = useRef(null);
+  const [idx, setIdx] = useState(0);
+  const [zeiten, setZeiten] = useState([]);
+  const [laeuft, setLaeuft] = useState(false);
+  const [tempo, setTempo] = useState(1);
+  const stand = useRef({ idx: 0, zeiten: [] });
+  stand.current = { idx, zeiten };
+  useEffect(() => { if (audioRef.current) audioRef.current.playbackRate = tempo; }, [tempo]);
+  const tap = () => {
+    const a = audioRef.current;
+    const { idx: k, zeiten: z } = stand.current;
+    if (!a || a.paused || k >= zeilen.length) return;
+    const t = Math.max(0, a.currentTime - 0.2 * tempo); // Reaktionszeit ausgleichen
+    const neu = [...z.slice(0, k), t];
+    setZeiten(neu);
+    setIdx(k + 1);
+    if (k + 1 >= zeilen.length) {
+      a.pause();
+      onFertig(zeilen.map((zl, q) => lrcZeit(neu[q]) + zl).join("\n"));
+    }
+  };
+  const zurueck = () => {
+    const { idx: k, zeiten: z } = stand.current;
+    if (k <= 0) return;
+    const a = audioRef.current;
+    if (a) a.currentTime = Math.max(0, (z[k - 1] || 0) - 2);
+    setZeiten(z.slice(0, k - 1));
+    setIdx(k - 1);
+  };
+  const startStop = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) a.play().catch(() => {}); else a.pause();
+  };
+  useEffect(() => {
+    const h = (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+      if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); tap(); }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [zeilen]);
+  const zeile = (k, stil) => (k >= 0 && k < zeilen.length ? <div style={stil}>{zeilen[k]}</div> : <div style={stil}>&nbsp;</div>);
+  return (
+    <div style={{ margin: "8px 0", padding: 12, border: "1px solid var(--border)", borderRadius: 10 }}>
+      <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
+        Tap-Sync „{titel}“: Song starten und bei jeder Zeile genau dann auf den großen Button tippen (oder Leertaste), wenn sie anfängt. Kopfhörer empfohlen. Zeile {Math.min(idx + 1, zeilen.length)} von {zeilen.length}.
+      </div>
+      <audio ref={audioRef} src={url} preload="auto" onPlay={() => setLaeuft(true)} onPause={() => setLaeuft(false)} />
+      <div style={{ textAlign: "center", minHeight: 110 }}>
+        {zeile(idx - 1, { fontSize: 13, color: "var(--muted)", opacity: 0.7 })}
+        {zeile(idx, { fontSize: 20, fontWeight: 700, margin: "8px 0" })}
+        {zeile(idx + 1, { fontSize: 14, color: "var(--muted)" })}
+        {zeile(idx + 2, { fontSize: 13, color: "var(--muted)", opacity: 0.6 })}
+      </div>
+      <button onPointerDown={(e) => { e.preventDefault(); tap(); }} style={{ width: "100%", padding: "22px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: "none", background: "var(--accent, #B71C1C)", color: "#fff", cursor: "pointer", touchAction: "manipulation", userSelect: "none" }}>
+        {laeuft ? "TAP – Zeile beginnt jetzt" : "Erst Song starten ▶"}
+      </button>
+      <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+        <button style={styles.linkBtn} onClick={startStop}>{laeuft ? "Pause" : "Start / Weiter"}</button>
+        <button style={styles.linkBtn} onClick={zurueck} disabled={idx === 0}>↶ Eine Zeile zurück</button>
+        <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+          Tempo{" "}
+          <select value={tempo} onChange={(e) => setTempo(parseFloat(e.target.value))} style={{ fontSize: 12.5 }}>
+            <option value={1}>normal</option>
+            <option value={0.85}>85 %</option>
+            <option value={0.7}>70 %</option>
+          </select>
+        </span>
+        <button style={styles.linkBtn} onClick={onAbbruch}>Abbrechen</button>
+      </div>
+    </div>
+  );
+}
+
 /* Verwaltung → Spieler: Link für die Eltern erzeugen, kopieren, aktualisieren, sperren */
 function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy, songs = [], onSongAdd, onSongChange }) {
   const [kopiert, setKopiert] = useState(false);
@@ -3565,6 +3644,7 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
   const [textEdit, setTextEdit] = useState(null);
   const [sync, setSync] = useState(null);
   const [syncModell, setSyncModell] = useState("Xenova/whisper-small");
+  const [tapI, setTapI] = useState(null);
   const autoSync = async (i) => {
     const x = songs[i];
     if (!x || !(x.text || "").trim()) {
@@ -3638,6 +3718,7 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
                 <button style={styles.linkBtn} disabled={busy || i === songs.length - 1} onClick={() => onSongChange(i, "runter")}>↓</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => onSongChange(i, "umbenennen")}>Umbenennen</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => { setTextEdit(textEdit && textEdit.i === i ? null : { i, val: x.text || "" }); }}>{x.text ? "Text ✓" : "Text"}</button>
+                <button style={styles.linkBtn} disabled={busy} onClick={() => { if (!(x.text || "").trim()) { setSync({ i, msg: "Bitte zuerst über „Text“ den Liedtext eintragen und speichern.", fehler: true }); return; } setTextEdit(null); setTapI(i); }}>Tap-Sync</button>
                 <button style={styles.linkBtn} disabled={busy || (sync && !sync.fertig && !sync.fehler)} onClick={() => autoSync(i)}>Auto-Sync</button>
                 <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} disabled={busy} onClick={() => onSongChange(i, "loeschen")}>Löschen</button>
               </div>
@@ -3658,6 +3739,11 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
               </select>
               {" "}– Liedtext zuerst über „Text“ eintragen, am besten am Laptop.
             </div>
+            {tapI != null && songs[tapI] && (
+              <TapSync key={songs[tapI].pfad} titel={songs[tapI].titel} url={songUrl(songs[tapI].pfad)} text={songs[tapI].text}
+                onAbbruch={() => setTapI(null)}
+                onFertig={async (lrc) => { const k = tapI; setTapI(null); await onSongChange(k, "text", lrc); setTextEdit({ i: k, val: lrc }); setSync({ i: k, msg: "Tap-Sync fertig und gespeichert. Im Textfeld unten kannst du die Zeiten bei Bedarf prüfen.", fertig: true }); }} />
+            )}
             {textEdit && songs[textEdit.i] && (
               <div style={{ margin: "6px 0 8px" }}>
                 <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 4 }}>Text zu „{songs[textEdit.i].titel}“ – normal oder mit Zeitstempeln [mm:ss.xx] pro Zeile (dann läuft der Text im Player mit)</div>
