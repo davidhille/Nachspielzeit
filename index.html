@@ -2975,7 +2975,7 @@ function KartenSeitePlus({ token }) {
   const b = plus && plus.saisonBilanz;
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
-  const kopf = (t) => <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "28px 0 10px" }}>{t}</h2>;
+  const kopf = (t) => <h3 style={{ ...styles.h3, marginTop: 28 }}>{t}</h3>;
   const diffFarbe = (d) => (d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "var(--muted)");
   return (
     <div style={styles.app}>
@@ -2996,50 +2996,64 @@ function KartenSeitePlus({ token }) {
         {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
         {b && (
           <>
-            {kopf("Saisonbilanz")}
-            <div style={styles.card}>
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "baseline" }}>
+            <div style={{ marginTop: 28 }}>
+              <h3 style={styles.h3}>Saisonbilanz {plus.saison}</h3>
+              <div style={styles.statsRow}>
                 {[["Spiele", b.spiele], ["Siege", b.siege], ["Unentschieden", b.unentschieden], ["Niederlagen", b.niederlagen], ["Tore", `${b.toreFuer}:${b.toreGegen}`]].map(([l, v]) => (
-                  <div key={l} style={{ minWidth: 70 }}>
-                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 800 }}>{v}</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{l}</div>
+                  <div key={l} style={styles.statBox}>
+                    <div style={styles.statValue}>{v}</div>
+                    <div style={styles.statLabel}>{l}</div>
                   </div>
                 ))}
               </div>
               {plus.torschuetzen.length > 0 && (
-                <div style={{ marginTop: 14, fontSize: 13.5 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Torschützen</div>
-                  {plus.torschuetzen.map((t) => `${t.name} (${t.tore})`).join(" · ")}
+                <div style={{ marginTop: 14 }}>
+                  <div style={styles.subheading}>Torschützenliste</div>
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <tbody>
+                        {plus.torschuetzen.map((t, i) => (
+                          <tr key={t.name + i}>
+                            <td style={styles.tdName}><span style={styles.rank}>{i + 1}</span>{t.name}</td>
+                            <td style={{ ...styles.td, textAlign: "right", fontWeight: 700 }}>{t.tore}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
             {plus.gegnerBilanz.length > 0 && (
-              <>
-                {kopf("Bilanz pro Gegner")}
-                <div style={{ ...styles.card, overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <div style={{ marginTop: 28 }}>
+                <h3 style={styles.h3}>Bilanz pro Gegner</h3>
+                <div style={styles.tableWrap}>
+                  <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={{ ...th, textAlign: "left" }}>Gegner</th>
-                        <th style={th}>Spiele</th><th style={th}>S</th><th style={th}>U</th><th style={th}>N</th><th style={th}>Tore</th><th style={th}>Diff.</th>
+                        <th style={styles.th}>Gegner</th>
+                        {["Spiele", "S", "U", "N", "Tore", "Diff."].map((h) => <th key={h} style={{ ...styles.th, textAlign: "right" }}>{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
                       {plus.gegnerBilanz.map((g) => {
                         const d = g.toreFuer - g.toreGegen;
                         return (
-                          <tr key={g.name} style={{ borderTop: "1px solid var(--border)" }}>
-                            <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{g.name}</td>
-                            <td style={td}>{g.spiele}</td><td style={td}>{g.siege}</td><td style={td}>{g.unentschieden}</td><td style={td}>{g.niederlagen}</td>
-                            <td style={td}>{g.toreFuer}:{g.toreGegen}</td>
-                            <td style={{ ...td, fontWeight: 700, color: diffFarbe(d) }}>{d > 0 ? "+" : ""}{d}</td>
+                          <tr key={g.name}>
+                            <td style={styles.tdName}>{g.name}</td>
+                            <td style={{ ...styles.td, textAlign: "right" }}>{g.spiele}</td>
+                            <td style={{ ...styles.td, textAlign: "right" }}>{g.siege}</td>
+                            <td style={{ ...styles.td, textAlign: "right" }}>{g.unentschieden}</td>
+                            <td style={{ ...styles.td, textAlign: "right" }}>{g.niederlagen}</td>
+                            <td style={{ ...styles.td, textAlign: "right" }}>{g.toreFuer}:{g.toreGegen}</td>
+                            <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-              </>
+              </div>
             )}
             {plus.spieltage.length > 0 && (
               <>
