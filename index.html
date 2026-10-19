@@ -2685,9 +2685,66 @@ async function ladeKartenSnapshot(token) {
   return res.json();
 }
 
+/* Eine Sammelkarte als Bild (dieselbe Grafik wie der Download), wird erst beim Sichtbarwerden gerendert */
+function KartenBild({ sp, saison, team, onFehler }) {
+  const boxRef = useRef(null);
+  const [url, setUrl] = useState(null);
+  const [blob, setBlob] = useState(null);
+  const [sichtbar, setSichtbar] = useState(false);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return setSichtbar(true);
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && (setSichtbar(true), io.disconnect()), { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!sichtbar) return;
+    let alt = null;
+    let weg = false;
+    generateSammelkarte(
+      { name: sp.name, nachname: "", trikotnummer: sp.trikot, photo_url: sp.foto },
+      kartenStats(sp),
+      saison,
+      team
+    )
+      .then((b) => {
+        if (weg) return;
+        alt = URL.createObjectURL(b);
+        setBlob(b);
+        setUrl(alt);
+      })
+      .catch((e) => onFehler((e && e.message) || "Sammelkarte konnte nicht erstellt werden."));
+    return () => {
+      weg = true;
+      if (alt) URL.revokeObjectURL(alt);
+    };
+  }, [sichtbar, JSON.stringify(sp), saison, team]); // eslint-disable-line
+  const speichern = () => {
+    if (!blob) return;
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = u;
+    a.download = `sammelkarte-${(sp.name || "spieler").toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 2000);
+  };
+  return (
+    <div ref={boxRef} style={{ width: "100%", maxWidth: 340, margin: "0 auto" }}>
+      <div style={{ aspectRatio: "750 / 1050", borderRadius: 24, background: url ? "transparent" : "var(--surface-2)" }}>
+        {url && <img src={url} alt={`Sammelkarte ${sp.name}`} style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 10px 18px rgba(142,20,22,0.28))" }} />}
+      </div>
+      <div style={{ textAlign: "center", marginTop: 8 }}>
+        <button style={styles.linkBtn} onClick={speichern} disabled={!blob}>Karte speichern</button>
+      </div>
+    </div>
+  );
+}
+
 function KartenSeite({ token }) {
   const [daten, setDaten] = useState(undefined);
-  const [busy, setBusy] = useState(null);
   const [fehler, setFehler] = useState(null);
   useEffect(() => {
     const m = document.createElement("meta");
@@ -2701,30 +2758,6 @@ function KartenSeite({ token }) {
   if (!daten || !Array.isArray(daten.spieler)) {
     return <div style={styles.loadingScreen}>Dieser Link ist nicht (mehr) gültig.</div>;
   }
-  const lade = async (sp) => {
-    setBusy(sp.id);
-    setFehler(null);
-    try {
-      const blob = await generateSammelkarte(
-        { name: sp.name, nachname: "", trikotnummer: sp.trikot, photo_url: sp.foto },
-        kartenStats(sp),
-        daten.saison,
-        daten.team || "U8"
-      );
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `sammelkarte-${(sp.name || "spieler").toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-")}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch (e) {
-      setFehler((e && e.message) || "Sammelkarte konnte nicht erstellt werden.");
-    } finally {
-      setBusy(null);
-    }
-  };
   const stand = daten.stand ? new Date(daten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   return (
     <div style={styles.app}>
@@ -2742,19 +2775,9 @@ function KartenSeite({ token }) {
       </header>
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 8, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start", marginTop: 18 }}>
           {daten.spieler.map((sp) => (
-            <div key={sp.id}>
-              <PlayerCard
-                player={{ name: sp.name, trikotnummer: sp.trikot, photo_url: sp.foto }}
-                stats={kartenStats(sp)}
-              />
-              <div style={{ textAlign: "center", marginTop: 8 }}>
-                <button style={styles.linkBtn} onClick={() => lade(sp)} disabled={busy === sp.id}>
-                  {busy === sp.id ? "Erstelle Karte…" : "Karte speichern"}
-                </button>
-              </div>
-            </div>
+            <KartenBild key={sp.id} sp={sp} saison={daten.saison} team={daten.team || "U8"} onFehler={setFehler} />
           ))}
         </div>
       </main>
