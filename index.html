@@ -3643,7 +3643,7 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
   const [kopiertPlus, setKopiertPlus] = useState(false);
   const [textEdit, setTextEdit] = useState(null);
   const [sync, setSync] = useState(null);
-  const [syncModell, setSyncModell] = useState("Xenova/whisper-small");
+  const syncModell = "Xenova/whisper-small";
   const [tapI, setTapI] = useState(null);
   const autoSync = async (i) => {
     const x = songs[i];
@@ -3732,12 +3732,7 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
               </div>
             )}
             <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "4px 0" }}>
-              Auto-Sync: Modell{" "}
-              <select value={syncModell} onChange={(e) => setSyncModell(e.target.value)} style={{ fontSize: 12.5 }}>
-                <option value="Xenova/whisper-small">genau (small, ca. 250 MB)</option>
-                <option value="Xenova/whisper-base">schnell (base, ca. 80 MB)</option>
-              </select>
-              {" "}– Liedtext zuerst über „Text“ eintragen, am besten am Laptop.
+              Liedtext zuerst über „Text“ eintragen, am besten am Laptop. Auto-Sync braucht einige Minuten, Tap-Sync dauert so lange wie der Song.
             </div>
             {tapI != null && songs[tapI] && (
               <TapSync key={songs[tapI].pfad} titel={songs[tapI].titel} url={songUrl(songs[tapI].pfad)} text={songs[tapI].text}
