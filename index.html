@@ -2660,8 +2660,8 @@ function kartenStats(sp) {
   return [
     { value: sp.tore, label: "TORE" },
     { value: `${sp.spieltage}`, label: "SPIELTAGE" },
-    { value: sp.training != null ? sp.training + "%" : "–", label: "TRAINING", kurz: "TRAINING", icon: "schuh", prozent: sp.training },
-    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", kurz: "SPIELTAG", icon: "pokal", prozent: sp.spieltagQuote },
+    { value: sp.training != null ? sp.training + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: sp.training },
+    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: sp.spieltagQuote },
   ];
 }
 async function veroeffentlicheKarten(token, snapshot) {
@@ -4404,7 +4404,7 @@ function PlayerCard({ player, stats }) {
           {stats.map((s, i) =>
             s.icon && s.prozent != null ? (
               <div key={i} title={`${s.label}: ${s.value}`} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{s.kurz || s.label}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{s.label}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                   {[0, 1, 2, 3, 4].map((k) => (
                     <StatIcon key={k} name={s.icon} size={15} aktiv={k < Math.max(0, Math.min(5, Math.round(s.prozent / 20)))} />
@@ -4550,8 +4550,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         [
           { value: toreGesamt, label: "TORE" },
           { value: `${spieltagDabeiAnzahl}`, label: "SPIELTAGE" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "TRAINING", kurz: "TRAINING", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", kurz: "SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: quoteTraining },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
         ],
         saison ? saison.replace("-", "/") : "",
         teamName
@@ -4606,8 +4606,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
           { value: basisAktuell.toFixed(2), label: "BASIS" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW TRAINING", kurz: "TRAINING", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW SPIELTAG", kurz: "SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: quoteTraining },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
           { value: toreGesamt, label: "TORE" },
         ]}
       />
