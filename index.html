@@ -2676,7 +2676,7 @@ function sammelkartenWerte({ tore, spieltage, training, spieltagQuote, monat, ka
     { value: `${spieltage}`, label: "SPIELTAGE" },
     { value: training != null ? training + "%" : "–", label: "ANW. TRAININGS", kurz: "ANWESENHEIT TRAININGS", icon: "schuh", prozent: training },
     { value: spieltagQuote != null ? spieltagQuote + "%" : "–", label: "ANW. SPIELTAGE", kurz: "ANWESENHEIT SPIELTAGE", icon: "pokal", prozent: spieltagQuote },
-    { value: monat != null ? monat + "%" : "–", label: "TRAININGSBEW. (MONAT)", kurz: "TRAININGSBEWERTUNG (MONAT)", daumen: monat ?? null },
+    { value: monat != null ? monat + "%" : "–", label: "TRAININGSFORM (MONAT)", kurz: "TRAININGSFORM (MONAT)", daumen: monat ?? null },
     { label: "KARTEN (TRAINING)", kurz: "KARTEN (TRAINING)", karten: karten || { gelb: 0, blau: 0, rot: 0 } },
   ];
 }
