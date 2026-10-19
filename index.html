@@ -2868,8 +2868,8 @@ function KartenSeite({ token }) {
           <div style={{ flex: 1 }}>
             <div style={styles.title}>Sammelkarten</div>
             <div style={styles.subtitle}>
-              SV Heimstetten {daten.team || "U8"} · Saison {daten.saison}
-              {stand ? ` · Stand ${stand}` : ""}
+              <div>SV Heimstetten {daten.team || "U8"}</div>
+              <div>Saison {daten.saison}{stand ? ` · Stand ${stand}` : ""}</div>
             </div>
           </div>
         </div>
@@ -2997,8 +2997,8 @@ function KartenSeitePlus({ token }) {
           <div style={{ flex: 1 }}>
             <div style={styles.title}>Unsere Saison</div>
             <div style={styles.subtitle}>
-              SV Heimstetten {karten.team || "U8"} · Saison {karten.saison}
-              {stand ? ` · Stand ${stand}` : ""}
+              <div>SV Heimstetten {karten.team || "U8"}</div>
+              <div>Saison {karten.saison}{stand ? ` · Stand ${stand}` : ""}</div>
             </div>
           </div>
         </div>
