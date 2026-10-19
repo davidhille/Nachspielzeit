@@ -2674,8 +2674,8 @@ function sammelkartenWerte({ tore, spieltage, training, spieltagQuote, monat, ka
   return [
     { value: tore, label: "TORE" },
     { value: `${spieltage}`, label: "SPIELTAGE" },
-    { value: training != null ? training + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: training },
-    { value: spieltagQuote != null ? spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: spieltagQuote },
+    { value: training != null ? training + "%" : "–", label: "ANW. TRAININGS", kurz: "ANWESENHEIT TRAININGS", icon: "schuh", prozent: training },
+    { value: spieltagQuote != null ? spieltagQuote + "%" : "–", label: "ANW. SPIELTAGE", kurz: "ANWESENHEIT SPIELTAGE", icon: "pokal", prozent: spieltagQuote },
     { value: monat != null ? monat + "%" : "–", label: "TRAININGSBEW. (MONAT)", kurz: "TRAININGSBEWERTUNG (MONAT)", icon: "ball", prozent: monat },
     { label: "KARTEN", kurz: "KARTEN", karten: karten || { gelb: 0, blau: 0, rot: 0 } },
   ];
@@ -4648,8 +4648,8 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
           { value: basisAktuell.toFixed(2), label: "BASIS" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAININGS", kurz: "ANWESENHEIT TRAININGS", icon: "schuh", prozent: quoteTraining },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAGE", kurz: "ANWESENHEIT SPIELTAGE", icon: "pokal", prozent: quoteSpieltage },
           { value: toreGesamt, label: "TORE" },
         ]}
       />
