@@ -3212,11 +3212,6 @@ function KartenSeitePlus({ token }) {
                 </div>
               </KlappBlock>
             )}
-            {plus.songs && plus.songs.length > 0 && (
-              <KlappBlock titel="Mannschaftssongs" info={`${plus.songs.length}`}>
-                <SongPlayer songs={plus.songs} />
-              </KlappBlock>
-            )}
           </>
         )}
         <KlappBlock titel="Sammelkarten" info={`${karten.spieler.length}`}>
@@ -3226,6 +3221,11 @@ function KartenSeitePlus({ token }) {
             ))}
           </div>
         </KlappBlock>
+        {plus && plus.songs && plus.songs.length > 0 && (
+          <KlappBlock titel="Mannschaftssongs" info={`${plus.songs.length}`}>
+            <SongPlayer songs={plus.songs} />
+          </KlappBlock>
+        )}
       </main>
     </div>
   );
