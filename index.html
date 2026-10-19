@@ -2609,7 +2609,7 @@ function truncateCanvasText(ctx, text, maxWidth) {
   return t + "…";
 }
 
-// Sammelkarte (Trading Card) eines Spielers als PNG, 750x1050 (Format 63x88 mm)
+// Sammelkarte (Trading Card) eines Spielers als PNG, 750x1130
 /* ---------- Öffentlicher Karten-Link (alle Sammelkarten, ohne Login) ----------
    Die App veröffentlicht einen Snapshot (nur Vorname, Trikot, Foto, Kennzahlen – kein Nachname/Geburtsdatum) als JSON im Storage
    unter karten/<geheimer Token>.json. Die Seite ?karten=<Token> liest nur diese Datei. Token neu erzeugen/löschen = alter Link tot. */
@@ -2648,6 +2648,8 @@ function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = 
         spitzname: p.spitzname || null,
         alter: p.geburtsdatum ? alterVonGeburtsdatum(String(p.geburtsdatum).slice(0, 10)) : null,
         ...(voll ? { nachname: p.nachname || "", geburtsdatum: p.geburtsdatum ? String(p.geburtsdatum).slice(0, 10) : null } : {}),
+        monat: monatsBewertungProzent(trainings.filter((t) => t.playerId === p.id), heute.slice(0, 7)),
+        karten: kartenZaehlen(saisonTr),
         tore,
         spieltage: spieltage.filter((s) => s.teilnehmer.includes(p.id)).length,
         training: saisonTr.length > 0 ? Math.round((anwesend / saisonTr.length) * 100) : null,
@@ -2656,13 +2658,30 @@ function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = 
     });
   return { version: 1, team: teamName, saison: saison ? saison.replace("-", "/") : "", spieler };
 }
-function kartenStats(sp) {
+/* Monatsbewertung (0-100): Punkte des Monats im Verhältnis zum Maximum (0,5 je Training); null ohne Trainings */
+function monatsBewertungProzent(eintraege, monatKey) {
+  const im = eintraege.filter((t) => t.date.slice(0, 7) === monatKey);
+  if (im.length === 0) return null;
+  const punkte = im.reduce((sum, t) => sum + trainingPunkte(t), 0);
+  return Math.round(Math.max(0, Math.min(1, punkte / (im.length * 0.5))) * 100);
+}
+function kartenZaehlen(eintraege) {
+  const z = { gelb: 0, blau: 0, rot: 0 };
+  eintraege.forEach((t) => { if (z[t.karte] !== undefined) z[t.karte]++; });
+  return z;
+}
+function sammelkartenWerte({ tore, spieltage, training, spieltagQuote, monat, karten }) {
   return [
-    { value: sp.tore, label: "TORE" },
-    { value: `${sp.spieltage}`, label: "SPIELTAGE" },
-    { value: sp.training != null ? sp.training + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: sp.training },
-    { value: sp.spieltagQuote != null ? sp.spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: sp.spieltagQuote },
+    { value: tore, label: "TORE" },
+    { value: `${spieltage}`, label: "SPIELTAGE" },
+    { value: training != null ? training + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: training },
+    { value: spieltagQuote != null ? spieltagQuote + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: spieltagQuote },
+    { value: monat != null ? monat + "%" : "–", label: "BEWERT. MONAT", kurz: "BEWERTUNG MONAT", icon: "ball", prozent: monat },
+    { label: "KARTEN", kurz: "KARTEN", karten: karten || { gelb: 0, blau: 0, rot: 0 } },
   ];
+}
+function kartenStats(sp) {
+  return sammelkartenWerte({ tore: sp.tore, spieltage: sp.spieltage, training: sp.training, spieltagQuote: sp.spieltagQuote, monat: sp.monat, karten: sp.karten });
 }
 async function veroeffentlicheKarten(token, snapshot) {
   const res = await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/karten/${token}.json`, {
@@ -2741,7 +2760,7 @@ function KartenBild({ sp, saison, team, onFehler }) {
   };
   return (
     <div ref={boxRef} style={{ width: "100%", maxWidth: 340, margin: "0 auto" }}>
-      <div style={{ aspectRatio: "750 / 1050", borderRadius: 24, background: url ? "transparent" : "var(--surface-2)" }}>
+      <div style={{ aspectRatio: "750 / 1130", borderRadius: 24, background: url ? "transparent" : "var(--surface-2)" }}>
         {url && <img src={url} alt={`Sammelkarte ${sp.name}`} style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 10px 18px rgba(142,20,22,0.28))" }} />}
       </div>
       <div style={{ textAlign: "center", marginTop: 8 }}>
@@ -2837,6 +2856,7 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
 /* Kleine Linien-Icons für die Kennzahlen (24x24): Fußballschuh = Training, Pokal = Spieltag */
 const STAT_ICONS = {
   schuh: { fill: "M3 6h6l1.5 3.5 6.5 1.5c2.5.6 4 1.8 4 3.5V16H3z", lines: ["M6 16v3", "M10.5 16v3", "M15 16v3", "M19 16v2.5", "M11.5 12l1.5-1.5", "M14.5 12.8l1.5-1.5"] },
+  ball: { fill: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z", lines: ["M12 8.5l3.2 2.3-1.2 3.7h-4l-1.2-3.7z", "M12 8.5V3.3", "M15.2 10.8l5-1.6", "M14 14.5l3 4.1", "M10 14.5l-3 4.1", "M8.8 10.8l-5-1.6"] },
   pokal: { fill: "M7 3h10v5.5a5 5 0 0 1-10 0z", lines: ["M7 5H4v2a3 3 0 0 0 3 3", "M17 5h3v2a3 3 0 0 1-3 3", "M12 13.5V18", "M10 18h4", "M8.5 21h7"] },
 };
 function StatIcon({ name, size = 15, color = "var(--gold)", aktiv = true }) {
@@ -2877,7 +2897,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   } catch (e) {}
 
   const W = 750;
-  const H = 1050;
+  const H = 1130;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -3029,12 +3049,32 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   const cols = 2;
   const cellW = pw / cols;
   const cellH = 78;
-  stats.slice(0, 4).forEach((st, i) => {
+  stats.slice(0, 6).forEach((st, i) => {
     const cx = px + (i % cols) * cellW;
     const cy = sy + Math.floor(i / cols) * cellH;
     roundRectPath(ctx, cx + 6, cy, cellW - 12, cellH - 10, 16);
     ctx.fillStyle = "rgba(255,255,255,0.09)";
     ctx.fill();
+    if (st.karten) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "700 15px 'Inter', sans-serif";
+      ctx.fillText(st.kurz || st.label, cx + cellW / 2, cy + 21);
+      const farben = [["gelb", "#F2C21B"], ["blau", "#2F6FDB"], ["rot", "#D32F2F"]];
+      const grp = 78;
+      const gx0 = cx + (cellW - grp * 3) / 2;
+      farben.forEach(([k, f], j) => {
+        const gx = gx0 + j * grp;
+        roundRectPath(ctx, gx + 6, cy + 29, 17, 24, 3);
+        ctx.fillStyle = f;
+        ctx.fill();
+        ctx.fillStyle = "#F2A93B";
+        ctx.textAlign = "left";
+        ctx.font = "800 28px 'Space Grotesk', sans-serif";
+        ctx.fillText(String(st.karten[k] || 0), gx + 32, cy + 52);
+      });
+      return;
+    }
     if (st.icon && st.prozent != null) {
       // Anteil als 5 Icons (je 20 %)
       const voll = Math.max(0, Math.min(5, Math.round(st.prozent / 20)));
@@ -4547,12 +4587,14 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
     try {
       const blob = await generateSammelkarte(
         player,
-        [
-          { value: toreGesamt, label: "TORE" },
-          { value: `${spieltagDabeiAnzahl}`, label: "SPIELTAGE" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAINING", kurz: "ANWESENHEIT TRAINING", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAG", kurz: "ANWESENHEIT SPIELTAG", icon: "pokal", prozent: quoteSpieltage },
-        ],
+        sammelkartenWerte({
+          tore: toreGesamt,
+          spieltage: spieltagDabeiAnzahl,
+          training: quoteTraining != null ? Math.round(quoteTraining) : null,
+          spieltagQuote: quoteSpieltage != null ? Math.round(quoteSpieltage) : null,
+          monat: monatsBewertungProzent(saisonTrainings, month),
+          karten: kartenZaehlen(saisonTrainings),
+        }),
         saison ? saison.replace("-", "/") : "",
         teamName
       );
