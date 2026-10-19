@@ -3070,6 +3070,16 @@ function PIcon({ name, size = 22 }) {
     </svg>
   );
 }
+/* Text mit Zeitstempeln im LRC-Format ([mm:ss.xx] Zeile) → [{t, text}]; ohne Zeitstempel: null */
+function parseLrc(text) {
+  if (!text) return null;
+  const zeilen = [];
+  text.split(/\r?\n/).forEach((roh) => {
+    const m = roh.match(/^\s*\[(\d+):(\d+(?:[.,]\d+)?)\]\s*(.*)$/);
+    if (m) zeilen.push({ t: Number(m[1]) * 60 + Number(m[2].replace(",", ".")), text: m[3] });
+  });
+  return zeilen.length >= 2 ? zeilen.sort((a, b) => a.t - b.t) : null;
+}
 function SongPlayer({ songs, cover, team }) {
   const ROT = "#C4271F";
   const [aktiv, setAktiv] = useState(0);
@@ -3084,6 +3094,10 @@ function SongPlayer({ songs, cover, team }) {
   const ref = useRef(null);
   const start = useRef(false);
   const song = songs[aktiv] || songs[0];
+  const lrc = useMemo(() => parseLrc(song.text), [song.text]);
+  const lrcBox = useRef(null);
+  let aktZeile = -1;
+  if (lrc) for (let i = 0; i < lrc.length; i++) { if (zeit + 0.15 >= lrc[i].t) aktZeile = i; else break; }
 
   useEffect(() => {
     if (start.current && ref.current) ref.current.play().catch(() => setLaeuft(false));
@@ -3091,6 +3105,15 @@ function SongPlayer({ songs, cover, team }) {
     setDauer(0);
     setTextOffen(false);
   }, [aktiv]);
+  useEffect(() => {
+    if (lrc) setTextOffen(true);
+  }, [aktiv]); // eslint-disable-line
+  useEffect(() => {
+    const box = lrcBox.current;
+    if (!box || aktZeile < 0) return;
+    const el = box.children[aktZeile];
+    if (el) box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2, behavior: "smooth" });
+  }, [aktZeile, textOffen]);
 
   // Dauer der Songs in der Playlist (nur Metadaten laden)
   useEffect(() => {
@@ -3249,8 +3272,21 @@ function SongPlayer({ songs, cover, team }) {
         <button onClick={() => speichern(song)} style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }}><PIcon name="download" size={16} /> Speichern</button>
         {song.text ? <button style={styles.linkBtn} onClick={() => setTextOffen((o) => !o)} aria-expanded={textOffen}>{textOffen ? "Text ausblenden" : "Text anzeigen"}</button> : null}
       </div>
-      {song.text && textOffen && (
+      {song.text && textOffen && !lrc && (
         <div style={{ marginTop: 10, padding: "12px 14px", background: "var(--surface-2)", borderRadius: 12, fontSize: 14.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{song.text}</div>
+      )}
+      {song.text && textOffen && lrc && (
+        <div ref={lrcBox} style={{ position: "relative", marginTop: 10, padding: "40px 14px", height: 260, overflowY: "auto", background: "var(--surface-2)", borderRadius: 12, textAlign: "center", scrollbarWidth: "none" }}>
+          {lrc.map((z, i) => (
+            <div
+              key={i}
+              onClick={() => { if (ref.current) { start.current = true; ref.current.currentTime = z.t; ref.current.play().catch(() => {}); } }}
+              style={{ padding: "5px 0", cursor: "pointer", fontSize: i === aktZeile ? 19 : 16, lineHeight: 1.4, fontWeight: i === aktZeile ? 800 : 500, color: i === aktZeile ? ROT : "var(--muted)", opacity: i === aktZeile ? 1 : 0.75, transition: "all 0.25s ease", minHeight: z.text ? undefined : 14 }}
+            >
+              {z.text || "\u00A0"}
+            </div>
+          ))}
+        </div>
       )}
 
       {songs.length > 1 && (
@@ -3481,7 +3517,7 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
             ))}
             {textEdit && songs[textEdit.i] && (
               <div style={{ margin: "6px 0 8px" }}>
-                <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 4 }}>Text / Beschreibung zu „{songs[textEdit.i].titel}“ (erscheint ausklappbar im Player)</div>
+                <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 4 }}>Text zu „{songs[textEdit.i].titel}“ – normal oder mit Zeitstempeln [mm:ss.xx] pro Zeile (dann läuft der Text im Player mit)</div>
                 <textarea value={textEdit.val} onChange={(e) => setTextEdit({ ...textEdit, val: e.target.value })} rows={6} style={{ ...styles.textarea, marginTop: 0, width: "100%" }} />
                 <div style={{ display: "flex", gap: 14, marginTop: 4 }}>
                   <button style={styles.linkBtn} disabled={busy} onClick={() => { onSongChange(textEdit.i, "text", textEdit.val); setTextEdit(null); }}>Speichern</button>
