@@ -3182,6 +3182,11 @@ function SongPlayer({ songs, cover, team }) {
         album: "Mannschaftssongs",
         artwork: cover ? [{ src: cover }] : [],
       });
+    } catch (e) {}
+  }, [aktiv, song.titel, cover, team]);
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    try {
       navigator.mediaSession.setActionHandler("play", () => ref.current && ref.current.play());
       navigator.mediaSession.setActionHandler("pause", () => ref.current && ref.current.pause());
       navigator.mediaSession.setActionHandler("previoustrack", zurueck);
