@@ -3734,7 +3734,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
       return;
     }
     if (st.daumen !== undefined) {
-      // Trainingsform (Monat) als Daumen: ab 80 % hoch, 50-79 % Mitte, darunter runter
+      // Trainingsform (Monat) als Daumen: ab 75 % hoch, 50-74 % Mitte, darunter runter
       ctx.textAlign = "center";
       ctx.fillStyle = "rgba(255,255,255,0.75)";
       ctx.font = "700 15px 'Inter', sans-serif";
@@ -3744,7 +3744,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
         ctx.font = "800 28px 'Space Grotesk', sans-serif";
         ctx.fillText("–", cx + cellW / 2, cy + 52);
       } else {
-        const [ic, fb] = st.daumen >= 80 ? ["daumenHoch", "#7BD88F"] : st.daumen >= 50 ? ["daumenMitte", "#F7C65C"] : ["daumenRunter", "#FF8A8A"];
+        const [ic, fb] = st.daumen >= 75 ? ["daumenHoch", "#7BD88F"] : st.daumen >= 50 ? ["daumenMitte", "#F7C65C"] : ["daumenRunter", "#FF8A8A"];
         zeichneStatIcon(ctx, ic, cx + cellW / 2 - 17, cy + 25, 34, true, fb);
       }
       return;
