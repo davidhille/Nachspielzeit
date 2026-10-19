@@ -3521,22 +3521,33 @@ async function lyricsAutoSync(audioUrl, text, modell, status) {
   status("Lade Spracherkennung …");
   const tf = await import(TRANSFORMERS_URL);
   tf.env.allowLocalModels = false;
+  try { tf.env.backends.onnx.wasm.proxy = true; } catch (e) {} // Berechnung im Hintergrund-Worker, damit die Seite nicht einfriert
   const asr = await tf.pipeline("automatic-speech-recognition", modell, {
     progress_callback: (p) => { if (p && p.status === "progress" && p.progress != null) status(`Lade Modell … ${Math.round(p.progress)} %`); },
   });
-  status("Lese Song …");
+  status("Lade Song-Datei …");
   const buf = await (await fetch(audioUrl)).arrayBuffer();
+  status("Dekodiere Song …");
   const AC = window.AudioContext || window.webkitAudioContext;
   const ac = new AC();
   const dec = await ac.decodeAudioData(buf);
   ac.close && ac.close();
-  const off = new OfflineAudioContext(1, Math.ceil(dec.duration * 16000), 16000);
-  const quelle = off.createBufferSource();
-  quelle.buffer = dec;
-  quelle.connect(off.destination);
-  quelle.start();
-  const mono = (await off.startRendering()).getChannelData(0);
+  // Mono mischen und auf 16 kHz herunterrechnen (Mittelwert je Block)
+  const kan = dec.numberOfChannels;
+  const rate = dec.sampleRate;
+  const ziel = 16000;
+  const laenge = Math.floor((dec.length * ziel) / rate);
+  const mono = new Float32Array(laenge);
+  const daten = Array.from({ length: kan }, (_, c) => dec.getChannelData(c));
+  for (let k = 0; k < laenge; k++) {
+    const a0 = Math.floor((k * rate) / ziel);
+    const a1 = Math.max(a0 + 1, Math.floor(((k + 1) * rate) / ziel));
+    let sum = 0;
+    for (let c = 0; c < kan; c++) for (let q = a0; q < a1 && q < dec.length; q++) sum += daten[c][q];
+    mono[k] = sum / (kan * (a1 - a0));
+  }
   status("Analysiere Gesang … (das dauert ein paar Minuten, Seite bitte offen lassen)");
+  await new Promise((r) => setTimeout(r, 100)); // Anzeige aktualisieren lassen
   const res = await asr(mono, { language: "german", task: "transcribe", chunk_length_s: 30, stride_length_s: 5, return_timestamps: "word" });
   const erkannt = (res.chunks || []).map((c) => ({ text: c.text, start: c.timestamp ? c.timestamp[0] : null }));
   const { zeiten, treffer } = lyricsAusrichten(zeilen, erkannt);
