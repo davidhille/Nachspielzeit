@@ -2645,6 +2645,7 @@ function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = 
         name: p.name,
         trikot: p.trikotnummer ?? null,
         foto: p.photo_url || null,
+        spitzname: p.spitzname || null,
         alter: p.geburtsdatum ? alterVonGeburtsdatum(String(p.geburtsdatum).slice(0, 10)) : null,
         ...(voll ? { nachname: p.nachname || "", geburtsdatum: p.geburtsdatum ? String(p.geburtsdatum).slice(0, 10) : null } : {}),
         tore,
@@ -2710,7 +2711,7 @@ function KartenBild({ sp, saison, team, onFehler }) {
     let alt = null;
     let weg = false;
     generateSammelkarte(
-      { name: sp.name, nachname: sp.nachname || "", geburtsdatum: sp.geburtsdatum || null, alter: sp.alter ?? null, trikotnummer: sp.trikot, photo_url: sp.foto },
+      { name: sp.name, spitzname: sp.spitzname || null, nachname: sp.nachname || "", geburtsdatum: sp.geburtsdatum || null, alter: sp.alter ?? null, trikotnummer: sp.trikot, photo_url: sp.foto },
       kartenStats(sp),
       saison,
       team
@@ -2944,6 +2945,26 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   } catch (e) {}
 
   // Namensband
+  // Spitzname / Spruch als Schleife über der Foto-Unterkante
+  if (player.spitzname && String(player.spitzname).trim()) {
+    const txt = `„${String(player.spitzname).trim()}“`;
+    ctx.font = "italic 700 28px 'Inter', sans-serif";
+    const tw = Math.min(ctx.measureText(txt).width, pw - 120);
+    const bw2 = tw + 56;
+    const bh2 = 46;
+    const bx2 = (W - bw2) / 2;
+    const by2 = py + ph - bh2 / 2;
+    roundRectPath(ctx, bx2, by2, bw2, bh2, 23);
+    ctx.fillStyle = "#4E0A0C";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#F2A93B";
+    ctx.stroke();
+    ctx.fillStyle = "#F7C65C";
+    ctx.textAlign = "center";
+    ctx.fillText(truncateCanvasText(ctx, txt, pw - 120), W / 2, by2 + 32);
+  }
+
   const ny = py + ph + 26;
   const nh = 132;
   roundRectPath(ctx, px, ny, pw, nh, 22);
@@ -4296,6 +4317,9 @@ function PlayerCard({ player, stats }) {
             <div>{player.name}</div>
             <div style={{ minHeight: "1.2em" }}>{player.nachname || "\u00A0"}</div>
           </div>
+          {player.spitzname && (
+            <div style={{ fontSize: 13, fontStyle: "italic", fontWeight: 600, color: "var(--gold)", marginTop: 4 }}>„{player.spitzname}“</div>
+          )}
           <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
             SV HEIMSTETTEN U8
           </div>
@@ -4369,10 +4393,12 @@ function formatGeburtsdatum(iso) {
 function PlayerStammdaten({ player, onSave }) {
   const [nachname, setNachname] = useState(player.nachname || "");
   const [geb, setGeb] = useState(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
+  const [spitz, setSpitz] = useState(player.spitzname || "");
   useEffect(() => {
+    setSpitz(player.spitzname || "");
     setNachname(player.nachname || "");
     setGeb(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
-  }, [player.nachname, player.geburtsdatum]);
+  }, [player.nachname, player.geburtsdatum, player.spitzname]);
   return (
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
       <div style={{ flex: "1 1 160px" }}>
@@ -4382,6 +4408,17 @@ function PlayerStammdaten({ player, onSave }) {
           value={nachname}
           onChange={(e) => setNachname(e.target.value)}
           onBlur={() => nachname.trim() !== (player.nachname || "") && onSave({ nachname: nachname.trim() || null })}
+        />
+      </div>
+      <div style={{ flex: "1 1 200px" }}>
+        <label style={styles.label}>Spitzname / Spruch (auf der Sammelkarte)</label>
+        <input
+          style={{ ...styles.input, width: "100%" }}
+          value={spitz}
+          maxLength={28}
+          placeholder="z. B. Der Turbo"
+          onChange={(e) => setSpitz(e.target.value)}
+          onBlur={() => spitz.trim() !== (player.spitzname || "") && onSave({ spitzname: spitz.trim() || null })}
         />
       </div>
       <div style={{ flex: "0 0 auto" }}>
