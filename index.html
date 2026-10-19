@@ -3141,6 +3141,17 @@ function SongPlayer({ songs, cover, team }) {
     if (shuffle && d > 0) setAktiv(zufall());
     else setAktiv((a) => (a + d + songs.length) % songs.length);
   };
+  const speichern = () => {
+    const { zeiten: z } = stand.current;
+    if (z.length === 0) return;
+    const a = audioRef.current;
+    const ende = a && isFinite(a.duration) ? a.duration : z[z.length - 1] + 3 * (zeilen.length - z.length);
+    const start = z[z.length - 1];
+    const rest = zeilen.length - z.length;
+    const voll = zeilen.map((zl, q) => lrcZeit(q < z.length ? z[q] : start + ((Math.max(ende - 1, start + 1) - start) * (q - z.length + 1)) / (rest + 1)) + zl);
+    if (a) a.pause();
+    onFertig(voll.join("\n"));
+  };
   const zurueck = () => {
     if (ref.current && ref.current.currentTime > 3) {
       ref.current.currentTime = 0;
@@ -3608,7 +3619,7 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
         Tap-Sync „{titel}“: Song starten und bei jeder Zeile genau dann auf den großen Button tippen (oder Leertaste), wenn sie anfängt. Kopfhörer empfohlen. Zeile {Math.min(idx + 1, zeilen.length)} von {zeilen.length}.
       </div>
-      <audio ref={audioRef} src={url} preload="auto" onPlay={() => setLaeuft(true)} onPause={() => setLaeuft(false)} />
+      <audio ref={audioRef} src={url} preload="auto" onPlay={() => setLaeuft(true)} onPause={() => setLaeuft(false)} onEnded={() => setLaeuft(false)} />
       <div style={{ textAlign: "center", minHeight: 110 }}>
         {zeile(idx - 1, { fontSize: 13, color: "var(--muted)", opacity: 0.7 })}
         {zeile(idx, { fontSize: 20, fontWeight: 700, margin: "8px 0" })}
@@ -3621,6 +3632,7 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
         <button style={styles.linkBtn} onClick={startStop}>{laeuft ? "Pause" : "Start / Weiter"}</button>
         <button style={styles.linkBtn} onClick={zurueck} disabled={idx === 0}>↶ Eine Zeile zurück</button>
+        <button style={{ ...styles.linkBtn, fontWeight: 700 }} onClick={speichern} disabled={idx === 0}>Fertig &amp; speichern ({idx}/{zeilen.length})</button>
         <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
           Tempo{" "}
           <select value={tempo} onChange={(e) => setTempo(parseFloat(e.target.value))} style={{ fontSize: 12.5 }}>
