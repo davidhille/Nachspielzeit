@@ -460,6 +460,8 @@ const toLocalISODate = (d) => {
 };
 const todayISO = () => toLocalISODate(new Date());
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+/* Ein Spieltag gilt erst als gespielt, wenn mindestens ein Ergebnis eingetragen ist (Notizen oder Aufstellung allein zählen nicht). */
+const spieltagGespielt = (s) => s.spiele.length > 0;
 function spieltagNummern(spieltage) {
   // Spieltage und Turniere werden getrennt durchnummeriert, jeweils chronologisch.
   const chronologisch = [...spieltage].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
@@ -2717,7 +2719,7 @@ function kartenLinkUrlVorschau(token) {
 function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = false) {
   const heute = todayISO();
   const saison = seasonKeyOf(heute.slice(0, 7));
-  const vergangene = spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heute);
+  const vergangene = spieltage.filter((s) => spieltagGespielt(s) && seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heute);
   const spieler = players
     .filter((p) => p.active !== false)
     .sort((a, b) => (a.trikotnummer ?? 999) - (b.trikotnummer ?? 999) || (a.name || "").localeCompare(b.name || "", "de"))
@@ -2743,7 +2745,7 @@ function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = 
         monat: monatsBewertungProzent(trainings.filter((t) => t.playerId === p.id), heute.slice(0, 7)),
         karten: kartenZaehlen(saisonTr),
         tore,
-        spieltage: spieltage.filter((s) => s.teilnehmer.includes(p.id)).length,
+        spieltage: spieltage.filter((s) => spieltagGespielt(s) && s.teilnehmer.includes(p.id)).length,
         training: saisonTr.length > 0 ? Math.round((anwesend / saisonTr.length) * 100) : null,
         spieltagQuote: vergangene.length > 0 ? Math.round((dabei / vergangene.length) * 100) : null,
       };
@@ -5340,7 +5342,7 @@ function SpieltagAnwesenheit({ spieltage, players, month, onOpenPlayer }) {
   // Nur Spieltage, die schon stattgefunden haben (heute oder früher)
   const heuteISO = todayISO();
   const spieltageDerSaison = spieltage.filter(
-    (s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO
+    (s) => spieltagGespielt(s) && seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO
   );
   const gesamt = spieltageDerSaison.length;
 
@@ -5661,13 +5663,13 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
   // Spieltag-Quote: nur bereits stattgefundene Spieltage der Saison
   const heuteISO = todayISO();
   const vergangeneSpieltage = spieltage.filter(
-    (s) => seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO
+    (s) => spieltagGespielt(s) && seasonKeyOf(s.date.slice(0, 7)) === saison && s.date <= heuteISO
   );
   const spieltagDabeiAnzahl = vergangeneSpieltage.filter((s) => s.teilnehmer.includes(player.id)).length;
   const quoteSpieltage = vergangeneSpieltage.length > 0 ? (spieltagDabeiAnzahl / vergangeneSpieltage.length) * 100 : null;
 
   const spieltageDabei = spieltage
-    .filter((s) => s.teilnehmer.includes(player.id))
+    .filter((s) => spieltagGespielt(s) && s.teilnehmer.includes(player.id))
     .sort((a, b) => b.date.localeCompare(a.date));
   const spieltagNr = spieltagNummern(spieltage);
   const toreGesamt = spieltage
