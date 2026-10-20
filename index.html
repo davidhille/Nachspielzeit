@@ -2060,9 +2060,9 @@ function App() {
     }, 3000);
     return () => clearTimeout(timer);
   }, [kartenHash, kartenPlusJson, kartenToken, kartenAltKey]); // eslint-disable-line
-  const kartenLinkErzeugen = (name) =>
+  const kartenLinkErzeugen = (name, code) =>
     wrapAction(async () => {
-      const neu = neuerKartenToken(name);
+      const neu = neuerKartenToken(name, code);
       const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll);
       await veroeffentlicheKarten(neu, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
       // der bisherige Link bleibt vorerst aktiv (schon verschickt) und kann unten abgeschaltet werden
@@ -2663,7 +2663,12 @@ function truncateCanvasText(ctx, text, maxWidth) {
    unter karten/<geheimer Token>.json. Die Seite ?karten=<Token> liest nur diese Datei. Token neu erzeugen/löschen = alter Link tot. */
 const KARTEN_OBJ = `${SUPABASE_URL}/storage/v1/object`;
 /* Link-Name (frei wählbar, z. B. "Saison 26") + 5 zufällige Zeichen → "saison-26-k7m2x". Ohne Namen: rein zufälliger Token. */
-function neuerKartenToken(name = "") {
+function zufallsCode() {
+  const a = new Uint8Array(5);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => (b % 36).toString(36)).join("");
+}
+function neuerKartenToken(name = "", code = "") {
   const slug = (name || "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24).replace(/-+$/g, "");
   if (!slug) {
@@ -2671,9 +2676,8 @@ function neuerKartenToken(name = "") {
     crypto.getRandomValues(a);
     return Array.from(a, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 28);
   }
-  const a = new Uint8Array(5);
-  crypto.getRandomValues(a);
-  return `${slug}-${Array.from(a, (b) => (b % 36).toString(36)).join("")}`;
+  const c = (code || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+  return `${slug}-${c.length >= 5 ? c : zufallsCode()}`;
 }
 function kartenLinkUrl(token) {
   return `${window.location.origin}/${token}`;
@@ -3795,6 +3799,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
   const urlVorschau = token ? kartenLinkUrlVorschau(token) : "";
   const [kopiertV, setKopiertV] = useState(false);
   const [linkName, setLinkName] = useState("");
+  const [linkCode, setLinkCode] = useState("");
   const [textEdit, setTextEdit] = useState(null);
   const [sync, setSync] = useState(null);
   const [tapI, setTapI] = useState(null);
@@ -3807,11 +3812,23 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
       window.prompt("Link kopieren:", text);
     }
   };
+  const codeSauber = linkCode.toLowerCase().replace(/[^a-z0-9]/g, "");
   const namenSetzen = () => {
-    if (token && !window.confirm("Neuer Link-Name: Der bisherige Link bleibt vorerst weiter aktiv und kann unten abgeschaltet werden. Fortfahren?")) return;
-    onCreate(linkName);
+    if (codeSauber && codeSauber.length < 5) { window.alert("Der Code braucht mindestens 5 Zeichen (Buchstaben und Ziffern) oder bleibt leer für einen Zufallscode."); return; }
+    if (codeSauber && /^[0-9]+$/.test(codeSauber) && !window.confirm("Ein Code nur aus Ziffern ist leichter zu erraten. Trotzdem verwenden?")) return;
+    if (token && !window.confirm("Neuer Link: Der bisherige Link bleibt vorerst weiter aktiv und kann unten abgeschaltet werden. Fortfahren?")) return;
+    onCreate(linkName, codeSauber);
     setLinkName("");
+    setLinkCode("");
   };
+  const namensFelder = (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="Link-Name, z. B. Saison 26" style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 2, minWidth: 160 }} />
+      <input value={linkCode} onChange={(e) => setLinkCode(e.target.value)} placeholder="Code (leer = zufällig)" maxLength={12} style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 1, minWidth: 120 }} />
+      <button style={styles.linkBtn} onClick={() => setLinkCode(zufallsCode())} disabled={busy}>Würfeln</button>
+      <button style={token ? styles.linkBtn : styles.secondaryBtn} onClick={namenSetzen} disabled={busy || !linkName.trim()}>{token ? "Link ändern" : "Link erzeugen"}</button>
+    </div>
+  );
   return (
     <div style={{ ...styles.card, marginBottom: 16 }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>Link für Eltern</div>
@@ -3831,11 +3848,8 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
             <button style={styles.linkBtn} onClick={() => window.open(url, "_blank")}>Öffnen</button>
             <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={onRevoke} disabled={busy}>Alle Links sperren</button>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-            <input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="Neuer Link-Name, z. B. Saison 26" style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 1, minWidth: 180 }} />
-            <button style={styles.linkBtn} onClick={namenSetzen} disabled={busy || !linkName.trim()}>Link-Namen ändern</button>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Der Link besteht aus deinem Namen und einem zufälligen Kurzcode, damit er nicht zu erraten ist.</div>
+          <div style={{ marginTop: 12 }}>{namensFelder}</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Der Link besteht aus Name und Code (mind. 5 Zeichen, Buchstaben/Ziffern), damit er nicht zu erraten ist.</div>
           {altTokens.length > 0 && (
             <div style={{ marginTop: 10, fontSize: 12.5 }}>
               <div style={{ color: "var(--muted)", marginBottom: 4 }}>Frühere Links (funktionieren weiter, zeigen dieselbe Seite):</div>
@@ -3903,10 +3917,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
           </div>
         </>
       ) : (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="Link-Name, z. B. Saison 26" style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 1, minWidth: 180 }} />
-          <button style={styles.secondaryBtn} onClick={() => { onCreate(linkName); setLinkName(""); }} disabled={busy}>Link erzeugen</button>
-        </div>
+        namensFelder
       )}
     </div>
   );
