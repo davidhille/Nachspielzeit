@@ -460,8 +460,8 @@ const toLocalISODate = (d) => {
 };
 const todayISO = () => toLocalISODate(new Date());
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-/* Ein Spieltag gilt erst als gespielt, wenn mindestens ein Ergebnis eingetragen ist (Notizen oder Aufstellung allein zählen nicht). */
-const spieltagGespielt = (s) => s.spiele.length > 0;
+/* Ein Spieltag gilt erst als gespielt, wenn mindestens ein Ergebnis eingetragen ist (Notizen oder Aufstellung allein zählen nicht, ebenso wenig ein Spieltag in der Zukunft). */
+const spieltagGespielt = (s) => s.spiele.length > 0 && s.date <= todayISO();
 function spieltagNummern(spieltage) {
   // Spieltage und Turniere werden getrennt durchnummeriert, jeweils chronologisch.
   const chronologisch = [...spieltage].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
