@@ -3099,6 +3099,14 @@ function SongPlayer({ songs, cover, team }) {
   const [offen, setOffen] = useState(false);
   const [textOffen, setTextOffen] = useState(false);
   const [dauern, setDauern] = useState({});
+  const [breit, setBreit] = useState(() => typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(min-width: 900px)").matches : false);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 900px)");
+    const h = (e) => setBreit(e.matches);
+    mq.addEventListener ? mq.addEventListener("change", h) : mq.addListener(h);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", h) : mq.removeListener(h); };
+  }, []);
   const ref = useRef(null);
   const start = useRef(false);
   const song = songs[aktiv] || songs[0];
@@ -3114,7 +3122,7 @@ function SongPlayer({ songs, cover, team }) {
     setTextOffen(false);
   }, [aktiv]);
   useEffect(() => {
-    if (lrc) setTextOffen(true);
+    if (lrc && (breit || !offen)) setTextOffen(true);
   }, [aktiv]); // eslint-disable-line
   useEffect(() => {
     const box = lrcBox.current;
@@ -3284,13 +3292,15 @@ function SongPlayer({ songs, cover, team }) {
 
       <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         {songs.length > 1 && (
-          <button onClick={() => setOffen((o) => !o)} aria-expanded={offen} style={pille(offen)}><PIcon name="list" size={16} /> Playlist · {songs.length}</button>
+          <button onClick={() => { if (!offen && !breit) setTextOffen(false); setOffen((o) => !o); }} aria-expanded={offen} style={pille(offen)}><PIcon name="list" size={16} /> Playlist · {songs.length}</button>
         )}
-        {song.text ? <button onClick={() => setTextOffen((o) => !o)} aria-expanded={textOffen} style={pille(textOffen)}><PIcon name="text" size={16} /> Text</button> : null}
+        {song.text ? <button onClick={() => { if (!textOffen && !breit) setOffen(false); setTextOffen((o) => !o); }} aria-expanded={textOffen} style={pille(textOffen)}><PIcon name="text" size={16} /> Text</button> : null}
         <button onClick={() => speichern(song)} style={pille(false)}><PIcon name="download" size={16} /> Speichern</button>
       </div>
+      {((songs.length > 1 && offen) || (song.text && textOffen)) && (
+        <div style={{ display: "grid", gridTemplateColumns: breit && songs.length > 1 && offen && song.text && textOffen ? "1fr 1fr" : "1fr", gap: 14, alignItems: "start", marginTop: 12 }}>
       {songs.length > 1 && offen && (
-        <div style={{ marginTop: 6 }}>
+        <div style={{ maxHeight: 340, overflowY: "auto", paddingRight: 2 }}>
           {songs.map((x, i) => (
             <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 12, alignItems: "center", textAlign: "left", border: "none", borderRadius: 12, padding: "10px 12px", marginBottom: 4, fontSize: 15, fontFamily: "inherit", cursor: "pointer", background: i === aktiv ? "rgba(196,39,31,0.10)" : "transparent", color: i === aktiv ? ROT : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
               <span style={{ width: 22, display: "inline-flex", justifyContent: "center" }}>
@@ -3304,10 +3314,10 @@ function SongPlayer({ songs, cover, team }) {
       )}
 
       {song.text && textOffen && !lrc && (
-        <div style={{ marginTop: 10, padding: "12px 14px", background: "var(--surface-2)", borderRadius: 12, fontSize: 14.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{song.text}</div>
+        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: 12, fontSize: 14.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{song.text}</div>
       )}
       {song.text && textOffen && lrc && (
-        <div ref={lrcBox} style={{ position: "relative", marginTop: 10, padding: "40px 14px", height: 260, overflowY: "auto", background: "var(--surface-2)", borderRadius: 12, textAlign: "center", scrollbarWidth: "none" }}>
+        <div ref={lrcBox} style={{ position: "relative", padding: "40px 14px", height: 340, overflowY: "auto", background: "var(--surface-2)", borderRadius: 12, textAlign: "center", scrollbarWidth: "none" }}>
           {lrc.map((z, i) => (
             <div
               key={i}
@@ -3320,6 +3330,8 @@ function SongPlayer({ songs, cover, team }) {
         </div>
       )}
 
+        </div>
+      )}
     </div>
   );
 }
