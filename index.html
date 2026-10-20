@@ -3677,8 +3677,14 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
       if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
       if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); tap(); }
     };
+    const hUp = (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+      if (e.code === "Space") e.preventDefault(); // verhindert, dass ein fokussierter Button per Leertaste ausgelöst wird
+    };
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    window.addEventListener("keyup", hUp);
+    return () => { window.removeEventListener("keydown", h); window.removeEventListener("keyup", hUp); };
   }, [zeilen]);
   const zeile = (k, stil) => (k >= 0 && k < zeilen.length ? <div style={stil}>{zeilen[k]}</div> : <div style={stil}>&nbsp;</div>);
   return (
@@ -3688,16 +3694,21 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
       </div>
       <audio ref={audioRef} src={url} preload="auto" onPlay={() => setLaeuft(true)} onPause={() => setLaeuft(false)} onEnded={() => setLaeuft(false)} />
       <div style={{ textAlign: "center", minHeight: 110 }}>
-        {zeile(idx - 1, { fontSize: 13, color: "var(--muted)", opacity: 0.7 })}
-        {zeile(idx, { fontSize: 20, fontWeight: 700, margin: "8px 0" })}
+        {idx > 0 ? (
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#C4271F" }}>♪ {zeilen[idx - 1]} <span style={{ fontWeight: 500, fontSize: 12, color: "var(--muted)" }}>(getippt)</span></div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>&nbsp;</div>
+        )}
+        <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Als Nächstes tippen, sobald diese Zeile anfängt</div>
+        {zeile(idx, { fontSize: 20, fontWeight: 700, margin: "2px 0 6px" })}
         {zeile(idx + 1, { fontSize: 14, color: "var(--muted)" })}
         {zeile(idx + 2, { fontSize: 13, color: "var(--muted)", opacity: 0.6 })}
       </div>
       <button onPointerDown={(e) => { e.preventDefault(); tap(); }} style={{ width: "100%", padding: "22px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: "none", background: "var(--accent, #B71C1C)", color: "#fff", cursor: "pointer", touchAction: "manipulation", userSelect: "none" }}>
-        {laeuft ? "TAP – Zeile beginnt jetzt" : "Erst Song starten ▶"}
+        {laeuft ? "TAP – Zeile beginnt jetzt" : idx > 0 ? "Pausiert – unten „Start / Weiter“" : "Erst Song starten ▶ (Button unten)"}
       </button>
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
-        <button style={styles.linkBtn} onClick={startStop}>{laeuft ? "Pause" : "Start / Weiter"}</button>
+        <button style={styles.linkBtn} onClick={(e) => { e.currentTarget.blur(); startStop(); }}>{laeuft ? "Pause" : "Start / Weiter"}</button>
         <button style={styles.linkBtn} onClick={zurueck} disabled={idx === 0}>↶ Eine Zeile zurück</button>
         <button style={{ ...styles.linkBtn, fontWeight: 700 }} onClick={speichern} disabled={idx === 0}>Fertig &amp; speichern ({idx}/{zeilen.length})</button>
         <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
