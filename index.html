@@ -3383,6 +3383,8 @@ function KartenSeitePlus({ token }) {
   const [plus, setPlus] = useState(undefined);
   const [fehler, setFehler] = useState(null);
   const [maxH, setMaxH] = useState(null);
+  const [tab, setTab] = useState(null);
+  const [besucht, setBesucht] = useState({});
   useEffect(() => {
     if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
     let weg = false;
@@ -3409,6 +3411,15 @@ function KartenSeitePlus({ token }) {
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3, marginTop: 28 }}>{t}</h3>;
+  const tabs = [];
+  if (b) tabs.push({ k: "bilanz", label: "Bilanz" });
+  if (b && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
+  tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
+  if (plus && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
+  const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs[0].k;
+  const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
+  // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
+  const panel = (k, inhalt) => (besucht[k] || aktTab === k ? <div style={{ display: aktTab === k ? "block" : "none" }}>{inhalt}</div> : null);
   const diffFarbe = (d) => (d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "var(--muted)");
   return (
     <div style={styles.app}>
@@ -3424,12 +3435,30 @@ function KartenSeitePlus({ token }) {
           </div>
         </div>
       </header>
+      {tabs.length > 1 && (
+        <nav aria-label="Bereiche" style={{ position: "sticky", top: 0, zIndex: 20, background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px", display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" }}>
+            {tabs.map((t) => {
+              const an = t.k === aktTab;
+              return (
+                <button key={t.k} onClick={() => waehle(t.k)} aria-current={an ? "page" : undefined}
+                  style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14.5, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? "#C4271F" : "var(--border)"}`, background: an ? "#C4271F" : "var(--surface)", color: an ? "#fff" : "inherit" }}>
+                  {t.label}
+                  {t.n != null ? <span style={{ fontSize: 12.5, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
         {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
         {b && (
           <>
-            <KlappBlock titel={`Saisonbilanz ${plus.saison}`} startOffen>
+            {panel("bilanz", (
+            <section style={{ ...styles.card, marginTop: 16 }}>
+              <h3 style={{ ...styles.h3, marginTop: 0 }}>Saisonbilanz {plus.saison}</h3>
               <div style={styles.statsRow}>
                 {[["Spiele", b.spiele], ["Siege", b.siege], ["Unentschieden", b.unentschieden], ["Niederlagen", b.niederlagen], ["Tore", `${b.toreFuer}:${b.toreGegen}`]].map(([l, v]) => (
                   <div key={l} style={styles.statBox}>
@@ -3486,30 +3515,33 @@ function KartenSeitePlus({ token }) {
                   </div>
                 </div>
               )}
-            </KlappBlock>
-            {plus.spieltage.length > 0 && (
-              <KlappBlock titel="Spieltagskarten" info={`${plus.spieltage.length}`}>
+            </section>
+            ))}
+            {plus.spieltage.length > 0 && panel("spieltage", (
+              <section style={{ ...styles.card, marginTop: 16 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
                   {plus.spieltage.map((t) => (
                     <SpieltagKartenBild key={t.id} tag={t} team={karten.team} onFehler={setFehler} minH={maxH} />
                   ))}
                 </div>
-              </KlappBlock>
-            )}
+              </section>
+            ))}
           </>
         )}
-        <KlappBlock titel="Sammelkarten" info={`${karten.spieler.length}`}>
+        {panel("karten", (
+        <section style={{ ...styles.card, marginTop: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
             {karten.spieler.map((sp) => (
               <KartenBild key={sp.id} sp={sp} saison={karten.saison} team={karten.team || "U8"} onFehler={setFehler} />
             ))}
           </div>
-        </KlappBlock>
-        {plus && plus.songs && plus.songs.length > 0 && (
-          <KlappBlock titel="Mannschaftssongs" info={`${plus.songs.length}`}>
+        </section>
+        ))}
+        {plus && plus.songs && plus.songs.length > 0 && panel("songs", (
+          <section style={{ ...styles.card, marginTop: 16 }}>
             <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} />
-          </KlappBlock>
-        )}
+          </section>
+        ))}
       </main>
     </div>
   );
