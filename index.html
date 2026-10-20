@@ -2033,6 +2033,8 @@ function App() {
 
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
+  const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
+  const kartenAltKey = kartenAlt.join(",");
   const kartenSnapshot = useMemo(
     () => (kartenToken && !loading ? berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll) : null),
     [kartenToken, loading, players, trainings, spieltage, teamInfo]
@@ -2047,30 +2049,39 @@ function App() {
     if (!kartenHash || !kartenToken) return;
     let last = null;
     try { last = localStorage.getItem("nsz_karten_hash"); } catch {}
-    if (last === kartenToken + kurzHash(kartenHash + (kartenPlusJson || ""))) return;
+    const schluessel = kartenToken + kartenAltKey + kurzHash(kartenHash + (kartenPlusJson || ""));
+    if (last === schluessel) return;
     const timer = setTimeout(() => {
-      veroeffentlicheKarten(kartenToken, JSON.parse(kartenHash), kartenPlusJson ? JSON.parse(kartenPlusJson) : null)
+      veroeffentlicheAlle([kartenToken, ...kartenAlt], JSON.parse(kartenHash), kartenPlusJson ? JSON.parse(kartenPlusJson) : null)
         .then(() => {
-          try { localStorage.setItem("nsz_karten_hash", kartenToken + kurzHash(kartenHash + (kartenPlusJson || ""))); } catch {}
+          try { localStorage.setItem("nsz_karten_hash", schluessel); } catch {}
         })
         .catch((e) => console.error(e));
     }, 3000);
     return () => clearTimeout(timer);
-  }, [kartenHash, kartenPlusJson, kartenToken]);
-  const kartenLinkErzeugen = () =>
+  }, [kartenHash, kartenPlusJson, kartenToken, kartenAltKey]); // eslint-disable-line
+  const kartenLinkErzeugen = (name) =>
     wrapAction(async () => {
-      const neu = neuerKartenToken();
+      const neu = neuerKartenToken(name);
       const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll);
       await veroeffentlicheKarten(neu, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
-      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu } });
-      if (kartenToken) await loescheKarten(kartenToken);
+      // der bisherige Link bleibt vorerst aktiv (schon verschickt) und kann unten abgeschaltet werden
+      const alt = kartenToken ? [kartenToken, ...kartenAlt] : kartenAlt;
+      await veroeffentlicheAlle(alt, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
+      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu, share_alt: alt } });
     }, "Karten-Link erstellt");
+  const kartenAltAbschalten = (tok) =>
+    wrapAction(async () => {
+      await loescheKarten(tok);
+      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_alt: kartenAlt.filter((x) => x !== tok) } });
+    }, "Alter Link abgeschaltet");
   const kartenLinkSperren = () =>
     wrapAction(async () => {
       const cfg = { ...(teamInfo?.config || {}) };
       delete cfg.share_token;
+      delete cfg.share_alt;
       await dbUpdate("teams", CURRENT_TEAM, { config: cfg });
-      if (kartenToken) await loescheKarten(kartenToken);
+      for (const t of [kartenToken, ...kartenAlt]) if (t) await loescheKarten(t);
     }, "Karten-Link gesperrt");
   const songsSpeichern = async (songs) => {
     await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), songs } });
@@ -2111,7 +2122,7 @@ function App() {
     }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
-      await veroeffentlicheKarten(kartenToken, berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll), berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
+      await veroeffentlicheAlle([kartenToken, ...kartenAlt], berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll), berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
     }, "Karten aktualisiert");
 
   const softDelete = (table, id, entityLabel) =>
@@ -2364,7 +2375,7 @@ function App() {
           <Verwaltung
             kartenBox={
               teamInfo ? (
-                <KartenLinkBox token={kartenToken} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} songs={teamInfo?.config?.songs || []} onSongAdd={songHinzufuegen} onSongChange={songAendern} />
+                <KartenLinkBox token={kartenToken} altTokens={kartenAlt} onAltOff={kartenAltAbschalten} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} songs={teamInfo?.config?.songs || []} onSongAdd={songHinzufuegen} onSongChange={songAendern} />
               ) : null
             }
             players={players}
@@ -2651,13 +2662,21 @@ function truncateCanvasText(ctx, text, maxWidth) {
    Die App veröffentlicht einen Snapshot (nur Vorname, Trikot, Foto, Kennzahlen – kein Nachname/Geburtsdatum) als JSON im Storage
    unter karten/<geheimer Token>.json. Die Seite ?karten=<Token> liest nur diese Datei. Token neu erzeugen/löschen = alter Link tot. */
 const KARTEN_OBJ = `${SUPABASE_URL}/storage/v1/object`;
-function neuerKartenToken() {
-  const a = new Uint8Array(20);
+/* Link-Name (frei wählbar, z. B. "Saison 26") + 5 zufällige Zeichen → "saison-26-k7m2x". Ohne Namen: rein zufälliger Token. */
+function neuerKartenToken(name = "") {
+  const slug = (name || "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24).replace(/-+$/g, "");
+  if (!slug) {
+    const a = new Uint8Array(20);
+    crypto.getRandomValues(a);
+    return Array.from(a, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 28);
+  }
+  const a = new Uint8Array(5);
   crypto.getRandomValues(a);
-  return Array.from(a, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 28);
+  return `${slug}-${Array.from(a, (b) => (b % 36).toString(36)).join("")}`;
 }
 function kartenLinkUrl(token) {
-  return `${window.location.origin}/?karten=${token}`;
+  return `${window.location.origin}/${token}`;
 }
 function songUrl(pfad) {
   return `${KARTEN_OBJ}/public/${PHOTO_BUCKET}/${pfad}`;
@@ -2688,8 +2707,8 @@ async function loescheSongDatei(pfad) {
     });
   } catch (e) {}
 }
-function kartenLinkUrlPlus(token) {
-  return `${window.location.origin}/?karten=${token}&seite=erweitert`;
+function kartenLinkUrlVorschau(token) {
+  return `${window.location.origin}/${token}?seite=vorschau`;
 }
 function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = false) {
   const heute = todayISO();
@@ -2770,6 +2789,9 @@ async function kartenPutJson(pfad, obj) {
 async function veroeffentlicheKarten(token, snapshot, plus) {
   await kartenPutJson(`karten/${token}.json`, snapshot);
   if (plus) await kartenPutJson(`karten/${token}-plus.json`, plus);
+}
+async function veroeffentlicheAlle(tokens, snapshot, plus) {
+  for (const t of tokens) await veroeffentlicheKarten(t, snapshot, plus);
 }
 async function loescheKarten(token) {
   for (const pfad of [`karten/${token}.json`, `karten/${token}-plus.json`]) {
@@ -2905,48 +2927,6 @@ function KartenBild({ sp, saison, team, onFehler }) {
   );
 }
 
-function KartenSeite({ token }) {
-  const [daten, setDaten] = useState(undefined);
-  const [fehler, setFehler] = useState(null);
-  useEffect(() => {
-    const m = document.createElement("meta");
-    m.name = "robots";
-    m.content = "noindex,nofollow";
-    document.head.appendChild(m);
-    ladeKartenSnapshot(token).then(setDaten).catch(() => setDaten(null));
-    return () => m.remove();
-  }, [token]);
-  if (daten === undefined) return <div style={styles.loadingScreen}>Lade …</div>;
-  if (!daten || !Array.isArray(daten.spieler)) {
-    return <div style={styles.loadingScreen}>Dieser Link ist nicht (mehr) gültig.</div>;
-  }
-  const stand = daten.stand ? new Date(daten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
-  return (
-    <div style={styles.app}>
-      <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
-        <div style={{ ...styles.headerTop, maxWidth: 1100, margin: "0 auto" }}>
-          <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
-          <div style={{ flex: 1 }}>
-            <div style={styles.title}>Sammelkarten</div>
-            <div style={styles.subtitle}>
-              <div>SV Heimstetten {daten.team || "U8"}</div>
-              <div>Saison {daten.saison}{stand ? ` · Stand ${stand}` : ""}</div>
-            </div>
-          </div>
-        </div>
-      </header>
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
-        {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start", marginTop: 18 }}>
-          {daten.spieler.map((sp) => (
-            <KartenBild key={sp.id} sp={sp} saison={daten.saison} team={daten.team || "U8"} onFehler={setFehler} />
-          ))}
-        </div>
-      </main>
-    </div>
-  );
-}
-
 /* Erweiterte Seite: Saisonbilanz, Bilanz pro Gegner, Spieltagskarten, Sammelkarten */
 function tagZuShare(tag) {
   const gegnerListe = tag.spiele.map((sp, i) => ({ id: "g" + i, name: sp.gegner }));
@@ -3015,26 +2995,6 @@ function SpieltagKartenBild({ tag, team, onFehler, minH }) {
         <button style={styles.linkBtn} onClick={speichern} disabled={!blob}>Karte speichern</button>
       </div>
     </div>
-  );
-}
-
-function KlappBlock({ titel, info, startOffen = false, children }) {
-  const [offen, setOffen] = useState(startOffen);
-  return (
-    <section style={{ ...styles.card, marginTop: 16, padding: 0, overflow: "hidden" }}>
-      <button
-        onClick={() => setOffen((o) => !o)}
-        aria-expanded={offen}
-        style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: 10, background: "none", border: "none", padding: "14px 16px", cursor: "pointer", fontFamily: "inherit", color: "inherit", textAlign: "left" }}
-      >
-        <span style={{ ...styles.h3, margin: 0 }}>
-          {titel}
-          {info ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--muted)", marginLeft: 8 }}>{info}</span> : null}
-        </span>
-        <span style={{ transition: "transform 0.2s", transform: offen ? "rotate(180deg)" : "none", fontSize: 16 }}>▾</span>
-      </button>
-      {offen && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
-    </section>
   );
 }
 
@@ -3547,6 +3507,177 @@ function KartenSeitePlus({ token }) {
   );
 }
 
+/* ---------- Vorschau (Staging): Hier werden Änderungen an der Eltern-Seite zuerst gezeigt. Die freigegebene Version ist KartenSeitePlus. ---------- */
+function KartenSeiteVorschau({ token }) {
+  const [karten, setKarten] = useState(undefined);
+  const [plus, setPlus] = useState(undefined);
+  const [fehler, setFehler] = useState(null);
+  const [maxH, setMaxH] = useState(null);
+  const [tab, setTab] = useState(null);
+  const [besucht, setBesucht] = useState({});
+  useEffect(() => {
+    if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
+    let weg = false;
+    Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true }); }))
+      .then((hs) => !weg && setMaxH(Math.max(...hs)))
+      .catch(() => {});
+    return () => { weg = true; };
+  }, [plus]);
+  useEffect(() => {
+    const m = document.createElement("meta");
+    m.name = "robots";
+    m.content = "noindex,nofollow";
+    document.head.appendChild(m);
+    ladeKartenSnapshot(token).then(setKarten).catch(() => setKarten(null));
+    ladeKartenSnapshot(token, "-plus").then(setPlus).catch(() => setPlus(null));
+    return () => m.remove();
+  }, [token]);
+  if (karten === undefined || plus === undefined) return <div style={styles.loadingScreen}>Lade …</div>;
+  if (!karten || !Array.isArray(karten.spieler)) {
+    return <div style={styles.loadingScreen}>Dieser Link ist nicht (mehr) gültig.</div>;
+  }
+  const stand = karten.stand ? new Date(karten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+  const b = plus && plus.saisonBilanz;
+  const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
+  const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
+  const kopf = (t) => <h3 style={{ ...styles.h3, marginTop: 28 }}>{t}</h3>;
+  const tabs = [];
+  if (b) tabs.push({ k: "bilanz", label: "Bilanz" });
+  if (b && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
+  tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
+  if (plus && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
+  const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs[0].k;
+  const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
+  // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
+  const panel = (k, inhalt) => (besucht[k] || aktTab === k ? <div style={{ display: aktTab === k ? "block" : "none" }}>{inhalt}</div> : null);
+  const diffFarbe = (d) => (d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "var(--muted)");
+  return (
+    <div style={styles.app}>
+      <div style={{ background: "#FFF3CD", color: "#664D03", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 12px" }}>Vorschau – so könnte die nächste Version der Eltern-Seite aussehen. Eltern sehen diese Seite nicht.</div>
+      <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
+        <div style={{ ...styles.headerTop, maxWidth: 1100, margin: "0 auto" }}>
+          <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
+          <div style={{ flex: 1 }}>
+            <div style={styles.title}>Unsere Saison</div>
+            <div style={styles.subtitle}>
+              <div>SV Heimstetten {karten.team || "U8"}</div>
+              <div>Saison {karten.saison}{stand ? ` · Stand ${stand}` : ""}</div>
+            </div>
+          </div>
+        </div>
+      </header>
+      {tabs.length > 1 && (
+        <nav aria-label="Bereiche" style={{ position: "sticky", top: 0, zIndex: 20, background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px", display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" }}>
+            {tabs.map((t) => {
+              const an = t.k === aktTab;
+              return (
+                <button key={t.k} onClick={() => waehle(t.k)} aria-current={an ? "page" : undefined}
+                  style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14.5, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? "#C4271F" : "var(--border)"}`, background: an ? "#C4271F" : "var(--surface)", color: an ? "#fff" : "inherit" }}>
+                  {t.label}
+                  {t.n != null ? <span style={{ fontSize: 12.5, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
+        {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
+        {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
+        {b && (
+          <>
+            {panel("bilanz", (
+            <section style={{ ...styles.card, marginTop: 16 }}>
+              <h3 style={{ ...styles.h3, marginTop: 0 }}>Saisonbilanz {plus.saison}</h3>
+              <div style={styles.statsRow}>
+                {[["Spiele", b.spiele], ["Siege", b.siege], ["Unentschieden", b.unentschieden], ["Niederlagen", b.niederlagen], ["Tore", `${b.toreFuer}:${b.toreGegen}`]].map(([l, v]) => (
+                  <div key={l} style={styles.statBox}>
+                    <div style={styles.statValue}>{v}</div>
+                    <div style={styles.statLabel}>{l}</div>
+                  </div>
+                ))}
+              </div>
+              {plus.torschuetzen.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={styles.subheading}>Torschützenliste</div>
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <tbody>
+                        {plus.torschuetzen.map((t, i) => (
+                          <tr key={t.name + i}>
+                            <td style={styles.tdName}><span style={styles.rank}>{i + 1}</span>{t.name}</td>
+                            <td style={{ ...styles.td, textAlign: "right", fontWeight: 700 }}>{t.tore}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {plus.gegnerBilanz.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={styles.subheading}>Bilanz pro Gegner</div>
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>Gegner</th>
+                          {["Spiele", "S", "U", "N", "Tore", "Diff."].map((h) => <th key={h} style={{ ...styles.th, textAlign: "right" }}>{h}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {plus.gegnerBilanz.map((g) => {
+                          const d = g.toreFuer - g.toreGegen;
+                          return (
+                            <tr key={g.name}>
+                              <td style={styles.tdName}>{g.name}</td>
+                              <td style={{ ...styles.td, textAlign: "right" }}>{g.spiele}</td>
+                              <td style={{ ...styles.td, textAlign: "right" }}>{g.siege}</td>
+                              <td style={{ ...styles.td, textAlign: "right" }}>{g.unentschieden}</td>
+                              <td style={{ ...styles.td, textAlign: "right" }}>{g.niederlagen}</td>
+                              <td style={{ ...styles.td, textAlign: "right" }}>{g.toreFuer}:{g.toreGegen}</td>
+                              <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
+            ))}
+            {plus.spieltage.length > 0 && panel("spieltage", (
+              <section style={{ ...styles.card, marginTop: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
+                  {plus.spieltage.map((t) => (
+                    <SpieltagKartenBild key={t.id} tag={t} team={karten.team} onFehler={setFehler} minH={maxH} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </>
+        )}
+        {panel("karten", (
+        <section style={{ ...styles.card, marginTop: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
+            {karten.spieler.map((sp) => (
+              <KartenBild key={sp.id} sp={sp} saison={karten.saison} team={karten.team || "U8"} onFehler={setFehler} />
+            ))}
+          </div>
+        </section>
+        ))}
+        {plus && plus.songs && plus.songs.length > 0 && panel("songs", (
+          <section style={{ ...styles.card, marginTop: 16 }}>
+            <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} />
+          </section>
+        ))}
+      </main>
+    </div>
+  );
+}
+
 /* Hilfsfunktionen für Tap-Sync (Liedtext → Zeilen, LRC-Zeitstempel) */
 const lrcZeit = (t) => { const c = Math.round(Math.max(0, t) * 100); return `[${String(Math.floor(c / 6000)).padStart(2, "0")}:${((c % 6000) / 100).toFixed(2).padStart(5, "0")}]`; };
 function reinerLiedtext(text) {
@@ -3658,37 +3789,34 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
 }
 
 /* Verwaltung → Spieler: Link für die Eltern erzeugen, kopieren, aktualisieren, sperren */
-function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy, songs = [], onSongAdd, onSongChange }) {
+function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, onRefresh, voll, onToggleVoll, busy, songs = [], onSongAdd, onSongChange }) {
   const [kopiert, setKopiert] = useState(false);
   const url = token ? kartenLinkUrl(token) : "";
-  const urlPlus = token ? kartenLinkUrlPlus(token) : "";
-  const [kopiertPlus, setKopiertPlus] = useState(false);
+  const urlVorschau = token ? kartenLinkUrlVorschau(token) : "";
+  const [kopiertV, setKopiertV] = useState(false);
+  const [linkName, setLinkName] = useState("");
   const [textEdit, setTextEdit] = useState(null);
   const [sync, setSync] = useState(null);
   const [tapI, setTapI] = useState(null);
-  const kopierenPlus = async () => {
+  const kopierText = async (text, setFlag) => {
     try {
-      await navigator.clipboard.writeText(urlPlus);
-      setKopiertPlus(true);
-      setTimeout(() => setKopiertPlus(false), 2000);
+      await navigator.clipboard.writeText(text);
+      setFlag(true);
+      setTimeout(() => setFlag(false), 2000);
     } catch (e) {
-      window.prompt("Link kopieren:", urlPlus);
+      window.prompt("Link kopieren:", text);
     }
   };
-  const kopieren = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setKopiert(true);
-      setTimeout(() => setKopiert(false), 2000);
-    } catch (e) {
-      window.prompt("Link kopieren:", url);
-    }
+  const namenSetzen = () => {
+    if (token && !window.confirm("Neuer Link-Name: Der bisherige Link bleibt vorerst weiter aktiv und kann unten abgeschaltet werden. Fortfahren?")) return;
+    onCreate(linkName);
+    setLinkName("");
   };
   return (
     <div style={{ ...styles.card, marginBottom: 16 }}>
-      <div style={{ fontWeight: 700, marginBottom: 4 }}>Karten-Link für Eltern</div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Link für Eltern</div>
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
-        Eine Seite mit den Sammelkarten aller aktiven Spieler. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
+        Eine Seite mit Saisonbilanz, Spieltagskarten, Sammelkarten und Mannschaftssongs. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 10 }}>
         <input type="checkbox" checked={voll} onChange={onToggleVoll} disabled={busy} />
@@ -3698,23 +3826,38 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
         <>
           <input readOnly value={url} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
-            <button style={styles.linkBtn} onClick={kopieren}>{kopiert ? "Kopiert ✓" : "Link kopieren"}</button>
+            <button style={styles.linkBtn} onClick={() => kopierText(url, setKopiert)}>{kopiert ? "Kopiert ✓" : "Link kopieren"}</button>
             <button style={styles.linkBtn} onClick={onRefresh} disabled={busy}>Jetzt aktualisieren</button>
             <button style={styles.linkBtn} onClick={() => window.open(url, "_blank")}>Öffnen</button>
-            <button style={styles.linkBtn} onClick={onCreate} disabled={busy}>Neuen Link erzeugen</button>
-            <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={onRevoke} disabled={busy}>Link sperren</button>
+            <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={onRevoke} disabled={busy}>Alle Links sperren</button>
           </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+            <input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="Neuer Link-Name, z. B. Saison 26" style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 1, minWidth: 180 }} />
+            <button style={styles.linkBtn} onClick={namenSetzen} disabled={busy || !linkName.trim()}>Link-Namen ändern</button>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Der Link besteht aus deinem Namen und einem zufälligen Kurzcode, damit er nicht zu erraten ist.</div>
+          {altTokens.length > 0 && (
+            <div style={{ marginTop: 10, fontSize: 12.5 }}>
+              <div style={{ color: "var(--muted)", marginBottom: 4 }}>Frühere Links (funktionieren weiter, zeigen dieselbe Seite):</div>
+              {altTokens.map((t) => (
+                <div key={t} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "2px 0" }}>
+                  <span style={{ wordBreak: "break-all" }}>{kartenLinkUrl(t)}</span>
+                  <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => { if (window.confirm("Diesen alten Link abschalten? Eltern, die ihn gespeichert haben, sehen dann nichts mehr.")) onAltOff(t); }} disabled={busy}>Abschalten</button>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>Erweiterter Link (in Vorbereitung)</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>Vorschau-Link (zum Testen)</div>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
-              Zusätzlich zu den Sammelkarten: alle Spieltagskarten, Saisonbilanz und Bilanz pro Gegner. Gleicher geheimer Token, andere Seite – der normale Link bleibt unverändert.
+              Hier siehst du Änderungen an der Eltern-Seite, bevor sie freigegeben werden. Gleiche Daten wie der Eltern-Link, nur eine andere Darstellung. Eltern sehen sie nicht.
             </div>
-            <input readOnly value={urlPlus} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
+            <input readOnly value={urlVorschau} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
-              <button style={styles.linkBtn} onClick={kopierenPlus}>{kopiertPlus ? "Kopiert ✓" : "Link kopieren"}</button>
-              <button style={styles.linkBtn} onClick={() => window.open(urlPlus, "_blank")}>Öffnen</button>
+              <button style={styles.linkBtn} onClick={() => kopierText(urlVorschau, setKopiertV)}>{kopiertV ? "Kopiert ✓" : "Link kopieren"}</button>
+              <button style={styles.linkBtn} onClick={() => window.open(urlVorschau, "_blank")}>Öffnen</button>
             </div>
-            <div style={{ fontWeight: 600, fontSize: 13.5, margin: "14px 0 4px" }}>Mannschaftssongs (Player auf der erweiterten Seite)</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, margin: "14px 0 4px" }}>Mannschaftssongs (Player auf der Eltern-Seite)</div>
             {songs.map((x, i) => (
               <div key={x.pfad} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13.5, padding: "4px 0" }}>
                 <span style={{ flex: 1, minWidth: 120 }}>{i + 1}. {x.titel}</span>
@@ -3760,7 +3903,10 @@ function KartenLinkBox({ token, onCreate, onRevoke, onRefresh, voll, onToggleVol
           </div>
         </>
       ) : (
-        <button style={styles.secondaryBtn} onClick={onCreate} disabled={busy}>Link erzeugen</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="Link-Name, z. B. Saison 26" style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 1, minWidth: 180 }} />
+          <button style={styles.secondaryBtn} onClick={() => { onCreate(linkName); setLinkName(""); }} disabled={busy}>Link erzeugen</button>
+        </div>
       )}
     </div>
   );
@@ -9633,8 +9779,10 @@ styleSheet.textContent =
 document.head.appendChild(styleSheet);
 
 try {
-  const kartenToken = new URLSearchParams(window.location.search).get("karten");
-  ReactDOM.createRoot(document.getElementById("root")).render(kartenToken ? (new URLSearchParams(window.location.search).get("seite") === "erweitert" ? <KartenSeitePlus token={kartenToken} /> : <KartenSeite token={kartenToken} />) : <Root />);
+  const suche = new URLSearchParams(window.location.search);
+  const pfadMatch = window.location.pathname.match(/^\/([a-z0-9][a-z0-9-]{6,63})\/?$/);
+  const kartenToken = suche.get("karten") || (pfadMatch ? pfadMatch[1] : null);
+  ReactDOM.createRoot(document.getElementById("root")).render(kartenToken ? (suche.get("seite") === "vorschau" ? <KartenSeiteVorschau token={kartenToken} /> : <KartenSeitePlus token={kartenToken} />) : <Root />);
   document.getElementById("root").dataset.rendered = "true";
 } catch (e) {
   document.getElementById("root").innerHTML =
