@@ -1430,6 +1430,25 @@ function ZugaengeVerwaltung({ teams }) {
           <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_ZUGAENGE}</pre>
         </div>
       )}
+      {!fehler && codes !== null && (
+        <div style={{ ...styles.card, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <KartenTitel>Neuen Code anlegen</KartenTitel>
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <select style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+            <option value="*">Alle Teams (Admin)</option>
+          </select>
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={code} onChange={(e) => setCode(e.target.value)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={styles.primaryBtn} onClick={anlegen}>Code anlegen</button>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
+          </div>
+        </div>
+      )}
       {codes === null ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
       ) : (
@@ -1459,25 +1478,6 @@ function ZugaengeVerwaltung({ teams }) {
             </div>
           ))}
           {codes.length === 0 && !fehler && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Codes.</div>}
-        </div>
-      )}
-      {!fehler && codes !== null && (
-        <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <KartenTitel>Neuen Code anlegen</KartenTitel>
-          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
-          <select style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-            <option value="*">Alle Teams (Admin)</option>
-          </select>
-          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={code} onChange={(e) => setCode(e.target.value)} />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={styles.primaryBtn} onClick={anlegen}>Code anlegen</button>
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
-          </div>
         </div>
       )}
     </section>
@@ -7701,6 +7701,7 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
     .sort((a, b) => b.tore - a.tore);
 
   return (
+    <>
     <div style={{ marginTop: 8 }}>
       <KartenTitel block>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</KartenTitel>
 
@@ -7734,10 +7735,13 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
               <div style={styles.statLabel}>Tore</div>
             </div>
           </div>
+        </>
+      )}
+    </div>
 
-          {torschuetzen.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={styles.subheading}>Torschützenliste</div>
+    {spieleDerSaison.length > 0 && torschuetzen.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <KartenTitel block>Torschützenliste</KartenTitel>
               <div style={styles.tableWrap}>
                 <table style={styles.table}>
                   <tbody>
@@ -7754,10 +7758,8 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
                 </table>
               </div>
             </div>
-          )}
-        </>
-      )}
-    </div>
+    )}
+    </>
   );
 }
 
