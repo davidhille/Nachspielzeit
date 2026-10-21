@@ -8421,7 +8421,7 @@ function GoalStepper({ value, onChange }) {
   );
 }
 
-function ChevronIcon({ size = 14, open }) {
+function ChevronIcon({ size = 16, open }) {
   return (
     <svg
       width={size}
@@ -11042,7 +11042,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                     >
                       <TrashIcon size={14} />
                     </button>
-                    <ChevronIcon open={open} />
+                    <span aria-hidden="true" style={{ flex: "none", display: "inline-flex", color: "var(--muted)" }}><ChevronIcon open={open} /></span>
                   </div>
                 </div>
                 {!open && (
