@@ -543,8 +543,19 @@ let SAISON = { start: 9, ende: 7 };
 const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.25, unentschuldigt: -0.25, entschuldigt: 0 };
 const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
 const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
+let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "" } };
 const setzeEinstellungen = (cfg) => {
   cfg = cfg || {};
+  const tr = cfg.training_std || {};
+  STANDARDS = {
+    training: {
+      tage: Array.isArray(tr.tage) && tr.tage.length ? tr.tage.map(Number).filter((x) => x >= 0 && x <= 6) : [2, 4],
+      von: tr.von || "16:30",
+      bis: tr.bis || "17:45",
+      wochen: Math.max(1, Math.min(52, Number(tr.wochen) || 8)),
+    },
+    spieltag: { zeit: (cfg.spieltag_std && cfg.spieltag_std.zeit) || "", ort: (cfg.spieltag_std && cfg.spieltag_std.ort) || "" },
+  };
   const st = Number(cfg.saison_start), en = Number(cfg.saison_ende);
   SAISON = st >= 1 && st <= 12 && en >= 1 && en <= 12 && en < st ? { start: st, ende: en } : { start: 9, ende: 7 };
   SPIELTAG_WERTUNG = ["ergebnisse", "teilnehmer", "datum"].includes(cfg.spieltag_wertung) ? cfg.spieltag_wertung : "ergebnisse";
@@ -1477,6 +1488,14 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [titel, setTitel] = useState(cfg.eltern_titel || "");
   const [fotoUrl, setFotoUrl] = useState(cfg.team_photo_url || "");
   const [fotoBusy, setFotoBusy] = useState(false);
+  const trs = cfg.training_std || {};
+  const [trTage, setTrTage] = useState(Array.isArray(trs.tage) && trs.tage.length ? trs.tage.map(Number) : [2, 4]);
+  const [trVon, setTrVon] = useState(trs.von || "16:30");
+  const [trBis, setTrBis] = useState(trs.bis || "17:45");
+  const [trWochen, setTrWochen] = useState(String(trs.wochen || 8));
+  const [stZeit, setStZeit] = useState((cfg.spieltag_std && cfg.spieltag_std.zeit) || "");
+  const [stOrt, setStOrt] = useState((cfg.spieltag_std && cfg.spieltag_std.ort) || "");
+  const [startTab, setStartTab] = useState(cfg.start_tab || "letzte");
   const [saisonStart, setSaisonStart] = useState(String(cfg.saison_start || 9));
   const [saisonEnde, setSaisonEnde] = useState(String(cfg.saison_ende || 7));
   const [wertung, setWertung] = useState(cfg.spieltag_wertung || "ergebnisse");
@@ -1525,6 +1544,10 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (!(sE < sS)) { setStatus("Das Saisonende muss vor dem Saisonbeginn liegen (z. B. Beginn September, Ende Juli)."); return; }
       if (sS === 9 && sE === 7) { delete neuCfg.saison_start; delete neuCfg.saison_ende; } else { neuCfg.saison_start = sS; neuCfg.saison_ende = sE; }
       if (wertung === "ergebnisse") delete neuCfg.spieltag_wertung; else neuCfg.spieltag_wertung = wertung;
+      const trNeu = { tage: [...trTage].sort(), von: trVon || "16:30", bis: trBis || "17:45", wochen: Math.max(1, Math.min(52, parseInt(trWochen, 10) || 8)) };
+      if (JSON.stringify(trNeu) === JSON.stringify({ tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }) || trNeu.tage.length === 0) delete neuCfg.training_std; else neuCfg.training_std = trNeu;
+      if (stZeit || stOrt.trim()) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim() }; else delete neuCfg.spieltag_std;
+      if (startTab === "letzte") delete neuCfg.start_tab; else neuCfg.start_tab = startTab;
       const bNeu = {};
       Object.keys(bewertung).forEach((k) => {
         const std = { ...KARTEN_STD, ...TEILNAHME_STD }[k];
@@ -1620,6 +1643,38 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             Ab dem Saisonbeginn starten Bilanz, Quoten und Karten bei null. Die Monate dazwischen gelten als Sommerpause ohne Wertung. Standard: September bis Juli.
           </div>
         </div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Standard für neue Trainings
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+            {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+              const an = trTage.includes(d);
+              return <button key={d} onClick={() => setTrTage(an ? trTage.filter((x) => x !== d) : [...trTage, d])} style={{ ...styles.chip, ...(an ? styles.chipActive : {}), minHeight: 38, padding: "6px 12px" }}>{WOCHENTAGE[d]}</button>;
+            })}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap", fontWeight: 400 }}>
+            von <input type="time" style={{ ...styles.input, width: "auto" }} value={trVon} onChange={(e) => setTrVon(e.target.value)} />
+            bis <input type="time" style={{ ...styles.input, width: "auto" }} value={trBis} onChange={(e) => setTrBis(e.target.value)} />
+            für <input type="number" min="1" max="52" style={{ ...styles.input, width: 70 }} value={trWochen} onChange={(e) => setTrWochen(e.target.value)} /> Wochen
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Vorbelegung beim Anlegen von Trainingsterminen im Trainingsplan.</div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Standard für neue Spieltage
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontWeight: 400 }}>
+            Uhrzeit <input type="time" style={{ ...styles.input, width: "auto" }} value={stZeit} onChange={(e) => setStZeit(e.target.value)} />
+            Ort <input style={{ ...styles.input, flex: 1, minWidth: 160 }} value={stOrt} placeholder="z. B. Sportanlage Heimstetten" onChange={(e) => setStOrt(e.target.value)} />
+          </div>
+        </div>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Startansicht der App
+          <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={startTab} onChange={(e) => setStartTab(e.target.value)}>
+            <option value="letzte">Zuletzt geöffneter Bereich (Standard)</option>
+            <option value="dashboard">Übersicht</option>
+            <option value="training">Training bewerten</option>
+            <option value="spieltage">Spieltage</option>
+            <option value="taktik">Taktik</option>
+          </select>
+        </label>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Wann zählt ein Spieltag als gespielt?
           <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={wertung} onChange={(e) => setWertung(e.target.value)}>
@@ -2090,6 +2145,7 @@ function App() {
   const [teamSettings, setTeamSettings] = useState({});
   const [features, setFeatures] = useState({});
   const [teamInfo, setTeamInfo] = useState(null);
+  const startTabErledigt = useRef(false);
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
   const [trashSpieltage, setTrashSpieltage] = useState([]);
@@ -2252,7 +2308,13 @@ function App() {
       );
       setTeamSettings(teamSettingsRaw[0] || {});
       setFeatures(Object.fromEntries(featuresRaw.map((r) => [r.key, r.enabled !== false])));
-      setTeamInfo(teamsRaw.find((t) => t.id === CURRENT_TEAM) || null);
+      const ti = teamsRaw.find((t) => t.id === CURRENT_TEAM) || null;
+      setTeamInfo(ti);
+      const st = ti && ti.config && ti.config.start_tab;
+      if (!startTabErledigt.current) {
+        startTabErledigt.current = true;
+        if (st && st !== "letzte") setTab(st);
+      }
       setUebungen(
         uebungenRaw
           .filter((u) => !u.deleted_at)
@@ -9876,13 +9938,13 @@ function TrainingsplanBereich({
   onSaveTerminNotiz,
 }) {
   const uebungProps = { uebungen, trainingUebungen, onAddTrainingUebung, onRemoveTrainingUebung, onMoveTrainingUebung, onSaveTerminNotiz };
-  const [wochentage, setWochentage] = useState([2, 4]);
-  const [wochen, setWochen] = useState(8);
+  const [wochentage, setWochentage] = useState(STANDARDS.training.tage);
+  const [wochen, setWochen] = useState(STANDARDS.training.wochen);
   const [startDatum, setStartDatum] = useState(todayISO());
   const [terminTab, setTerminTab] = useState("kommende");
   const [terminTyp, setTerminTyp] = useState("training");
-  const [vonZeit, setVonZeit] = useState("16:30");
-  const [bisZeit, setBisZeit] = useState("17:45");
+  const [vonZeit, setVonZeit] = useState(STANDARDS.training.von);
+  const [bisZeit, setBisZeit] = useState(STANDARDS.training.bis);
   const [rhythmus, setRhythmus] = useState("woechentlich");
 
   const toggleWochentag = (idx) => {
@@ -9892,8 +9954,8 @@ function TrainingsplanBereich({
   const waehleTyp = (typ) => {
     setTerminTyp(typ);
     if (typ === "training") {
-      setVonZeit("16:30");
-      setBisZeit("17:45");
+      setVonZeit(STANDARDS.training.von);
+      setBisZeit(STANDARDS.training.bis);
     } else {
       setVonZeit("");
       setBisZeit("");
@@ -10637,9 +10699,9 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
   const [openSpieltagId, setOpenSpieltagId] = useState(null);
   const [gegnerHinzufuegen, setGegnerHinzufuegen] = useState(false);
   const [neuerGegnerId, setNeuerGegnerId] = useState("");
-  const [neueZeit, setNeueZeit] = useState("");
+  const [neueZeit, setNeueZeit] = useState(STANDARDS.spieltag.zeit);
   const [neuerTyp, setNeuerTyp] = useState("spieltag");
-  const [neuerOrt, setNeuerOrt] = useState("");
+  const [neuerOrt, setNeuerOrt] = useState(STANDARDS.spieltag.ort);
 
   const sorted = [...spieltage].sort((a, b) => b.date.localeCompare(a.date));
   const nummern = useMemo(() => spieltagNummern(spieltage), [spieltage]);
