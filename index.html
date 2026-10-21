@@ -7357,7 +7357,7 @@ function formatGeburtsdatum(iso) {
 }
 
 /* Nachname und Geburtsdatum (Spielerverwaltung); Speichern beim Verlassen des Feldes */
-function PlayerStammdaten({ player, onSave }) {
+function PlayerStammdaten({ player, onSave, trikot }) {
   const [nachname, setNachname] = useState(player.nachname || "");
   const [geb, setGeb] = useState(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
   const [spitz, setSpitz] = useState(player.spitzname || "");
@@ -7368,6 +7368,17 @@ function PlayerStammdaten({ player, onSave }) {
   }, [player.nachname, player.geburtsdatum, player.spitzname]);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px 12px" }}>
+      {trikot}
+      <div>
+        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
+        <input
+          type="date"
+          style={{ ...styles.input, width: "100%" }}
+          value={geb}
+          onChange={(e) => setGeb(e.target.value)}
+          onBlur={() => geb !== (player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "") && onSave({ geburtsdatum: geb || null })}
+        />
+      </div>
       <div>
         <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Nachname (nur im Profil)</label>
         <input
@@ -7386,16 +7397,6 @@ function PlayerStammdaten({ player, onSave }) {
           placeholder="z. B. Der Turbo"
           onChange={(e) => setSpitz(e.target.value)}
           onBlur={() => spitz.trim() !== (player.spitzname || "") && onSave({ spitzname: spitz.trim() || null })}
-        />
-      </div>
-      <div>
-        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
-        <input
-          type="date"
-          style={{ ...styles.input, width: "100%" }}
-          value={geb}
-          onChange={(e) => setGeb(e.target.value)}
-          onBlur={() => geb !== (player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "") && onSave({ geburtsdatum: geb || null })}
         />
       </div>
     </div>
@@ -9947,34 +9948,39 @@ function SpielerBereich({
 
               {open && (
                 <div style={styles.basisGrid}>
-                  <div style={styles.basisItem}>
-                    <label style={styles.label}>Basis-Qualität</label>
-                    <input
-                      type="range"
-                      min={0}
-                      max={40}
-                      step={0.5}
-                      value={wert}
-                      onChange={(e) => onBasisChange(p.id, Number(e.target.value))}
-                      style={styles.range}
-                    />
-                    <span style={styles.rangeValue}>{wert.toFixed(1)}</span>
+                  <div>
+                    <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Basis-Qualität</label>
+                    <div style={styles.basisItem}>
+                      <input
+                        type="range"
+                        min={0}
+                        max={40}
+                        step={0.5}
+                        value={wert}
+                        onChange={(e) => onBasisChange(p.id, Number(e.target.value))}
+                        style={styles.range}
+                      />
+                      <span style={styles.rangeValue}>{wert.toFixed(1)}</span>
+                    </div>
                   </div>
-                  <div style={styles.basisItem}>
-                    <label style={styles.label}>Trikotnummer</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={99}
-                      style={{ ...styles.input, flex: "none", width: 90 }}
-                      value={p.trikotnummer ?? ""}
-                      onChange={(e) =>
-                        onTrikotnummerChange(p.id, e.target.value === "" ? null : Number(e.target.value))
-                      }
-                    />
-                    <JerseyBadge number={p.trikotnummer} size={42} />
-                  </div>
-                  <PlayerStammdaten player={p} onSave={(patch) => onUpdatePlayer && onUpdatePlayer(p.id, patch)} />
+                  <PlayerStammdaten trikot={(
+                      <div>
+                        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Trikotnummer</label>
+                        <div style={styles.basisItem}>
+                          <input
+                            type="number"
+                            min={0}
+                            max={99}
+                            style={{ ...styles.input, flex: "none", width: 90 }}
+                            value={p.trikotnummer ?? ""}
+                            onChange={(e) =>
+                              onTrikotnummerChange(p.id, e.target.value === "" ? null : Number(e.target.value))
+                            }
+                          />
+                          <JerseyBadge number={p.trikotnummer} size={36} />
+                        </div>
+                      </div>
+                    )} player={p} onSave={(patch) => onUpdatePlayer && onUpdatePlayer(p.id, patch)} />
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <button
                       style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
@@ -10251,7 +10257,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
           )}
         </span>
         <span>
-          {formatTerminLabel(termin.date)}
+          <strong>{formatTerminLabel(termin.date)}</strong>
           {istHalle && <span style={{ ...styles.mutedTag, color: "var(--gold-2)" }}> · Hallentraining</span>}
           {abgesagt && <span style={{ ...styles.mutedTag, color: "var(--danger-text)" }}> · abgesagt</span>}
           {!bearbeiten && termin.start_zeit && termin.end_zeit && (
