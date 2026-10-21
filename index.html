@@ -5601,7 +5601,9 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
     </div>
   );
   return (
-    <div style={{ ...styles.card, marginBottom: 16 }}>
+    <section>
+    <h3 style={{ ...styles.h3, marginTop: 4 }}>Eltern-Seite</h3>
+    <div style={{ ...styles.card, marginBottom: 12 }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>Link für Eltern</div>
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
         Eine Seite mit Saisonbilanz, Spieltagskarten, Sammelkarten und Mannschaftssongs. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
@@ -5632,8 +5634,16 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
               ))}
             </div>
           )}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>Vorschau-Link (zum Testen)</div>
+        </>
+      ) : (
+        namensFelder
+      )}
+    </div>
+    {token && (
+      <>
+    <div style={{ ...styles.card, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>Vorschau-Link (zum Testen)</div>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
               Hier siehst du Änderungen an der Eltern-Seite, bevor sie freigegeben werden. Gleiche Daten wie der Eltern-Link, nur eine andere Darstellung. Eltern sehen sie nicht.
             </div>
@@ -5642,7 +5652,11 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
               <button style={styles.linkBtn} onClick={() => kopierText(urlVorschau, setKopiertV)}>{kopiertV ? "Kopiert ✓" : "Link kopieren"}</button>
               <button style={styles.linkBtn} onClick={() => window.open(urlVorschau, "_blank")}>Öffnen</button>
             </div>
-            <div style={{ fontWeight: 600, fontSize: 13.5, margin: "14px 0 4px" }}>Mannschaftssongs (Player auf der Eltern-Seite)</div>
+          </div>
+    </div>
+    <div style={{ ...styles.card, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Mannschaftssongs (Player auf der Eltern-Seite)</div>
             {songs.map((x, i) => (
               <div key={x.pfad} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13.5, padding: "4px 0" }}>
                 <span style={{ flex: 1, minWidth: 120 }}>{i + 1}. {x.titel}</span>
@@ -5686,11 +5700,10 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
                 onChange={(e) => { const f = Array.from(e.target.files || []); e.target.value = ""; if (f.length) onSongAdd(f); }} />
             </label>
           </div>
-        </>
-      ) : (
-        namensFelder
-      )}
     </div>
+      </>
+    )}
+    </section>
   );
 }
 
