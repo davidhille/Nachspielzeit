@@ -4171,7 +4171,7 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
   const liste = boards.slice().sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                 <button style={styles.secondaryBtn} onClick={neu}>+ Neues Board</button>
       </div>
       {liste.length === 0 && <EmptyState text="Noch kein Board angelegt. Mit „+ Neues Board“ geht es los." />}
@@ -10485,7 +10485,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 6 }}>
                 <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
       </div>
       <p style={styles.hintBlock}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</p>
