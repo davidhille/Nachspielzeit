@@ -882,11 +882,11 @@ notify pgrst, 'reload schema';`;
 
   return (
     <section>
-      <h2 style={styles.h2}>Spieler-Import</h2>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
-        CSV-Export aus dem DFBnet hochladen (Spalten: Name, Vorname, Geb., Passnummer). Übernommen werden Nachname, Geburtsdatum und Passnummer. Es wird nichts gelöscht.
-      </div>
       <div style={styles.card}>
+        <h3 style={styles.h3}>Spieler-Import</h3>
+        <div style={styles.cardDesc}>
+        CSV-Export aus dem DFBnet hochladen (Spalten: Name, Vorname, Geb., Passnummer). Übernommen werden Nachname, Geburtsdatum und Passnummer. Es wird nichts gelöscht.
+        </div>
         <input type="file" accept=".csv,text/csv,text/plain" onChange={(e) => e.target.files[0] && ladeDatei(e.target.files[0])} />
       </div>
       {fehler && (
@@ -1267,13 +1267,10 @@ function UebungenAdmin({ teams }) {
   const gefiltert = filterUebungen(normiert, suche, kwFilter);
   return (
     <section>
-      <h2 style={styles.h2}>Übungen</h2>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
-        Übungen importieren und Teams zuordnen. Eine Übung gehört entweder einem Team oder allen Teams (dann ist sie in jeder Team-App sichtbar, ändern können sie nur Admins).
-      </div>
       {fehler && <div style={{ ...styles.editBanner, marginBottom: 12 }}>{fehler}</div>}
       <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>Übungen importieren</div>
+        <h3 style={{ ...styles.h3, marginBottom: 0 }}>Übungen importieren</h3>
+        <div style={styles.cardDesc}>Übungen importieren und Teams zuordnen. Eine Übung gehört entweder einem Team oder allen Teams (dann ist sie in jeder Team-App sichtbar, ändern können sie nur Admins).</div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Zuordnung der importierten Übungen
           <div style={{ marginTop: 6 }}>
@@ -1418,9 +1415,11 @@ function ZugaengeVerwaltung({ teams }) {
   };
   return (
     <section>
-      <h2 style={styles.h2}>Zugänge</h2>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+        <h3 style={styles.h3}>Zugänge</h3>
+        <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
         Jedes Team hat eigene Zugangscodes und sieht nur seine Daten. Ein Code ohne Team („Alle Teams“) ist ein Admin-Code und funktioniert auch in der Administration.
+        </div>
       </div>
       {fehler && (
         <div style={{ ...styles.editBanner, marginBottom: 12 }}>
@@ -1586,11 +1585,13 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   }
   return (
     <section>
-      <h2 style={styles.h2}>Einstellungen · {teamRow.name}</h2>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
-        Einstellungen gelten nur für dieses Team. Die Änderung gilt nach dem nächsten Laden der App.
-      </div>
       <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <h3 style={styles.h3}>Einstellungen · {teamRow.name}</h3>
+          <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
+        Einstellungen gelten nur für dieses Team. Die Änderung gilt nach dem nächsten Laden der App.
+          </div>
+        </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Teamname
           <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={name} onChange={(e) => setName(e.target.value)} />
@@ -1796,9 +1797,11 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
   };
   return (
     <section>
-      <h2 style={styles.h2}>Teams</h2>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+        <h3 style={styles.h3}>Teams</h3>
+        <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
         Jedes Team hat eigene Spieler, Trainings, Spieltage und Übungen sowie eigene Funktionen und Einstellungen. Die App eines Teams läuft unter <b>kürzel.nachspielzeit.app</b>.
+        </div>
       </div>
       {fehler && <SqlHinweis fehler={fehler} />}
       <div className="card-list" style={styles.cardList}>
@@ -2040,8 +2043,8 @@ notify pgrst, 'reload schema';`;
       <main className="app-main" style={styles.main}>
         {tab === "backup" && (
           <section>
-            <h2 style={styles.h2}>Backup</h2>
             <div style={styles.card}>
+              <h3 style={styles.h3}>Backup</h3>
               <div style={{ fontSize: 14, lineHeight: 1.5 }}>
                 Lädt alle Daten der App (Spieler, Trainings, Spieltage, Übungen, Notizen, Einstellungen …) als eine JSON-Datei herunter. Bilder liegen im Supabase-Storage und sind nur als Link enthalten.
               </div>
@@ -2075,9 +2078,11 @@ notify pgrst, 'reload schema';`;
 
         {tab === "funktionen" && (
           <section>
-            <h2 style={styles.h2}>Funktionen · {teamName}</h2>
-            <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+            <div style={{ ...styles.card, marginBottom: 14 }}>
+              <h3 style={styles.h3}>Funktionen · {teamName}</h3>
+              <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
               Deaktivierte Funktionen verschwinden in der App dieses Teams ({team}.nachspielzeit.app). Die Daten bleiben erhalten. Die Änderung gilt nach dem nächsten Laden der App.
+              </div>
             </div>
             {featureFehler && (
               <div style={{ ...styles.editBanner, marginBottom: 12 }}>
@@ -2122,8 +2127,10 @@ notify pgrst, 'reload schema';`;
                         <div key={f.key} style={styles.card}>{zeile(f, false)}</div>
                       ))}
                     </div>
-                    <h3 style={{ ...styles.h3, marginTop: 4 }}>Eltern-Seite</h3>
-                    <div style={{ ...styles.card, maxWidth: 720, marginBottom: 16 }}>{eltern.map((f) => zeile(f, true))}</div>
+                    <div style={{ ...styles.card, marginBottom: 16 }}>
+                      <h3 style={styles.h3}>Eltern-Seite</h3>
+                      {eltern.map((f) => zeile(f, true))}
+                    </div>
                   </>
                 );
               })()
@@ -11497,6 +11504,7 @@ const styles = {
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
   empty: { background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 14 },
+  cardDesc: { fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", margin: "0 0 12px" },
   hint: { fontSize: 13, color: "var(--muted)", marginTop: -4, marginBottom: 6 },
   toast: {
     position: "fixed",
