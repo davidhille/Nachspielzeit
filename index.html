@@ -97,10 +97,10 @@
     .app-header { padding-left: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; padding-right: max(40px, calc((100% - 1200px) / 2 + 40px)) !important; }
     .team-hero { max-width: 520px; margin-left: auto; margin-right: auto; }
     /* Übersicht: Mannschaftsbild links, Spieler-Slider rechts (gleiche Höhe), Termine darunter */
-    .dash-top { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 28px; align-items: stretch; margin-bottom: 8px; }
+    .dash-top { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 28px; align-items: stretch; margin-bottom: 0; }
     .dash-top .team-hero { max-width: none; margin: 0 0 12px 0; }
     .dash-top .spieler-wrap { display: flex; flex-direction: column; min-width: 0; margin: 0 0 12px 0 !important; }
-    .dash-top .spieler-label { padding-top: 36px; }
+    .dash-top .spieler-label { padding-top: 0; line-height: 16px; }
     .dash-top .spieler-slider { flex: 1; min-height: 0; padding-bottom: 0; }
     .dash-top .spieler-karte { width: calc((100% - 28px) / 3); height: 100%; }
     .dash-top .spieler-karte > div { max-width: none !important; }
@@ -6372,13 +6372,8 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
     <>
     <div className={titleAbove ? "team-hero" : undefined} style={titleAbove ? { marginBottom } : undefined}>
     {titleAbove && (
-      <div className="hero-kopf" style={{ marginBottom: 8 }}>
-        <div style={{ ...styles.h2, margin: 0, height: 36, lineHeight: "28px" }}>{teamName}</div>
-        {(seasonLabel || subtitle) && (
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px" }}>
-            {subtitle ? subtitle : `Saison ${seasonLabel}`}
-          </div>
-        )}
+      <div className="hero-kopf" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
+        Mannschaft
       </div>
     )}
     <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))", boxShadow: "0 12px 26px rgba(142,20,22,0.35)" } : undefined}>
@@ -6628,10 +6623,8 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
   };
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div className="termine-label" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
-        Nächste Termine
-      </div>
+    <div style={{ ...styles.card, marginBottom: 14 }}>
+      <KartenTitel>Nächste Termine</KartenTitel>
       {kommende.length === 0 ? (
         <EmptyState text="Keine anstehenden Termine." />
       ) : (
@@ -6836,6 +6829,8 @@ function Dashboard({
 
   return (
     <section>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+      <KartenTitel>{season ? `Saison ${season.replace("-", "/")}` : "Saison"}</KartenTitel>
       <div className={fMannschaftsbild ? "dash-top" : undefined}>
         <div className="dash-left" style={{ minWidth: 0 }}>
           {fMannschaftsbild && (
@@ -6849,6 +6844,7 @@ function Dashboard({
         )}
         </div>
         <SpielerSlider rows={rows} players={players} onSelect={onSelectPlayer} />
+      </div>
       </div>
       <div className="dash-side">
         <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
