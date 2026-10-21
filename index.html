@@ -1728,15 +1728,15 @@ notify pgrst, 'reload schema';`;
             {features === null ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
             ) : (
-              <div className="card-list" style={styles.cardList}>
-                {FEATURES.map((f) => {
+              (() => {
+                const elternOben = (k) => { const x = FEATURES.find((q) => q.key === k); return !x || (features[k] !== false && (!x.unter || elternOben(x.unter))); };
+                const zeile = (f, imBlock) => {
                   const an = features[f.key] !== false;
-                  const elternOben = (k) => { const x = FEATURES.find((q) => q.key === k); return !x || (features[k] !== false && (!x.unter || elternOben(x.unter))); };
                   const aktiv = !f.unter || elternOben(f.unter);
                   return (
-                    <div key={f.key} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, marginLeft: f.unter ? (f.ebene === 2 ? 56 : 28) : 0, opacity: aktiv ? 1 : 0.5 }}>
+                    <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: imBlock ? "10px 0" : 0, paddingLeft: imBlock && f.unter ? (f.ebene === 2 ? 44 : 22) : 0, borderTop: imBlock && f.unter ? "1px solid var(--divider)" : "none", opacity: aktiv ? 1 : 0.5 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{f.label}</div>
+                        <div style={{ fontWeight: imBlock && f.ebene === 2 ? 600 : 700, fontSize: 14 }}>{f.label}</div>
                         <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{f.beschreibung}</div>
                       </div>
                       <button
@@ -1745,23 +1745,26 @@ notify pgrst, 'reload schema';`;
                         aria-label={f.label}
                         disabled={speichert === f.key}
                         onClick={() => schalte(f.key, !an)}
-                        style={{
-                          width: 52,
-                          height: 30,
-                          borderRadius: 999,
-                          border: "none",
-                          background: an ? "var(--success-text)" : "var(--border-strong)",
-                          position: "relative",
-                          flexShrink: 0,
-                          cursor: "pointer",
-                        }}
+                        style={{ width: 52, height: 30, borderRadius: 999, border: "none", background: an ? "var(--success-text)" : "var(--border-strong)", position: "relative", flexShrink: 0, cursor: "pointer" }}
                       >
                         <span style={{ position: "absolute", top: 3, left: an ? 25 : 3, width: 24, height: 24, borderRadius: 999, background: "#fff", transition: "left 120ms ease" }} />
                       </button>
                     </div>
                   );
-                })}
-              </div>
+                };
+                const eltern = FEATURES.filter((f) => f.key === "eltern_seite" || f.unter);
+                return (
+                  <>
+                    <div className="card-list" style={styles.cardList}>
+                      {FEATURES.filter((f) => !eltern.includes(f)).map((f) => (
+                        <div key={f.key} style={styles.card}>{zeile(f, false)}</div>
+                      ))}
+                    </div>
+                    <h3 style={{ ...styles.h3, marginTop: 4 }}>Eltern-Seite</h3>
+                    <div style={{ ...styles.card, maxWidth: 720, marginBottom: 16 }}>{eltern.map((f) => zeile(f, true))}</div>
+                  </>
+                );
+              })()
             )}
           </section>
         )}
