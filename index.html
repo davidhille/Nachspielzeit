@@ -2654,9 +2654,9 @@ function tkBogenGriff(l, g) {
   const a = pts[0], b = pts[pts.length - 1], c = g.toS(l.bogen[0], l.bogen[1]);
   return [0.25 * a[0] + 0.5 * c[0] + 0.25 * b[0], 0.25 * a[1] + 0.5 * c[1] + 0.25 * b[1]];
 }
-function tkStandardBogen(a, b, g) {
+function tkStandardBogen(a, b, g, vz = 1) {
   const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  return g.toN(m[0] - (b[1] - a[1]) * 0.25, m[1] + (b[0] - a[0]) * 0.25);
+  return g.toN(m[0] - vz * (b[1] - a[1]) * 0.25, m[1] + vz * (b[0] - a[0]) * 0.25);
 }
 function tkWelle(pts, amp, lam) {
   const cum = [0];
@@ -3037,6 +3037,14 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const [breit, setBreit] = useState(() => window.innerWidth >= window.innerHeight);
   const [exportiert, setExportiert] = useState(false);
   const [bogenAn, setBogenAn] = useState(false);
+  const [bogenSeite, setBogenSeite] = useState(1);
+  const [schleife, setSchleife] = useState(false);
+  const [tempo, setTempo] = useState(1);
+  const schleifeRef = useRef(false);
+  const tempoRef = useRef(1);
+  const weiterRef = useRef(false);
+  schleifeRef.current = schleife;
+  tempoRef.current = tempo;
   const [fTeam, setFTeam] = useState("wir");
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -3161,7 +3169,8 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   };
 
   const onDown = (e) => {
-    if (anim || dragRef.current) return;
+    if (anim) { if (anim.wait) weiterRef.current = true; return; }
+    if (dragRef.current) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const s = punkt(e);
     const [nx, ny] = g.toN(s[0], s[1]);
@@ -3207,7 +3216,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
         svg.setPointerCapture(e.pointerId);
       }
     } else {
-      dragRef.current = { kind: "draw", pid: e.pointerId, bogen: bogenAn && tool !== "frei" };
+      dragRef.current = { kind: "draw", pid: e.pointerId, bogen: bogenAn && tool !== "frei", seite: bogenSeite };
       setDraft({ art: tool, punkte: [[nx, ny]], farbe });
       svg.setPointerCapture(e.pointerId);
     }
@@ -3262,7 +3271,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           return { ...dr, punkte: [...dr.punkte, [nx, ny]] };
         }
         const a = g.toS(dr.punkte[0][0], dr.punkte[0][1]);
-        return { ...dr, punkte: [dr.punkte[0], [nx, ny]], bogen: d.bogen ? tkStandardBogen(a, s, g) : undefined };
+        return { ...dr, punkte: [dr.punkte[0], [nx, ny]], bogen: d.bogen ? tkStandardBogen(a, s, g, d.seite) : undefined };
       });
     }
   };
@@ -3405,6 +3414,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const neuerSchritt = () =>
     aendern((nd, step, idx) => {
       const kopie = { objekte: tkKopie(step.objekte), linien: tkKopie(step.linien.filter((l) => l.art === "verbindung")) };
+      ["pause", "dauer", "warten"].forEach((k) => { if (step[k] != null) kopie[k] = step[k]; });
       nd.schritte.splice(idx + 1, 0, kopie);
     }) || setSchritt(sIdx + 1);
   const schrittLoeschen = () => {
@@ -3417,39 +3427,54 @@ function TaktikEditor({ board, players, onSave, onClose }) {
 
   const stoppen = () => { cancelAnimationFrame(rafRef.current); setAnim(null); };
   const abspielen = () => {
-    const n = dataRef.current.schritte.length;
-    if (n < 2) return;
+    if (dataRef.current.schritte.length < 2) return;
     setSel(null);
     setDraft(null);
-    let i = sIdx >= n - 1 ? 0 : sIdx;
+    let i = sIdx >= dataRef.current.schritte.length - 1 ? 0 : sIdx;
+    let phase = "hold";
     let t0 = performance.now();
-    const DAUER = 1700, HALT = 600;
+    weiterRef.current = false;
+    setSchritt(i);
     const loop = (now) => {
-      const el = now - t0;
-      if (el < DAUER) setAnim({ i, t: el / DAUER });
-      else if (el < DAUER + HALT) setAnim({ i, t: 1 });
-      else {
-        i++;
-        t0 = now;
-        if (i >= n - 1) {
-          setAnim(null);
-          setSchritt(n - 1);
-          return;
+      const sch = dataRef.current.schritte;
+      const n = sch.length;
+      if (i > n - 1) i = n - 1;
+      const stp = sch[i];
+      const el = (now - t0) * tempoRef.current;
+      if (phase === "hold") {
+        const wait = !!stp.warten && i < n - 1;
+        setAnim((p) => (p && p.hold && p.i === i && p.wait === wait ? p : { i, hold: true, wait }));
+        if (wait ? weiterRef.current : el >= (stp.pause != null ? stp.pause : 0.6) * 1000) {
+          weiterRef.current = false;
+          if (i >= n - 1) {
+            if (schleifeRef.current) { i = 0; t0 = now; setSchritt(0); }
+            else { setAnim(null); setSchritt(n - 1); return; }
+          } else { phase = "move"; t0 = now; }
         }
+      } else {
+        const dur = (stp.dauer != null ? stp.dauer : 1.7) * 1000;
+        if (el < dur) setAnim({ i, t: el / dur });
+        else { i++; phase = "hold"; t0 = now; setSchritt(i); }
       }
       rafRef.current = requestAnimationFrame(loop);
     };
-    setSchritt(i);
     rafRef.current = requestAnimationFrame(loop);
   };
 
   let objekte = st.objekte, linien = st.linien, linienOp = 1, anzSchritt = sIdx;
   if (anim) {
-    const A = data.schritte[anim.i], B = data.schritte[anim.i + 1];
-    objekte = tkZwischen(A, B, anim.t);
-    linien = A.linien;
-    linienOp = 1 - Math.max(0, (anim.t - 0.6) / 0.4);
-    anzSchritt = anim.t > 0.5 ? anim.i + 1 : anim.i;
+    const A = data.schritte[anim.i];
+    if (anim.hold) {
+      objekte = A.objekte;
+      linien = A.linien;
+      anzSchritt = anim.i;
+    } else {
+      const B = data.schritte[anim.i + 1];
+      objekte = tkZwischen(A, B, anim.t);
+      linien = A.linien;
+      linienOp = 1 - Math.max(0, (anim.t - 0.6) / 0.4);
+      anzSchritt = anim.t > 0.5 ? anim.i + 1 : anim.i;
+    }
   }
 
   const toggleVoll = async () => {
@@ -3575,6 +3600,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           <button key={k} style={chip(tool === k)} onClick={() => { setTool(k); if (k !== "bewegen") setSel(null); }}>{l}</button>
         ))}
         {["pass", "lauf", "welle", "linie"].includes(tool) && <button style={chip(bogenAn)} onClick={() => setBogenAn(!bogenAn)}>Gebogen</button>}
+        {bogenAn && ["pass", "lauf", "welle", "linie"].includes(tool) && <button style={chip(false)} onClick={() => setBogenSeite(-bogenSeite)}>Bogen-Seite tauschen</button>}
         <span style={{ width: 6 }} />
         {TK_FARBEN.map(([f, l]) => (
           <button key={f} aria-label={l} title={l} onClick={() => waehleFarbe(f)}
@@ -3625,6 +3651,14 @@ function TaktikEditor({ board, players, onSave, onClose }) {
                     if (l.bogen) delete l.bogen;
                     else l.bogen = tkStandardBogen(g.toS(l.punkte[0][0], l.punkte[0][1]), g.toS(l.punkte[l.punkte.length - 1][0], l.punkte[l.punkte.length - 1][1]), g);
                   })}>Gebogen</button>
+                )}
+                {selLinie && selLinie.bogen && (
+                  <button style={chip(false)} onClick={() => aendern((nd, step) => {
+                    const l = step.linien.find((q) => q.id === selLinie.id);
+                    if (!l) return;
+                    const a = l.punkte[0], b = l.punkte[l.punkte.length - 1];
+                    l.bogen = [a[0] + b[0] - l.bogen[0], a[1] + b[1] - l.bogen[1]];
+                  })}>Bogen umdrehen</button>
                 )}
                 {selObj && selObj.art === "text" && <button style={chip(false)} onClick={() => { const v = window.prompt("Text", selObj.text || ""); if (v != null && v.trim()) objAendern((o) => (o.text = v.trim())); }}>Text ändern</button>}
                 {selLinie && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Farbe oben wählen</span>}
@@ -3681,12 +3715,52 @@ function TaktikEditor({ board, players, onSave, onClose }) {
         {data.schritte.length > 1 && <button style={chip(false, { color: "var(--danger-text)" })} onClick={schrittLoeschen} disabled={!!anim}>Schritt löschen</button>}
         <span style={{ width: 6 }} />
         {anim ? (
-          <button style={chip(true)} onClick={stoppen}>Stopp</button>
+          <>
+            <button style={chip(true)} onClick={stoppen}>Stopp</button>
+            {anim.wait && <button style={chip(false, { borderColor: TK_ROT })} onClick={() => (weiterRef.current = true)}>Weiter</button>}
+          </>
         ) : (
           <button style={chip(false, { opacity: data.schritte.length > 1 ? 1 : 0.45 })} onClick={abspielen} disabled={data.schritte.length < 2}>Abspielen</button>
         )}
+        {data.schritte.length > 1 && (
+          <>
+            <button style={chip(schleife)} onClick={() => setSchleife(!schleife)}>Wiederholen</button>
+            {[0.5, 1, 2].map((v) => (
+              <button key={v} style={chip(tempo === v, { minWidth: 44, padding: "9px 10px" })} onClick={() => setTempo(v)} title="Tempo">{String(v).replace(".", ",")}×</button>
+            ))}
+          </>
+        )}
         {data.schritte.length < 2 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Mit „+ Schritt“ den nächsten Moment anlegen und die Magnete neu stellen, dann „Abspielen“.</span>}
       </div>
+
+      {data.schritte.length > 1 && (
+        <div style={{ ...grp, rowGap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Schritt {sIdx + 1}:</span>
+          {(() => {
+            const fmt = (v) => v.toFixed(1).replace(".", ",") + " s";
+            const stufe = (feld, std, min, max, label) => {
+              const v = st[feld] != null ? st[feld] : std;
+              const set = (nv) => aendern((nd, step) => { step[feld] = Math.round(Math.max(min, Math.min(max, nv)) * 10) / 10; });
+              return (
+                <span key={feld} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 13 }}>{label}</span>
+                  <button style={chip(false, { padding: "6px 12px", minHeight: 34 })} onClick={() => set(v - 0.5)} aria-label={label + " kürzer"}>−</button>
+                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 48, textAlign: "center" }}>{fmt(v)}</span>
+                  <button style={chip(false, { padding: "6px 12px", minHeight: 34 })} onClick={() => set(v + 0.5)} aria-label={label + " länger"}>+</button>
+                </span>
+              );
+            };
+            const letzter = sIdx >= data.schritte.length - 1;
+            return (
+              <>
+                {!st.warten && stufe("pause", 0.6, 0, 60, "Pause")}
+                <button style={chip(!!st.warten)} onClick={() => aendern((nd, step) => { step.warten = !step.warten; })} disabled={letzter} title={letzter ? "Beim letzten Schritt nicht nötig" : ""}>Warten auf Tipp</button>
+                {!letzter && stufe("dauer", 1.7, 0.5, 20, "Bewegung")}
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
