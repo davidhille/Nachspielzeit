@@ -6904,7 +6904,7 @@ function Dashboard({
 
       {uebersichtTab === "training" && (
         <>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 8 }}>
           <KartenTitel block>Punktestand</KartenTitel>
           {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
 
@@ -7020,7 +7020,7 @@ function AnwesenheitsStatistik({ trainings, players, month, onOpenPlayer }) {
     .sort((a, b) => (b.quote ?? 0) - (a.quote ?? 0));
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Anwesenheit {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       {rows.length === 0 && <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison erfasst." />}
       {rows.length > 0 && (
@@ -7080,7 +7080,7 @@ function TrainerNotizen({ trainings, players, month, onOpenPlayer }) {
   const vorschau = (t) => t.replace(/!\[[^\]]*\]\([^)]*\)/g, "[Bild]").replace(/[*_#>`-]/g, "").replace(/\s+/g, " ").trim();
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       <div className="card-list" style={styles.cardList}>
         {gruppen.map((g) => {
@@ -7153,7 +7153,7 @@ function SpieltagAnwesenheit({ spieltage, players, month, onOpenPlayer }) {
     .sort((a, b) => (b.quote ?? 0) - (a.quote ?? 0));
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Anwesenheit Spieltage {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       {gesamt === 0 ? (
         <EmptyState text="Noch keine Spieltage in dieser Saison erfasst." />
@@ -7196,7 +7196,7 @@ function SpieltagNotizenUebersicht({ spieltage, month }) {
   if (notizen.length === 0) return null;
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       <div className="card-list" style={styles.cardList}>
         {notizen.map((s) => (
@@ -7701,7 +7701,7 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
     .sort((a, b) => b.tore - a.tore);
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</KartenTitel>
 
       {spieleDerSaison.length === 0 && (
@@ -7785,7 +7785,7 @@ function GegnerBilanzTabelle({ spieltage, gegner }) {
   }, [spieltage, gegner]);
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Bilanz pro Gegner</KartenTitel>
       {bilanzen.length === 0 ? (
         <EmptyState text="Noch keine Spiele gegen hinterlegte Gegner erfasst." />
@@ -7838,7 +7838,7 @@ function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month, onO
   if (players.length === 0) return null;
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 8 }}>
       <KartenTitel block>Entwicklungsverlauf (Basis-Qualität)</KartenTitel>
       {saisonMonate.length < 2 ? (
         <EmptyState text="Noch nicht genug Monate mit Daten für einen Verlauf." />
@@ -8484,7 +8484,7 @@ function KartenTitel({ children, block = false, aktion = null, style }) {
     >
       <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
       {aktion}
-      <span aria-hidden="true" style={{ flex: "none", fontSize: 14, color: "var(--muted)", transition: "transform 0.15s", transform: zu ? "rotate(-90deg)" : "none" }}>▾</span>
+      <span aria-hidden="true" style={{ flex: "none", display: "inline-flex", color: "var(--muted)" }}><ChevronIcon size={16} open={!zu} /></span>
     </h3>
   );
 }
@@ -10890,8 +10890,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
 
 function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spieltage, onAddSpieltag, onRemoveSpieltag, onToggleGegnerZuordnung }) {
   const [name, setName] = useState("");
-  const [gegnerOffen, setGegnerOffen] = useState(true);
-  const [neuesDatum, setNeuesDatum] = useState(todayISO());
+    const [neuesDatum, setNeuesDatum] = useState(todayISO());
   const [openSpieltagId, setOpenSpieltagId] = useState(null);
   const [gegnerHinzufuegen, setGegnerHinzufuegen] = useState(false);
   const [neuerGegnerId, setNeuerGegnerId] = useState("");
@@ -10907,14 +10906,8 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
       {/* Gegner verwalten */}
       <div style={{ ...styles.card, marginBottom: 18 }}>
-        <div style={{ ...styles.cardHead, cursor: "pointer" }} onClick={() => setGegnerOffen(!gegnerOffen)}>
-          <span style={{ ...styles.h3Plain, fontSize: 17, fontWeight: 600, margin: 0 }}>Gegner</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
-            {gegnerOffen ? "Einklappen" : "Ausklappen"} <ChevronIcon open={gegnerOffen} />
-          </span>
-        </div>
+        <KartenTitel>Gegner</KartenTitel>
 
-        {gegnerOffen && (
           <>
             <div style={{ ...styles.addRow, marginTop: 10 }}>
               <input
@@ -10963,7 +10956,6 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
               ))}
             </div>
           </>
-        )}
       </div>
 
       {/* Spieltag anlegen */}
@@ -11328,7 +11320,7 @@ const styles = {
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 12px 0", paddingBottom: 8, borderBottom: "1px solid var(--divider)", letterSpacing: "-0.005em" },
-  h3Block: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 12px 0", letterSpacing: "-0.005em" },
+  h3Block: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, margin: 0, padding: "12px 0", borderTop: "1px solid var(--divider)", letterSpacing: "-0.005em" },
   h3Plain: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
   tabLabel: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--muted)", margin: "4px 0 10px 0" },
   subheading: { fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "16px 0 8px 0" },
