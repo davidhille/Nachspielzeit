@@ -1317,8 +1317,7 @@ function UebungenAdmin({ teams }) {
         </div>
       </div>
 
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Alle Übungen {alle ? `(${alle.length})` : ""}</div>
-      {alle !== null && <UebungFilterLeiste uebungen={normiert} suche={suche} setSuche={setSuche} filter={kwFilter} setFilter={setKwFilter} />}
+      {alle !== null && <UebungFilterLeiste karte titel={`Alle Übungen (${alle.length})`} uebungen={normiert} suche={suche} setSuche={setSuche} filter={kwFilter} setFilter={setKwFilter} />}
       {alle === null ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
       ) : (
@@ -10434,7 +10433,7 @@ function alleKeywordsVon(uebungen) {
   return [...new Set(uebungen.flatMap((u) => u.keywords))].sort((a, b) => a.localeCompare(b, "de"));
 }
 
-function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, karte = false, aktion = null }) {
+function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, karte = false, aktion = null, titel = "Suchen und filtern" }) {
   const alle = useMemo(() => alleKeywordsVon(uebungen), [uebungen]);
   const toggle = (k) => setFilter(filter.includes(k) ? filter.filter((x) => x !== k) : [...filter, k]);
   const Huelle = karte ? "div" : React.Fragment;
@@ -10443,7 +10442,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
     <Huelle {...huelleProps}>
       {karte && (
         <div style={{ ...styles.h3, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <span>Suchen und filtern</span>
+          <span>{titel}</span>
           {aktion}
         </div>
       )}
