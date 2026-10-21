@@ -6854,24 +6854,23 @@ function Dashboard({
         <BackupHinweis config={teamInfo?.config} />
       </div>
 
-      <div style={{ ...styles.segNav, marginTop: 20 }}>
-        <button
-          onClick={() => setUebersichtTab("training")}
-          style={{ ...styles.segBtn, ...(uebersichtTab === "training" ? styles.segBtnActive : {}) }}
-        >
-          Training
-        </button>
-        <button
-          onClick={() => setUebersichtTab("saison")}
-          style={{ ...styles.segBtn, ...(uebersichtTab === "saison" ? styles.segBtnActive : {}) }}
-        >
-          Saison
-        </button>
-      </div>
-
-      {(seasons.length > 1 || uebersichtTab === "training") && (
-      <div style={{ ...styles.card, marginBottom: 18 }}>
-        <h3 style={styles.h3}>Zeitraum</h3>
+      <div style={{ ...styles.card, marginTop: 20, marginBottom: 18 }}>
+        <h3 style={styles.h3}>Übersicht</h3>
+        <div style={{ ...styles.segNav, marginBottom: 12 }}>
+          <button
+            onClick={() => setUebersichtTab("training")}
+            style={{ ...styles.segBtn, ...(uebersichtTab === "training" ? styles.segBtnActive : {}) }}
+          >
+            Training
+          </button>
+          <button
+            onClick={() => setUebersichtTab("saison")}
+            style={{ ...styles.segBtn, ...(uebersichtTab === "saison" ? styles.segBtnActive : {}) }}
+          >
+            Saison
+          </button>
+        </div>
+        {(seasons.length > 1 || uebersichtTab === "training") && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {seasons.length > 1 && (
             <div style={styles.selectGroup}>
@@ -6898,8 +6897,8 @@ function Dashboard({
             </div>
           )}
         </div>
+        )}
       </div>
-      )}
 
       {uebersichtTab === "training" && <h3 style={styles.h3Block}>Punktestand</h3>}
 
