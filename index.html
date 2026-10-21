@@ -1803,6 +1803,25 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
         </div>
       </div>
       {fehler && <SqlHinweis fehler={fehler} />}
+      {!fehler && (
+        <div style={{ ...styles.card, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <h3 style={styles.h3}>Neues Team anlegen</h3>
+          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. U9)" value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
+            placeholder="Kürzel für die Adresse (z. B. u9)"
+            value={kuerzel}
+            onChange={(e) => setKuerzel(e.target.value)}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={styles.primaryBtn} onClick={anlegen}>Team anlegen</button>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted-2)" }}>
+            Die Adresse kürzel.nachspielzeit.app muss zusätzlich in Cloudflare als Custom Domain beim Projekt eingetragen werden.
+          </div>
+        </div>
+      )}
       <div className="card-list" style={styles.cardList}>
         {teams.map((t) => (
           <div key={t.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, opacity: t.archived ? 0.6 : 1 }}>
@@ -1823,25 +1842,6 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
           </div>
         ))}
       </div>
-      {!fehler && (
-        <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <h3 style={styles.h3}>Neues Team anlegen</h3>
-          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. U9)" value={name} onChange={(e) => setName(e.target.value)} />
-          <input
-            style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
-            placeholder="Kürzel für die Adresse (z. B. u9)"
-            value={kuerzel}
-            onChange={(e) => setKuerzel(e.target.value)}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={styles.primaryBtn} onClick={anlegen}>Team anlegen</button>
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--muted-2)" }}>
-            Die Adresse kürzel.nachspielzeit.app muss zusätzlich in Cloudflare als Custom Domain beim Projekt eingetragen werden.
-          </div>
-        </div>
-      )}
     </section>
   );
 }
