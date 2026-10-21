@@ -493,6 +493,7 @@ const TEILNAHME_LABEL = {
   unentschuldigt: "Unentschuldigt gefehlt",
   entschuldigt: "Abgemeldet",
 };
+const MONATSNAMEN = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 const MATERIAL_GRUPPEN = [
@@ -530,7 +531,37 @@ const toLocalISODate = (d) => {
 const todayISO = () => toLocalISODate(new Date());
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 /* Ein Spieltag gilt erst als gespielt, wenn mindestens ein Ergebnis eingetragen ist (Notizen oder Aufstellung allein zählen nicht, ebenso wenig ein Spieltag in der Zukunft). */
-const spieltagGespielt = (s) => s.spiele.length > 0 && s.date <= todayISO();
+let SPIELTAG_WERTUNG = "ergebnisse"; // ergebnisse | teilnehmer | datum (Einstellungen)
+const spieltagGespielt = (s) => {
+  if (s.date > todayISO()) return false;
+  if (SPIELTAG_WERTUNG === "datum") return true;
+  if (SPIELTAG_WERTUNG === "teilnehmer") return s.spiele.length > 0 || (s.teilnehmer || []).length > 0;
+  return s.spiele.length > 0;
+};
+/* Saison: Standard September bis Juli, die Monate dazwischen sind Sommerpause (Einstellungen pro Team) */
+let SAISON = { start: 9, ende: 7 };
+const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.25, unentschuldigt: -0.25, entschuldigt: 0 };
+const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
+const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
+const setzeEinstellungen = (cfg) => {
+  cfg = cfg || {};
+  const st = Number(cfg.saison_start), en = Number(cfg.saison_ende);
+  SAISON = st >= 1 && st <= 12 && en >= 1 && en <= 12 && en < st ? { start: st, ende: en } : { start: 9, ende: 7 };
+  SPIELTAG_WERTUNG = ["ergebnisse", "teilnehmer", "datum"].includes(cfg.spieltag_wertung) ? cfg.spieltag_wertung : "ergebnisse";
+  const b = cfg.bewertung || {};
+  KARTEN.gelb = -Math.abs(zahlOder(b.gelb, KARTEN_STD.gelb));
+  KARTEN.blau = -Math.abs(zahlOder(b.blau, KARTEN_STD.blau));
+  KARTEN.rot = -Math.abs(zahlOder(b.rot, KARTEN_STD.rot));
+  const A = zahlOder(b.anwesend, TEILNAHME_STD.anwesend);
+  const nA = Math.abs(zahlOder(b.abzugAnmeldung, TEILNAHME_STD.abzugAnmeldung));
+  const v = Math.abs(zahlOder(b.abzugVerspaetet, TEILNAHME_STD.abzugVerspaetet));
+  TEILNAHME.anwesend = A;
+  TEILNAHME.anwesend_nicht_angemeldet = A - nA;
+  TEILNAHME.verspaetet = A - v;
+  TEILNAHME.verspaetet_nicht_angemeldet = A - v - nA;
+  TEILNAHME.unentschuldigt = zahlOder(b.unentschuldigt, TEILNAHME_STD.unentschuldigt);
+  TEILNAHME.entschuldigt = zahlOder(b.entschuldigt, TEILNAHME_STD.entschuldigt);
+};
 function spieltagNummern(spieltage) {
   // Spieltage und Turniere werden getrennt durchnummeriert, jeweils chronologisch.
   const chronologisch = [...spieltage].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
@@ -594,9 +625,16 @@ const formatTerminLabel = (dateStr) => {
 // Saison läuft von September bis einschließlich Juli des Folgejahres.
 function seasonKeyOf(mkey) {
   const [y, m] = mkey.split("-").map(Number);
-  if (m >= 9) return `${y}-${y + 1}`;
-  if (m <= 7) return `${y - 1}-${y}`;
+  if (m >= SAISON.start) return `${y}-${y + 1}`;
+  if (m <= SAISON.ende) return `${y - 1}-${y}`;
   return null;
+}
+/* Saison, die gerade läuft bzw. als Nächstes beginnt (in der Sommerpause), z. B. "2026/27" */
+function aktuelleSaisonLabel() {
+  const d = new Date();
+  const k = seasonKeyOf(monthKey(d)) || `${d.getFullYear()}-${d.getFullYear() + 1}`;
+  const [a, b] = k.split("-");
+  return `${a}/${b.slice(2)}`;
 }
 
 function trainingPunkte(entry) {
@@ -1439,6 +1477,16 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [titel, setTitel] = useState(cfg.eltern_titel || "");
   const [fotoUrl, setFotoUrl] = useState(cfg.team_photo_url || "");
   const [fotoBusy, setFotoBusy] = useState(false);
+  const [saisonStart, setSaisonStart] = useState(String(cfg.saison_start || 9));
+  const [saisonEnde, setSaisonEnde] = useState(String(cfg.saison_ende || 7));
+  const [wertung, setWertung] = useState(cfg.spieltag_wertung || "ergebnisse");
+  const bw = cfg.bewertung || {};
+  const bwFeld = (k, d) => String(bw[k] ?? d).replace(".", ",");
+  const [bewertung, setBewertung] = useState({
+    gelb: bwFeld("gelb", KARTEN_STD.gelb), blau: bwFeld("blau", KARTEN_STD.blau), rot: bwFeld("rot", KARTEN_STD.rot),
+    anwesend: bwFeld("anwesend", TEILNAHME_STD.anwesend), abzugAnmeldung: bwFeld("abzugAnmeldung", TEILNAHME_STD.abzugAnmeldung),
+    abzugVerspaetet: bwFeld("abzugVerspaetet", TEILNAHME_STD.abzugVerspaetet), unentschuldigt: bwFeld("unentschuldigt", TEILNAHME_STD.unentschuldigt), entschuldigt: bwFeld("entschuldigt", TEILNAHME_STD.entschuldigt),
+  });
   const fotoWaehlen = async (file) => {
     if (!file) return;
     setFotoBusy(true);
@@ -1473,6 +1521,18 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (farbe) neuCfg.verein_farbe = farbe; else delete neuCfg.verein_farbe;
       if (titel.trim()) neuCfg.eltern_titel = titel.trim(); else delete neuCfg.eltern_titel;
       if (fotoUrl) neuCfg.team_photo_url = fotoUrl;
+      const sS = Number(saisonStart), sE = Number(saisonEnde);
+      if (!(sE < sS)) { setStatus("Das Saisonende muss vor dem Saisonbeginn liegen (z. B. Beginn September, Ende Juli)."); return; }
+      if (sS === 9 && sE === 7) { delete neuCfg.saison_start; delete neuCfg.saison_ende; } else { neuCfg.saison_start = sS; neuCfg.saison_ende = sE; }
+      if (wertung === "ergebnisse") delete neuCfg.spieltag_wertung; else neuCfg.spieltag_wertung = wertung;
+      const bNeu = {};
+      Object.keys(bewertung).forEach((k) => {
+        const std = { ...KARTEN_STD, ...TEILNAHME_STD }[k];
+        const n = zahlOder(bewertung[k], std);
+        const nn = ["gelb", "blau", "rot", "abzugAnmeldung", "abzugVerspaetet"].includes(k) ? Math.abs(n) : n;
+        if (nn !== std) bNeu[k] = nn;
+      });
+      if (Object.keys(bNeu).length) neuCfg.bewertung = bNeu; else delete neuCfg.bewertung;
       await dbUpdate("teams", team, { name: name.trim() || team, config: neuCfg });
       setVorlauf(String(v));
       setStatus("Gespeichert");
@@ -1542,6 +1602,46 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
               {fotoBusy ? "Lädt …" : fotoUrl ? "Bild ersetzen" : "Bild hochladen"}
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { fotoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
             </label>
+          </div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Saison
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontWeight: 400 }}>
+            Beginn im
+            <select style={{ ...styles.input, width: "auto" }} value={saisonStart} onChange={(e) => setSaisonStart(e.target.value)}>
+              {MONATSNAMEN.map((n, i) => (i + 1 >= 6 ? <option key={n} value={i + 1}>{n}</option> : null))}
+            </select>
+            Ende im
+            <select style={{ ...styles.input, width: "auto" }} value={saisonEnde} onChange={(e) => setSaisonEnde(e.target.value)}>
+              {MONATSNAMEN.map((n, i) => (i + 1 <= 8 && i + 1 >= 4 ? <option key={n} value={i + 1}>{n}</option> : null))}
+            </select>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            Ab dem Saisonbeginn starten Bilanz, Quoten und Karten bei null. Die Monate dazwischen gelten als Sommerpause ohne Wertung. Standard: September bis Juli.
+          </div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Wann zählt ein Spieltag als gespielt?
+          <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={wertung} onChange={(e) => setWertung(e.target.value)}>
+            <option value="ergebnisse">Sobald ein Ergebnis eingetragen ist (Standard)</option>
+            <option value="teilnehmer">Sobald Ergebnisse oder Teilnehmer eingetragen sind</option>
+            <option value="datum">Sobald das Datum erreicht ist</option>
+          </select>
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Gilt für Spieltagsquote, Spieltage-Anzahl und die Karten. Zukünftige Spieltage zählen nie.</div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Bewertung im Training (Punkte)
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 10, marginTop: 6 }}>
+            {[["anwesend", "Anwesend"], ["abzugAnmeldung", "Abzug: nicht angemeldet"], ["abzugVerspaetet", "Abzug: verspätet"], ["unentschuldigt", "Unentschuldigt gefehlt"], ["entschuldigt", "Abgemeldet"], ["gelb", "Abzug: Gelbe Karte"], ["blau", "Abzug: Blaue Karte"], ["rot", "Abzug: Rote Karte"]].map(([k, l]) => (
+              <label key={k} style={{ fontSize: 12.5, fontWeight: 600 }}>
+                {l}
+                <input inputMode="decimal" style={{ ...styles.input, marginTop: 3, width: "100%", boxSizing: "border-box" }} value={bewertung[k]} onChange={(e) => setBewertung({ ...bewertung, [k]: e.target.value })} />
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            Abzüge als positive Zahl eingeben. Achtung: Eine Änderung wirkt auch rückwirkend auf alle bisherigen Trainings. Standard: Anwesend 0,5, Abzüge 0,25 · Karten 0,5 / 1 / 2.
+            <button style={{ ...styles.linkBtn, marginLeft: 8 }} onClick={() => setBewertung({ gelb: "0,5", blau: "1", rot: "2", anwesend: "0,5", abzugAnmeldung: "0,25", abzugVerspaetet: "0,25", unentschuldigt: "-0,25", entschuldigt: "0" })}>Standard setzen</button>
           </div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
@@ -2207,6 +2307,7 @@ function App() {
   };
 
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
+  setzeEinstellungen(teamInfo?.config);
   setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel);
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
@@ -4040,7 +4141,7 @@ function Header({ tab, setTab }) {
         <img src={CLUB.logo} alt={CLUB.name} style={styles.crestImg} />
         <div style={{ flex: 1 }}>
           <div style={styles.title}>Nachspielzeit</div>
-          <div style={styles.subtitle}>{CLUB.name} · Saison 2026/27</div>
+          <div style={styles.subtitle}>{CLUB.name} · Saison {aktuelleSaisonLabel()}</div>
         </div>
         <button
           style={styles.logoutBtn}
@@ -4076,8 +4177,9 @@ function SaisonwechselHinweis({ seasons }) {
   const heute = new Date();
   const monatNr = heute.getMonth() + 1;
   const jahr = heute.getFullYear();
-  const zeigenGrundsaetzlich = monatNr === 8 || monatNr === 9;
-  const neueSaison = monatNr === 8 ? `${jahr}-${jahr + 1}` : seasonKeyOf(monthKey(heute));
+  const inPause = monatNr > SAISON.ende && monatNr < SAISON.start;
+  const zeigenGrundsaetzlich = inPause || monatNr === SAISON.start;
+  const neueSaison = inPause ? `${jahr}-${jahr + 1}` : seasonKeyOf(monthKey(heute));
   const storageKey = `nsz_season_hint_${neueSaison}`;
   const [dismissed, setDismissed] = useState(() => {
     try {
@@ -4093,7 +4195,7 @@ function SaisonwechselHinweis({ seasons }) {
   return (
     <div style={styles.seasonHint}>
       <span>
-        Die Saison {neueSaison.replace("-", "/")} {monatNr === 8 ? "beginnt bald" : "hat begonnen"}. Frühere
+        Die Saison {neueSaison.replace("-", "/")} {inPause ? "beginnt bald" : "hat begonnen"}. Frühere
         Saisons bleiben über die Saison-Auswahl weiterhin gespeichert und abrufbar.
       </span>
       <button
@@ -4240,7 +4342,7 @@ function monatsBewertungProzent(eintraege, monatKey) {
   const im = eintraege.filter((t) => t.date.slice(0, 7) === monatKey);
   if (im.length === 0) return null;
   const punkte = im.reduce((sum, t) => sum + trainingPunkte(t), 0);
-  return Math.round(Math.max(0, Math.min(1, punkte / (im.length * 0.5))) * 100);
+  return Math.round(Math.max(0, Math.min(1, punkte / (im.length * Math.max(0.01, TEILNAHME.anwesend)))) * 100);
 }
 function kartenZaehlen(eintraege) {
   const z = { gelb: 0, blau: 0, rot: 0 };
