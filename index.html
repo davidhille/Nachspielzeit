@@ -10498,10 +10498,10 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 6 }}>
-                <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+        <Hinweis style={{ flex: "1 1 260px", margin: 0 }}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</Hinweis>
+        <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
       </div>
-      <Hinweis>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</Hinweis>
 
       {uebungen.length === 0 ? (
         <EmptyState text="Noch keine Übungen angelegt." />
