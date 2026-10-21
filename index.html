@@ -80,7 +80,7 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .app-header :focus-visible { outline-color: #FFFFFF; }
   .app-header { position: relative; overflow: hidden; }
-  .app-header > * { position: relative; }
+  .app-header > *:not(.nav-bottom) { position: relative; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
@@ -108,6 +108,17 @@
     .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); align-items: start; }
   }
   #root { min-height: 100vh; }
+    /* Hauptnavigation: Desktop oben im Header, Mobil als feste Leiste unten */
+    .nav-bottom { display: none; }
+    @media (max-width: 899px) {
+      .nav-top { display: none !important; }
+      .nav-bottom { display: grid; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--surface); border-top: 1px solid var(--divider); box-shadow: 0 -2px 10px rgba(28,20,20,0.06); padding-bottom: env(safe-area-inset-bottom); }
+      .nav-bottom button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 8px 2px 7px; border: none; background: transparent; color: var(--muted); font-family: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
+      .app-header .nav-bottom button:focus-visible { outline-color: var(--accent-text); }
+      .nav-bottom button[aria-current="page"] { color: var(--accent-text); }
+      .nav-bottom button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .app-main { padding-bottom: 96px !important; }
+    }
     /* Auf-/zuklappbare Kacheln (KartenTitel) */
     .nz-zu > :not(.nz-pfad):not(.nz-titel), .nz-zu .nz-pfad > :not(.nz-pfad):not(.nz-titel) { display: none !important; }
     .nz-zu > .nz-titel, .nz-zu .nz-pfad > .nz-titel { margin-bottom: 0 !important; padding-bottom: 0 !important; border-bottom-color: transparent !important; }
@@ -4228,6 +4239,15 @@ function Header({ tab, setTab }) {
     fTaktik && ["taktik", "Taktik"],
     ["verwaltung", "Verwaltung"],
   ].filter(Boolean);
+  const NAV_KURZ = { dashboard: "Übersicht", training: "Bewerten", entwicklung: "Verlauf", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Verwaltung" };
+  const NAV_ICON = {
+    dashboard: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></>,
+    training: <><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4V3h6v1" /><path d="m9.5 13 2 2 3.5-4" /></>,
+    entwicklung: <><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></>,
+    spieltage: <><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 6H4v1a4 4 0 0 0 4 4" /><path d="M16 6h4v1a4 4 0 0 1-4 4" /><path d="M12 13v4" /><path d="M8 20h8" /></>,
+    taktik: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></>,
+    verwaltung: <><path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h2" /><path d="M10 17h10" /><circle cx="8" cy="17" r="2" /></>,
+  };
   const navRef = useRef(null);
   const [scrollFade, setScrollFade] = useState({ left: false, right: false });
 
@@ -4279,6 +4299,7 @@ function Header({ tab, setTab }) {
       </div>
       <nav
         ref={navRef}
+        className="nav-top"
         style={{ ...styles.nav, WebkitMaskImage: maskStops, maskImage: maskStops }}
         onScroll={updateFade}
       >
@@ -4289,6 +4310,14 @@ function Header({ tab, setTab }) {
             style={{ ...styles.navBtn, ...(tab === key ? styles.navBtnActive : {}) }}
           >
             {label}
+          </button>
+        ))}
+      </nav>
+      <nav className="nav-bottom" aria-label="Hauptnavigation" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
+        {items.map(([key, label]) => (
+          <button key={key} onClick={() => { setTab(key); window.scrollTo(0, 0); }} aria-current={tab === key ? "page" : undefined}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{NAV_ICON[key]}</svg>
+            <span>{NAV_KURZ[key] || label}</span>
           </button>
         ))}
       </nav>
@@ -11283,9 +11312,9 @@ const styles = {
     borderBottom: "2px solid transparent",
     marginBottom: -1,
   },
-  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "var(--surface-2)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
+  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "var(--surface)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
   segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", padding: "8px 14px", borderRadius: 9, fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
-  segBtnActive: { background: "var(--surface)", color: "var(--accent-text)", boxShadow: "0 1px 3px rgba(28,20,20,0.12)" },
+  segBtnActive: { background: "rgba(196,39,31,0.10)", color: "var(--accent-text)" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
