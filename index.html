@@ -9704,10 +9704,6 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <Hinweis style={{ marginBottom: 16 }}>
-        Trage zu einem Datum die gezählte Menge ein. So lässt sich im Verlauf erkennen, in welchem Zeitraum etwas
-        weniger wurde.
-      </Hinweis>
 
       <div style={styles.subNav}>
         {MATERIAL_GRUPPEN.map((g) => (
@@ -10428,14 +10424,19 @@ function alleKeywordsVon(uebungen) {
   return [...new Set(uebungen.flatMap((u) => u.keywords))].sort((a, b) => a.localeCompare(b, "de"));
 }
 
-function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, karte = false }) {
+function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, karte = false, aktion = null }) {
   const alle = useMemo(() => alleKeywordsVon(uebungen), [uebungen]);
   const toggle = (k) => setFilter(filter.includes(k) ? filter.filter((x) => x !== k) : [...filter, k]);
   const Huelle = karte ? "div" : React.Fragment;
   const huelleProps = karte ? { style: { ...styles.card, marginBottom: 14 } } : {};
   return (
     <Huelle {...huelleProps}>
-      {karte && <h3 style={styles.h3}>Suchen und filtern</h3>}
+      {karte && (
+        <div style={{ ...styles.h3, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span>Suchen und filtern</span>
+          {aktion}
+        </div>
+      )}
       <input
         style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 10 }}
         placeholder="Übung suchen …"
@@ -10498,16 +10499,12 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-        <Hinweis style={{ flex: "1 1 260px", margin: 0 }}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</Hinweis>
-        <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
-      </div>
 
       {uebungen.length === 0 ? (
         <EmptyState text="Noch keine Übungen angelegt." />
       ) : (
         <>
-          <UebungFilterLeiste karte uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
+          <UebungFilterLeiste karte aktion={<button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>} uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
           <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, marginBottom: 10 }}>
             {gefiltert.length} {gefiltert.length === 1 ? "Übung" : "Übungen"}
             {filter.length > 0 ? ` · Filter: ${filter.join(", ")}` : ""}
