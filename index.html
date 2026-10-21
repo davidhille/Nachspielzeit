@@ -6855,24 +6855,25 @@ function Dashboard({
         <BackupHinweis config={teamInfo?.config} />
       </div>
 
-      <div style={styles.segmentedControl}>
+      <div style={{ ...styles.segNav, marginTop: 20 }}>
         <button
           onClick={() => setUebersichtTab("training")}
-          style={{ ...styles.segmentedBtn, ...(uebersichtTab === "training" ? styles.segmentedBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(uebersichtTab === "training" ? styles.segBtnActive : {}) }}
         >
           Training
         </button>
         <button
           onClick={() => setUebersichtTab("saison")}
-          style={{ ...styles.segmentedBtn, ...(uebersichtTab === "saison" ? styles.segmentedBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(uebersichtTab === "saison" ? styles.segBtnActive : {}) }}
         >
           Saison
         </button>
       </div>
 
-      <div style={{ ...styles.rowBetween, marginTop: 18 }}>
-        <h2 style={styles.h2}>{uebersichtTab === "training" ? "Punktestand" : "Saisonübersicht"}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
+      {(seasons.length > 1 || uebersichtTab === "training") && (
+      <div style={{ ...styles.card, marginBottom: 18 }}>
+        <h3 style={styles.h3}>Zeitraum</h3>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {seasons.length > 1 && (
             <div style={styles.selectGroup}>
               <label style={styles.selectGroupLabel}>Saison</label>
@@ -6899,6 +6900,9 @@ function Dashboard({
           )}
         </div>
       </div>
+      )}
+
+      {uebersichtTab === "training" && <h3 style={styles.h3Block}>Punktestand</h3>}
 
       {uebersichtTab === "training" && (
         <>
@@ -7015,7 +7019,7 @@ function AnwesenheitsStatistik({ trainings, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Anwesenheit {saison ? saison.replace("-", "/") : ""}</h3>
+      <h3 style={styles.h3Block}>Anwesenheit {saison ? saison.replace("-", "/") : ""}</h3>
       {rows.length === 0 && <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison erfasst." />}
       {rows.length > 0 && (
         <div style={styles.tableWrap}>
@@ -7075,7 +7079,7 @@ function TrainerNotizen({ trainings, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</h3>
+      <h3 style={styles.h3Block}>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</h3>
       <div className="card-list" style={styles.cardList}>
         {gruppen.map((g) => {
           const isOpen = !!offen[g.id];
@@ -7148,7 +7152,7 @@ function SpieltagAnwesenheit({ spieltage, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Anwesenheit Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
+      <h3 style={styles.h3Block}>Anwesenheit Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
       {gesamt === 0 ? (
         <EmptyState text="Noch keine Spieltage in dieser Saison erfasst." />
       ) : (
@@ -7191,7 +7195,7 @@ function SpieltagNotizenUebersicht({ spieltage, month }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
+      <h3 style={styles.h3Block}>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
       <div className="card-list" style={styles.cardList}>
         {notizen.map((s) => (
           <div key={s.id} style={styles.card}>
@@ -7696,7 +7700,7 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</h3>
+      <h3 style={styles.h3Block}>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</h3>
 
       {spieleDerSaison.length === 0 && (
         <EmptyState text="Noch keine Spiele in dieser Saison erfasst. Lege sie unter „Spieltage“ an." />
@@ -7780,7 +7784,7 @@ function GegnerBilanzTabelle({ spieltage, gegner }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Bilanz pro Gegner</h3>
+      <h3 style={styles.h3Block}>Bilanz pro Gegner</h3>
       {bilanzen.length === 0 ? (
         <EmptyState text="Noch keine Spiele gegen hinterlegte Gegner erfasst." />
       ) : (
@@ -7833,7 +7837,7 @@ function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month, onO
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3}>Entwicklungsverlauf (Basis-Qualität)</h3>
+      <h3 style={styles.h3Block}>Entwicklungsverlauf (Basis-Qualität)</h3>
       {saisonMonate.length < 2 ? (
         <EmptyState text="Noch nicht genug Monate mit Daten für einen Verlauf." />
       ) : (
@@ -11275,6 +11279,7 @@ const styles = {
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 12px 0", paddingBottom: 8, borderBottom: "1px solid var(--divider)", letterSpacing: "-0.005em" },
+  h3Block: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 12px 0", letterSpacing: "-0.005em" },
   h3Plain: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
   tabLabel: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--muted)", margin: "4px 0 10px 0" },
   subheading: { fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "16px 0 8px 0" },
