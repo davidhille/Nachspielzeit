@@ -5660,13 +5660,13 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
             {songs.map((x, i) => (
               <div key={x.pfad} style={{ fontSize: 13.5, padding: "8px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
                 <div style={{ marginBottom: 4 }}>{i + 1}. {x.titel}</div>
-                <div style={{ display: "flex", gap: "4px 14px", alignItems: "center", flexWrap: "wrap" }}>
-                <button style={styles.linkBtn} disabled={busy || i === 0} onClick={() => onSongChange(i, "hoch")}>↑</button>
-                <button style={styles.linkBtn} disabled={busy || i === songs.length - 1} onClick={() => onSongChange(i, "runter")}>↓</button>
+                <div style={{ display: "flex", gap: "4px 10px", alignItems: "center", flexWrap: "wrap" }}>
+                <button style={{ ...styles.linkBtn, padding: "4px 2px" }} disabled={busy || i === 0} onClick={() => onSongChange(i, "hoch")}>↑</button>
+                <button style={{ ...styles.linkBtn, padding: "4px 2px", marginLeft: -8 }} disabled={busy || i === songs.length - 1} onClick={() => onSongChange(i, "runter")}>↓</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => onSongChange(i, "umbenennen")}>Umbenennen</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => { setTextEdit(textEdit && textEdit.i === i ? null : { i, val: x.text || "" }); }}>{x.text ? "Text ✓" : "Text"}</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => { if (!(x.text || "").trim()) { setSync({ i, msg: "Bitte zuerst über „Text“ den Liedtext eintragen und speichern.", fehler: true }); return; } setTextEdit(null); setTapI(i); }}>Tap-Sync</button>
-                <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} disabled={busy} onClick={() => onSongChange(i, "loeschen")}>Löschen</button>
+                <button style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center" }} disabled={busy} aria-label="Löschen" title="Löschen" onClick={() => onSongChange(i, "loeschen")}><TrashIcon size={15} /></button>
                 </div>
               </div>
             ))}
