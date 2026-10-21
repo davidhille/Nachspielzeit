@@ -9382,6 +9382,7 @@ function Verwaltung({
   const [subTab, setSubTab] = useState("spieler");
   const fUebungen = useFeature("uebungen");
   const fMaterial = useFeature("material");
+  const fEltern = useFeature("eltern_seite");
   const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   const items = [
     ["spieler", "Spieler"],
@@ -9389,6 +9390,7 @@ function Verwaltung({
     fUebungen && ["uebungen", "Übungen"],
     ["spieltage", "Spieltage"],
     fMaterial && ["material", "Material"],
+    fEltern && kartenBox && ["eltern", "Eltern-Seite"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ].filter(Boolean);
 
@@ -9408,7 +9410,7 @@ function Verwaltung({
         ))}
       </div>
 
-      {subTab === "spieler" && kartenBox}
+      {subTab === "eltern" && fEltern && kartenBox}
       {subTab === "spieler" && (
         <SpielerBereich
           players={players}
