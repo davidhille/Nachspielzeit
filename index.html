@@ -7553,22 +7553,22 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
         ]}
       />
 
-      <div style={{ ...styles.subNav, marginTop: 16 }}>
+      <div style={{ ...styles.segNav, marginTop: 16 }}>
         <button
           onClick={() => setHistorieTab("training")}
-          style={{ ...styles.subNavBtn, ...(historieTab === "training" ? styles.subNavBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(historieTab === "training" ? styles.segBtnActive : {}) }}
         >
           Training {saison ? saison.replace("-", "/") : ""}
         </button>
         <button
           onClick={() => setHistorieTab("spieltage")}
-          style={{ ...styles.subNavBtn, ...(historieTab === "spieltage" ? styles.subNavBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(historieTab === "spieltage" ? styles.segBtnActive : {}) }}
         >
           Spieltag-Teilnahmen
         </button>
         <button
           onClick={() => setHistorieTab("notizen")}
-          style={{ ...styles.subNavBtn, ...(historieTab === "notizen" ? styles.subNavBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(historieTab === "notizen" ? styles.segBtnActive : {}) }}
         >
           Notizen{notizenAlle.length > 0 ? ` (${notizenAlle.length})` : ""}
         </button>
@@ -8205,16 +8205,16 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
     <section>
       <h2 style={styles.h2}>Spieltage</h2>
 
-      <div style={styles.subNav}>
+      <div style={styles.segNav}>
         <button
           onClick={() => setSubTab("liste")}
-          style={{ ...styles.subNavBtn, ...(subTab === "liste" ? styles.subNavBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(subTab === "liste" ? styles.segBtnActive : {}) }}
         >
           Spieltage
         </button>
         <button
           onClick={() => setSubTab("uebersicht")}
-          style={{ ...styles.subNavBtn, ...(subTab === "uebersicht" ? styles.subNavBtnActive : {}) }}
+          style={{ ...styles.segBtn, ...(subTab === "uebersicht" ? styles.segBtnActive : {}) }}
         >
           Übersicht
         </button>
@@ -9524,9 +9524,6 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
   const gesamt = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   return (
     <div style={{ marginTop: 4 }}>
-      <Hinweis>
-        Gelöschte Spieler, Gegner und Spieltage bleiben hier, bis du sie endgültig entfernst.
-      </Hinweis>
 
       {gesamt === 0 && <EmptyState text="Der Papierkorb ist leer." />}
       {EINST.papierkorbTage > 0 && (() => {
@@ -9705,12 +9702,12 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
   return (
     <div style={{ marginTop: 4 }}>
 
-      <div style={styles.subNav}>
+      <div style={styles.segNav}>
         {MATERIAL_GRUPPEN.map((g) => (
           <button
             key={g.id}
             onClick={() => setGruppeId(g.id)}
-            style={{ ...styles.subNavBtn, ...(gruppeId === g.id ? styles.subNavBtnActive : {}) }}
+            style={{ ...styles.segBtn, ...(gruppeId === g.id ? styles.segBtnActive : {}) }}
           >
             {g.label}
           </button>
@@ -10223,16 +10220,16 @@ function TrainingsplanBereich({
 
       {sortiert.length > 0 && (
         <>
-          <div style={{ ...styles.subNav, marginTop: 16 }}>
+          <div style={{ ...styles.segNav, marginTop: 16 }}>
             <button
               onClick={() => setTerminTab("kommende")}
-              style={{ ...styles.subNavBtn, ...(terminTab === "kommende" ? styles.subNavBtnActive : {}) }}
+              style={{ ...styles.segBtn, ...(terminTab === "kommende" ? styles.segBtnActive : {}) }}
             >
               Kommende Termine{kommende.length > 0 ? ` (${kommende.length})` : ""}
             </button>
             <button
               onClick={() => setTerminTab("vergangene")}
-              style={{ ...styles.subNavBtn, ...(terminTab === "vergangene" ? styles.subNavBtnActive : {}) }}
+              style={{ ...styles.segBtn, ...(terminTab === "vergangene" ? styles.segBtnActive : {}) }}
             >
               Vergangene Termine{vergangene.length > 0 ? ` (${vergangene.length})` : ""}
             </button>
@@ -11237,6 +11234,9 @@ const styles = {
     borderBottom: "2px solid transparent",
     marginBottom: -1,
   },
+  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "var(--surface-2)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
+  segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", padding: "8px 14px", borderRadius: 9, fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
+  segBtnActive: { background: "var(--surface)", color: "var(--accent-text)", boxShadow: "0 1px 3px rgba(28,20,20,0.12)" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
