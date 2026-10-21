@@ -949,6 +949,7 @@ const SQL_TEAMS = `create table if not exists teams (
   created_at timestamptz default now()
 );
 alter table teams enable row level security;
+grant select, insert, update, delete on table teams to anon, authenticated, service_role;
 drop policy if exists "access via code" on teams;
 create policy "access via code" on teams for all to public using (true) with check (true);
 insert into teams (id, name) values ('u8', 'U8') on conflict (id) do nothing;
@@ -988,6 +989,7 @@ create table if not exists access_codes (
   created_at timestamptz default now()
 );
 alter table access_codes enable row level security;
+grant select, insert, update, delete on table access_codes to anon, authenticated, service_role;
 insert into access_codes (code, team_id, label) values ('DEIN-AKTUELLER-CODE', null, 'Admin') on conflict (code) do nothing;
 
 create or replace function nsz_header_code() returns text language sql stable as $$
@@ -1987,6 +1989,7 @@ function AdminApp() {
   updated_at timestamptz default now()
 );
 alter table app_features enable row level security;
+grant select, insert, update, delete on table app_features to anon, authenticated, service_role;
 drop policy if exists "access via code" on app_features;
 create policy "access via code" on app_features for all to public using (true) with check (true);
 notify pgrst, 'reload schema';`;
@@ -2940,6 +2943,7 @@ create table if not exists taktik_boards (
   deleted_at timestamptz
 );
 alter table taktik_boards enable row level security;
+grant select, insert, update, delete on table taktik_boards to anon, authenticated, service_role;
 drop policy if exists "access via code" on taktik_boards;
 create policy "access via code" on taktik_boards for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
 notify pgrst, 'reload schema';`;
