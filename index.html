@@ -1462,7 +1462,7 @@ function ZugaengeVerwaltung({ teams }) {
       )}
       {!fehler && codes !== null && (
         <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>Neuen Code anlegen</div>
+          <h3 style={styles.h3}>Neuen Code anlegen</h3>
           <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
           <select style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
             {teams.map((t) => (
@@ -1823,7 +1823,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
       </div>
       {!fehler && (
         <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>Neues Team anlegen</div>
+          <h3 style={styles.h3}>Neues Team anlegen</h3>
           <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. U9)" value={name} onChange={(e) => setName(e.target.value)} />
           <input
             style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
@@ -10124,9 +10124,7 @@ function TrainingsplanBereich({
       <h3 style={styles.tabLabel}>Trainingsplan</h3>
 
       <div style={styles.card}>
-        <div style={styles.cardHead}>
-          <span style={styles.cardName}>Termine generieren</span>
-        </div>
+        <h3 style={styles.h3}>Termine generieren</h3>
         <div style={styles.fieldRow}>
           <label style={styles.label}>Erstes Training ab</label>
           <input
@@ -10763,8 +10761,8 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
             <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
           ) : (
             <div style={{ ...styles.card, background: "var(--bg, #F7F4F3)" }}>
-              <div style={{ ...styles.cardHead, marginBottom: 8 }}>
-                <span style={styles.cardName}>Übung hinzufügen</span>
+              <div style={{ ...styles.h3, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span>Übung hinzufügen</span>
                 <button style={styles.linkBtn} onClick={() => setWaehlen(false)}>Fertig</button>
               </div>
               {uebungen.length === 0 ? (
@@ -10840,7 +10838,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
       {/* Gegner verwalten */}
       <div style={{ ...styles.card, marginBottom: 18 }}>
         <div style={{ ...styles.cardHead, cursor: "pointer" }} onClick={() => setGegnerOffen(!gegnerOffen)}>
-          <span style={styles.cardName}>Gegner</span>
+          <span style={{ ...styles.h3Plain, fontSize: 17, fontWeight: 600, margin: 0 }}>Gegner</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
             {gegnerOffen ? "Einklappen" : "Ausklappen"} <ChevronIcon open={gegnerOffen} />
           </span>
@@ -10900,7 +10898,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
       {/* Spieltag anlegen */}
       <div style={{ marginBottom: 10 }}>
-        <div style={styles.subheading}>Neuen Spieltag anlegen</div>
+        <h3 style={styles.h3}>Neuen Spieltag anlegen</h3>
         <div style={styles.chipGroup}>
           <button
             onClick={(e) => { setNeuerTyp("spieltag"); e.currentTarget.blur(); }}
