@@ -9504,12 +9504,12 @@ function Verwaltung({
   return (
     <section>
 
-      <div style={styles.subNav}>
+      <div style={styles.segNav}>
         {items.map(([key, label]) => (
           <button
             key={key}
             onClick={() => setSubTab(key)}
-            style={{ ...styles.subNavBtn, ...(subTab === key ? styles.subNavBtnActive : {}) }}
+            style={{ ...styles.segBtn, ...(subTab === key ? styles.segBtnActive : {}) }}
           >
             {label}
           </button>
