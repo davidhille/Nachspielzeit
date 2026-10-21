@@ -10516,9 +10516,9 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
                 <button
                   key={u.id}
                   onClick={() => setEdit(u)}
-                  style={{ ...styles.card, padding: 0, overflow: "hidden", textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" }}
+                  style={{ ...styles.card, padding: 0, overflow: "hidden", textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit", display: "flex", flexDirection: "column", justifyContent: "flex-start", alignItems: "stretch" }}
                 >
-                  <div style={{ height: 110, background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden" }}>
+                  <div style={{ height: 110, flex: "none", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden" }}>
                     {u.bildUrl ? (
                       <img src={u.bildUrl} alt={u.titel} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
                     ) : (
