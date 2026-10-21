@@ -4172,8 +4172,7 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <h3 style={{ ...styles.tabLabel, margin: 0 }}>Taktik-Boards</h3>
-        <button style={styles.secondaryBtn} onClick={neu}>+ Neues Board</button>
+                <button style={styles.secondaryBtn} onClick={neu}>+ Neues Board</button>
       </div>
       {liste.length === 0 && <EmptyState text="Noch kein Board angelegt. Mit „+ Neues Board“ geht es los." />}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
@@ -5602,7 +5601,6 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
   );
   return (
     <section>
-    <h3 style={styles.tabLabel}>Eltern-Seite</h3>
     <div style={{ ...styles.card, marginBottom: 12 }}>
       <h3 style={styles.h3}>Link für Eltern</h3>
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
@@ -9513,7 +9511,6 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
   const gesamt = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   return (
     <div style={{ marginTop: 4 }}>
-      <h3 style={styles.tabLabel}>Papierkorb</h3>
       <p style={styles.hintBlock}>
         Gelöschte Spieler, Gegner und Spieltage bleiben hier, bis du sie endgültig entfernst.
       </p>
@@ -9694,7 +9691,6 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <h3 style={styles.tabLabel}>Material</h3>
       <p style={{ ...styles.hintBlock, marginBottom: 16 }}>
         Trage zu einem Datum die gezählte Menge ein. So lässt sich im Verlauf erkennen, in welchem Zeitraum etwas
         weniger wurde.
@@ -9903,7 +9899,6 @@ function SpielerBereich({
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
-      <h3 style={styles.tabLabel}>Spieler</h3>
       <div style={{ ...styles.card, marginBottom: 14 }}>
       <h3 style={styles.h3}>Spieler hinzufügen</h3>
       <div style={styles.addRow}>
@@ -10127,7 +10122,6 @@ function TrainingsplanBereich({
 
   return (
     <div style={{ marginTop: 4 }}>
-      <h3 style={styles.tabLabel}>Trainingsplan</h3>
 
       <div style={styles.card}>
         <h3 style={styles.h3}>Termine generieren</h3>
@@ -10492,8 +10486,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <h3 style={{ ...styles.tabLabel, margin: 0 }}>Übungen</h3>
-        <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
+                <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
       </div>
       <p style={styles.hintBlock}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</p>
 
@@ -10842,7 +10835,6 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
   return (
     <div style={{ marginTop: 4 }}>
-      <h3 style={styles.tabLabel}>Spieltage</h3>
 
       {/* Gegner verwalten */}
       <div style={{ ...styles.card, marginBottom: 18 }}>
