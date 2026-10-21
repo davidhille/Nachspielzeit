@@ -8119,9 +8119,11 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
   return (
     <section>
       <h2 style={styles.h2}>Monatsentwicklung</h2>
-      <Hinweis>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</Hinweis>
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <h3 style={styles.h3}>Monat wählen</h3>
+        <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
+          Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.
+        </div>
         <input
           type="month"
           value={month}
@@ -8251,11 +8253,11 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
 
       {subTab === "uebersicht" && (
         <div style={{ marginTop: 4 }}>
-          <Hinweis style={{ marginBottom: 10 }}>
-            Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
-          </Hinweis>
           <div style={{ ...styles.card, marginBottom: 16 }}>
           <h3 style={styles.h3}>Sortieren nach</h3>
+          <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
+            Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <button
               onClick={() => setUebersichtSort("spiele")}
