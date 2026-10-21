@@ -1606,7 +1606,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Wappen
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
             <img src={logoUrl || CLUB_STD.logo} alt="Wappen" style={{ height: 56, maxWidth: 120, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
-            <label style={{ ...styles.secondaryBtn, display: "inline-block", cursor: "pointer" }}>
+            <label style={{ ...styles.secondaryBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
               {logoBusy ? "Lädt …" : "Wappen hochladen"}
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { logoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
             </label>
@@ -1638,7 +1638,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Mannschaftsbild
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
             {fotoUrl ? <img src={fotoUrl} alt="Mannschaftsbild" style={{ height: 64, borderRadius: 8, objectFit: "cover" }} /> : <span style={{ fontSize: 12.5, fontWeight: 400, color: "var(--muted)" }}>Noch kein Bild</span>}
-            <label style={{ ...styles.secondaryBtn, display: "inline-block", cursor: "pointer" }}>
+            <label style={{ ...styles.secondaryBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
               {fotoBusy ? "Lädt …" : fotoUrl ? "Bild ersetzen" : "Bild hochladen"}
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { fotoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
             </label>
