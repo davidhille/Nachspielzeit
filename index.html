@@ -543,9 +543,14 @@ let SAISON = { start: 9, ende: 7 };
 const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.25, unentschuldigt: -0.25, entschuldigt: 0 };
 const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
 const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
+let EINST = { backupTage: 7, papierkorbTage: 0 };
 let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "" } };
 const setzeEinstellungen = (cfg) => {
   cfg = cfg || {};
+  EINST = {
+    backupTage: cfg.backup_tage === undefined ? 7 : Math.max(0, Math.min(365, Number(cfg.backup_tage) || 0)),
+    papierkorbTage: Math.max(0, Math.min(3650, Number(cfg.papierkorb_tage) || 0)),
+  };
   const tr = cfg.training_std || {};
   STANDARDS = {
     training: {
@@ -1496,6 +1501,12 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [stZeit, setStZeit] = useState((cfg.spieltag_std && cfg.spieltag_std.zeit) || "");
   const [stOrt, setStOrt] = useState((cfg.spieltag_std && cfg.spieltag_std.ort) || "");
   const [startTab, setStartTab] = useState(cfg.start_tab || "letzte");
+  const [backupTage, setBackupTage] = useState(String(cfg.backup_tage === undefined ? 7 : cfg.backup_tage));
+  const [papierTage, setPapierTage] = useState(String(cfg.papierkorb_tage || 0));
+  const [codes, setCodes] = useState(null);
+  useEffect(() => {
+    dbSelect("access_codes", { alle: true }).then((r) => setCodes(r.filter((c) => c.team_id === team))).catch(() => setCodes([]));
+  }, [team]);
   const [saisonStart, setSaisonStart] = useState(String(cfg.saison_start || 9));
   const [saisonEnde, setSaisonEnde] = useState(String(cfg.saison_ende || 7));
   const [wertung, setWertung] = useState(cfg.spieltag_wertung || "ergebnisse");
@@ -1548,6 +1559,10 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (JSON.stringify(trNeu) === JSON.stringify({ tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }) || trNeu.tage.length === 0) delete neuCfg.training_std; else neuCfg.training_std = trNeu;
       if (stZeit || stOrt.trim()) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim() }; else delete neuCfg.spieltag_std;
       if (startTab === "letzte") delete neuCfg.start_tab; else neuCfg.start_tab = startTab;
+      const bt = Math.max(0, Math.min(365, parseInt(backupTage, 10) || 0));
+      if (bt === 7) delete neuCfg.backup_tage; else neuCfg.backup_tage = bt;
+      const pt = Math.max(0, Math.min(3650, parseInt(papierTage, 10) || 0));
+      if (pt === 0) delete neuCfg.papierkorb_tage; else neuCfg.papierkorb_tage = pt;
       const bNeu = {};
       Object.keys(bewertung).forEach((k) => {
         const std = { ...KARTEN_STD, ...TEILNAHME_STD }[k];
@@ -1664,6 +1679,34 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             Uhrzeit <input type="time" style={{ ...styles.input, width: "auto" }} value={stZeit} onChange={(e) => setStZeit(e.target.value)} />
             Ort <input style={{ ...styles.input, flex: 1, minWidth: 160 }} value={stOrt} placeholder="z. B. Sportanlage Heimstetten" onChange={(e) => setStOrt(e.target.value)} />
           </div>
+        </div>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Backup-Erinnerung nach … Tagen
+          <input type="number" min="0" max="365" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={backupTage} onChange={(e) => setBackupTage(e.target.value)} />
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            Auf der Übersicht erscheint ein Hinweis, wenn das letzte Backup (im Admin unter „Backup“) so lange her ist. 0 = keine Erinnerung. Standard: 7.
+            {cfg.letztes_backup ? ` Letztes Backup: ${new Date(cfg.letztes_backup).toLocaleString("de-DE")}.` : " Bisher wurde noch kein Backup vermerkt."}
+          </div>
+        </label>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Papierkorb: Hinweis nach … Tagen
+          <input type="number" min="0" max="3650" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={papierTage} onChange={(e) => setPapierTage(e.target.value)} />
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            Im Papierkorb wird markiert, was länger als diese Frist liegt, mit einem Knopf zum endgültigen Löschen. Es wird nie automatisch gelöscht. 0 = kein Hinweis.
+          </div>
+        </label>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Zugangscodes dieses Teams
+          <div style={{ marginTop: 6, fontWeight: 400, fontSize: 13 }}>
+            {codes === null ? "Lade …" : codes.length === 0 ? "Keine Codes für dieses Team hinterlegt." : codes.map((c) => (
+              <div key={c.code} style={{ display: "flex", gap: 10, padding: "3px 0", alignItems: "center" }}>
+                <span style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em" }}>{"•••" + String(c.code).slice(-4)}</span>
+                <span style={{ flex: 1 }}>{c.label || "ohne Bezeichnung"}</span>
+                <span style={{ color: c.active === false ? "var(--danger-text)" : "var(--success-text)", fontWeight: 700 }}>{c.active === false ? "gesperrt" : "aktiv"}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Anlegen, sperren und löschen im Bereich „Zugänge“ (Admin, Ansicht „Alle Teams“).</div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Startansicht der App
@@ -1928,6 +1971,12 @@ function AdminApp() {
       localStorage.setItem("nsz_admin_last_backup", stempel);
     } catch {}
     setLetztesBackup(stempel);
+    try {
+      for (const t of teams.filter((x) => x.created_at !== undefined)) {
+        await dbUpdate("teams", t.id, { config: { ...(t.config || {}), letztes_backup: jetzt.toISOString() } });
+      }
+      ladeTeams();
+    } catch (e) {}
     setBackupInfo(infos);
     setBackupLaeuft(false);
   };
@@ -4232,6 +4281,25 @@ function Header({ tab, setTab }) {
         ))}
       </nav>
     </header>
+  );
+}
+
+function BackupHinweis({ config }) {
+  const tage = EINST.backupTage;
+  const letztes = config && config.letztes_backup ? new Date(config.letztes_backup) : null;
+  const heute = todayISO();
+  const key = `nsz_backup_hint_${heute}`;
+  const [weg, setWeg] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
+  if (!tage || weg) return null;
+  const alter = letztes ? Math.floor((Date.now() - letztes.getTime()) / 86400000) : null;
+  if (alter !== null && alter < tage) return null;
+  return (
+    <div style={styles.seasonHint}>
+      <span>
+        {alter === null ? "Es gibt noch kein Backup." : `Das letzte Backup ist ${alter} ${alter === 1 ? "Tag" : "Tage"} alt.`} Bitte unter admin.nachspielzeit.app → Backup eine Sicherung erstellen.
+      </span>
+      <button style={styles.linkBtn} onClick={() => { try { localStorage.setItem(key, "1"); } catch {} setWeg(true); }}>Heute nicht mehr</button>
+    </div>
   );
 }
 
@@ -6760,6 +6828,7 @@ function Dashboard({
         <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
         {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
         <SaisonwechselHinweis seasons={seasons} />
+        <BackupHinweis config={teamInfo?.config} />
       </div>
 
       <div style={styles.segmentedControl}>
@@ -9409,6 +9478,21 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
       </p>
 
       {gesamt === 0 && <EmptyState text="Der Papierkorb ist leer." />}
+      {EINST.papierkorbTage > 0 && (() => {
+        const grenze = Date.now() - EINST.papierkorbTage * 86400000;
+        const alt = [
+          ...trashPlayers.filter((x) => x.deleted_at && new Date(x.deleted_at).getTime() < grenze).map((x) => ["players", x.id, "Spieler"]),
+          ...trashGegner.filter((x) => x.deleted_at && new Date(x.deleted_at).getTime() < grenze).map((x) => ["gegner", x.id, "Gegner"]),
+          ...trashSpieltage.filter((x) => x.deletedAt && new Date(x.deletedAt).getTime() < grenze).map((x) => ["spieltage", x.id, "Spieltag"]),
+        ];
+        if (alt.length === 0) return null;
+        return (
+          <div style={{ ...styles.seasonHint, marginBottom: 12 }}>
+            <span>{alt.length} {alt.length === 1 ? "Eintrag liegt" : "Einträge liegen"} länger als {EINST.papierkorbTage} Tage im Papierkorb.</span>
+            <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => confirmAnd(`${alt.length} Einträge endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () => alt.forEach(([t, id, l]) => onHardDelete(t, id, l)))}>Jetzt endgültig löschen</button>
+          </div>
+        );
+      })()}
 
       {trashPlayers.length > 0 && (
         <>
