@@ -2044,13 +2044,13 @@ notify pgrst, 'reload schema';`;
           <section>
             <div style={styles.card}>
               <h3 style={styles.h3}>Backup</h3>
-              <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+              <div style={styles.cardDesc}>
                 Lädt alle Daten der App (Spieler, Trainings, Spieltage, Übungen, Notizen, Einstellungen …) als eine JSON-Datei herunter. Bilder liegen im Supabase-Storage und sind nur als Link enthalten.
               </div>
-              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
+              <div style={{ fontSize: 13.5, color: "var(--muted)", margin: "-4px 0 12px" }}>
                 Letztes Backup von diesem Gerät: {letztesBackup || "noch keines"}
               </div>
-              <button style={{ ...styles.primaryBtn, marginTop: 12 }} onClick={backupErstellen} disabled={backupLaeuft}>
+              <button style={styles.primaryBtn} onClick={backupErstellen} disabled={backupLaeuft}>
                 {backupLaeuft ? "Backup läuft …" : "Backup jetzt herunterladen"}
               </button>
               {backupInfo && (
@@ -2065,7 +2065,7 @@ notify pgrst, 'reload schema';`;
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 12, color: "var(--muted-2)", marginTop: 8 }}>Wiederherstellen aus einem Backup folgt in einem späteren Schritt.</div>
+            <div style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 10 }}>Wiederherstellen aus einem Backup folgt in einem späteren Schritt.</div>
           </section>
         )}
 
