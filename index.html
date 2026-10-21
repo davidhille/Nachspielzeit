@@ -4332,6 +4332,8 @@ function BackupHinweis({ config }) {
   const key = `nsz_backup_hint_${heute}`;
   const [weg, setWeg] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
   if (!tage || weg) return null;
+  // Nur Admin-Codes (ohne Team) können Backups machen – andere Trainer sehen den Hinweis nicht
+  if (!ACCESS_INFO || ACCESS_INFO.team_id) return null;
   const alter = letztes ? Math.floor((Date.now() - letztes.getTime()) / 86400000) : null;
   if (alter !== null && alter < tage) return null;
   return (
