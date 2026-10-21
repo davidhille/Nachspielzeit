@@ -5603,7 +5603,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
     <section>
     <div style={{ ...styles.card, marginBottom: 12 }}>
       <h3 style={styles.h3}>Link für Eltern</h3>
-      <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
+      <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
         Eine Seite mit Saisonbilanz, Spieltagskarten, Sammelkarten und Mannschaftssongs. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 10 }}>
@@ -5642,7 +5642,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
     <div style={{ ...styles.card, marginBottom: 12 }}>
           <div>
             <h3 style={styles.h3}>Vorschau-Link (zum Testen)</h3>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
+            <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 10 }}>
               Hier siehst du Änderungen an der Eltern-Seite, bevor sie freigegeben werden. Gleiche Daten wie der Eltern-Link, nur eine andere Darstellung. Eltern sehen sie nicht.
             </div>
             <input readOnly value={urlVorschau} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
@@ -8119,7 +8119,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
   return (
     <section>
       <h2 style={styles.h2}>Monatsentwicklung</h2>
-      <p style={styles.hintBlock}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
+      <Hinweis>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</Hinweis>
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <h3 style={styles.h3}>Monat wählen</h3>
         <input
@@ -8251,9 +8251,9 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
 
       {subTab === "uebersicht" && (
         <div style={{ marginTop: 4 }}>
-          <p style={{ ...styles.hintBlock, marginBottom: 10 }}>
+          <Hinweis style={{ marginBottom: 10 }}>
             Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
-          </p>
+          </Hinweis>
           <div style={{ ...styles.card, marginBottom: 16 }}>
           <h3 style={styles.h3}>Sortieren nach</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -8421,6 +8421,19 @@ function ChevronIcon({ size = 14, open }) {
     >
       <path d="m6 9 6 6 6-6" />
     </svg>
+  );
+}
+
+function Hinweis({ children, style }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, lineHeight: 1.45, color: "var(--text)", margin: "0 0 14px", ...style }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true">
+        <circle cx="12" cy="12" r="9.5" />
+        <path d="M12 11v5.5" />
+        <circle cx="12" cy="7.6" r="0.6" fill="var(--accent-text)" />
+      </svg>
+      <div>{children}</div>
+    </div>
   );
 }
 
@@ -9511,9 +9524,9 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
   const gesamt = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   return (
     <div style={{ marginTop: 4 }}>
-      <p style={styles.hintBlock}>
+      <Hinweis>
         Gelöschte Spieler, Gegner und Spieltage bleiben hier, bis du sie endgültig entfernst.
-      </p>
+      </Hinweis>
 
       {gesamt === 0 && <EmptyState text="Der Papierkorb ist leer." />}
       {EINST.papierkorbTage > 0 && (() => {
@@ -9691,10 +9704,10 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <p style={{ ...styles.hintBlock, marginBottom: 16 }}>
+      <Hinweis style={{ marginBottom: 16 }}>
         Trage zu einem Datum die gezählte Menge ein. So lässt sich im Verlauf erkennen, in welchem Zeitraum etwas
         weniger wurde.
-      </p>
+      </Hinweis>
 
       <div style={styles.subNav}>
         {MATERIAL_GRUPPEN.map((g) => (
@@ -10488,7 +10501,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 6 }}>
                 <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
       </div>
-      <p style={styles.hintBlock}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</p>
+      <Hinweis>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</Hinweis>
 
       {uebungen.length === 0 ? (
         <EmptyState text="Noch keine Übungen angelegt." />
@@ -10941,7 +10954,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
             Anlegen
           </button>
         </div>
-        <div style={{ ...styles.hintBlock, marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere und Hallenturniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</div>
+        <Hinweis style={{ marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere und Hallenturniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</Hinweis>
       </div>
 
       {/* Spieltag-Liste mit Gegner-Zuordnung */}
@@ -11485,7 +11498,6 @@ const styles = {
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
   empty: { background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 14 },
-  hintBlock: { fontSize: 13, lineHeight: 1.45, color: "var(--text-2)", background: "var(--surface-2)", borderLeft: "3px solid var(--accent)", borderRadius: "4px 8px 8px 4px", padding: "8px 12px", margin: "0 0 14px" },
   hint: { fontSize: 13, color: "var(--muted)", marginTop: -4, marginBottom: 6 },
   toast: {
     position: "fixed",
