@@ -155,7 +155,7 @@ let CURRENT_TEAM = (() => {
 })();
 const TEAM_TABLES = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele", "torschuetzen",
-  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features",
+  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards",
 ];
 const TEAM_COL_FEHLT = new Set(); // Tabellen, in denen die Spalte team_id (noch) nicht existiert
 const teamFilterAktiv = (table) => TEAM_TABLES.includes(table) && !TEAM_COL_FEHLT.has(table);
@@ -616,6 +616,7 @@ const FEATURES = [
   { key: "teilen", label: "Spieltag teilen", beschreibung: "Button „Teilen“ (WhatsApp-Bild) an den Spieltagen" },
   { key: "uebungen", label: "Übungsbibliothek", beschreibung: "Verwaltung → Übungen sowie Übungen und Notizen im Trainingsplan" },
   { key: "material", label: "Material", beschreibung: "Verwaltung → Material (Bestandsführung)" },
+  { key: "taktik", label: "Taktik-Board", beschreibung: "Tab „Taktik“ (interaktives Taktikboard mit Spielern, Laufwegen und Animation)" },
   { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Übersichtsseite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
 
@@ -628,7 +629,7 @@ const IS_ADMIN_HOST = /^admin\./i.test(window.location.hostname) || /[?&]admin=1
 const BACKUP_TABELLEN = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele",
   "torschuetzen", "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "team_settings", "uebungen",
-  "training_uebungen", "app_features", "teams",
+  "training_uebungen", "app_features", "teams", "taktik_boards",
 ];
 
 /* ---------- Spieler-Import (BFV/DFBnet-CSV) ---------- */
@@ -1816,6 +1817,8 @@ function App() {
   const [material, setMaterial] = useState([]);
   const [uebungen, setUebungen] = useState([]);
   const [trainingUebungen, setTrainingUebungen] = useState([]);
+  const [taktikBoards, setTaktikBoards] = useState([]);
+  const [taktikFehlt, setTaktikFehlt] = useState(false);
   const [teamSettings, setTeamSettings] = useState({});
   const [features, setFeatures] = useState({});
   const [teamInfo, setTeamInfo] = useState(null);
@@ -1900,7 +1903,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw, teamsRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw, teamsRaw, taktikRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -1920,7 +1923,9 @@ function App() {
           dbSelect("training_uebungen").catch(() => []),
           dbSelect("app_features").catch(() => []),
           dbSelect("teams").catch(() => []),
+          dbSelect("taktik_boards").then((r) => { setTaktikFehlt(false); return r; }).catch(() => { setTaktikFehlt(true); return []; }),
         ]);
+      setTaktikBoards(taktikRaw.filter((b) => !b.deleted_at));
       setPlayers(playersRaw.filter((p) => !p.deleted_at));
       setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
       const basisMap = {};
@@ -2373,6 +2378,38 @@ function App() {
             }}
           />
         )}
+        {tab === "taktik" && features.taktik !== false && (
+          <TaktikTab
+            boards={taktikBoards}
+            fehlt={taktikFehlt}
+            players={players}
+            onSave={async (b, neu) => {
+              const jetzt = new Date().toISOString();
+              if (neu) {
+                const row = (await dbInsert("taktik_boards", { id: b.id, name: b.name, data: b.data, updated_at: jetzt }))[0] || { id: b.id, name: b.name, data: b.data, updated_at: jetzt };
+                setTaktikBoards((l) => [...l, row]);
+              } else {
+                await dbUpdate("taktik_boards", b.id, { name: b.name, data: b.data, updated_at: jetzt });
+                setTaktikBoards((l) => l.map((x) => (x.id === b.id ? { ...x, name: b.name, data: b.data, updated_at: jetzt } : x)));
+              }
+            }}
+            onDelete={(id) =>
+              wrapAction(async () => {
+                await dbUpdate("taktik_boards", id, { deleted_at: new Date().toISOString() });
+                setTaktikBoards((l) => l.filter((x) => x.id !== id));
+              }, "Board gelöscht")
+            }
+            onDuplicate={(b) =>
+              wrapAction(async () => {
+                const jetzt = new Date().toISOString();
+                const row = { id: uid(), name: `${b.name} (Kopie)`, data: b.data, updated_at: jetzt };
+                const res = await dbInsert("taktik_boards", row);
+                setTaktikBoards((l) => [...l, res[0] || row]);
+              }, "Board dupliziert")
+            }
+          />
+        )}
+
         {tab === "verwaltung" && (
           <Verwaltung
             kartenBox={
@@ -2509,16 +2546,935 @@ function App() {
   );
 }
 
+/* ---------- Taktik-Board: Felder, Magnete, Linien, Schritte (Animation) ---------- */
+
+const SQL_TAKTIK = `-- Nachspielzeit: Tabelle für die Taktik-Boards (wiederholbar)
+create table if not exists taktik_boards (
+  id text primary key,
+  team_id text not null default 'u8',
+  name text not null default 'Neues Board',
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  deleted_at timestamptz
+);
+alter table taktik_boards enable row level security;
+drop policy if exists "access via code" on taktik_boards;
+create policy "access via code" on taktik_boards for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
+notify pgrst, 'reload schema';`;
+
+/* Feldmaße in Metern (Länge x Breite). Halbes Feld: links Mittellinie, rechts Torlinie. Fußball5: 40 x 25 m mit 6-m-Torzone. */
+const TK_FELDER = {
+  f5: { label: "Fußball5", L: 40, W: 25, pad: 2.6 },
+  ganz: { label: "Ganzes Feld", L: 105, W: 68, pad: 3.5 },
+  halb: { label: "Halbes Feld", L: 52.5, W: 68, pad: 3.5 },
+};
+const TK_FARBEN = [
+  ["#FFFFFF", "Weiß"],
+  ["#FFD84D", "Gelb"],
+  ["#FF6B5E", "Rot"],
+  ["#7CC4FF", "Blau"],
+  ["#1F2937", "Schwarz"],
+];
+const TK_ROT = "#C4271F";
+const TK_BLAU = "#2B4C9B";
+const TK_GOLD = "#F2A93B";
+const tkNeuesBoard = () => ({
+  v: 1,
+  feld: "f5",
+  ausr: "quer",
+  zonen: false,
+  anzeige: "nummer",
+  namen: true,
+  schritte: [{ objekte: [], linien: [] }],
+});
+const tkKopie = (x) => JSON.parse(JSON.stringify(x));
+const tkVorname = (n) => String(n || "").trim().split(/\s+/)[0] || "";
+
+function tkGeo(data) {
+  const F = TK_FELDER[data.feld] || TK_FELDER.f5;
+  const hoch = data.ausr === "hoch";
+  const { L, W, pad } = F;
+  const vbW = (hoch ? W : L) + 2 * pad;
+  const vbH = (hoch ? L : W) + 2 * pad;
+  // kanonisch (Meter, Länge entlang x) <-> Bildschirm (viewBox-Einheiten)
+  const toS = (x, y) => {
+    const cx = x * L, cy = y * W;
+    return hoch ? [pad + W - cy, pad + cx] : [pad + cx, pad + cy];
+  };
+  const toN = (sx, sy) => {
+    let cx, cy;
+    if (hoch) { cy = pad + W - sx; cx = sy - pad; } else { cx = sx - pad; cy = sy - pad; }
+    return [cx / L, cy / W];
+  };
+  return { F, L, W, pad, hoch, vbW, vbH, toS, toN, R: W * 0.043 };
+}
+
+function TkFeld({ data, g }) {
+  const { L, W, pad, hoch } = g;
+  const sw = Math.max(0.25, W * 0.005);
+  const lc = "rgba(255,255,255,0.93)";
+  const ln = { stroke: lc, strokeWidth: sw, fill: "none" };
+  const tr = hoch ? `matrix(0 1 -1 0 ${pad + W} ${pad})` : `translate(${pad} ${pad})`;
+  const fs = Math.max(1.5, W * 0.045);
+  const txt = (key, x, y, s, extra) => (
+    <text key={key} x={x} y={y} fontSize={fs} fontWeight="700" textAnchor="middle" dominantBaseline="central"
+      fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.25)" strokeWidth={fs * 0.06} paintOrder="stroke"
+      transform={hoch ? `rotate(-90 ${x} ${y})` : undefined} {...extra}>{s}</text>
+  );
+  const streifen = [];
+  const n = data.feld === "f5" ? 8 : 10;
+  for (let i = 0; i < n; i++) streifen.push(<rect key={i} x={(i * L) / n} y={0} width={L / n + 0.01} height={W} fill={i % 2 ? "#3C9246" : "#37893F"} />);
+  const marks = [];
+  if (data.feld === "ganz") {
+    marks.push(<rect key="r" x={0} y={0} width={L} height={W} {...ln} />);
+    marks.push(<line key="m" x1={L / 2} y1={0} x2={L / 2} y2={W} {...ln} />);
+    marks.push(<circle key="mk" cx={L / 2} cy={W / 2} r={9.15} {...ln} />);
+    marks.push(<circle key="mp" cx={L / 2} cy={W / 2} r={0.35} fill={lc} />);
+    [0, 1].forEach((s) => {
+      const f = (x) => (s ? L - x : x);
+      const d = Math.sqrt(9.15 * 9.15 - 5.5 * 5.5);
+      marks.push(<rect key={"sr" + s} x={s ? L - 16.5 : 0} y={W / 2 - 20.16} width={16.5} height={40.32} {...ln} />);
+      marks.push(<rect key={"fr" + s} x={s ? L - 5.5 : 0} y={W / 2 - 9.16} width={5.5} height={18.32} {...ln} />);
+      marks.push(<circle key={"ep" + s} cx={f(11)} cy={W / 2} r={0.3} fill={lc} />);
+      marks.push(<path key={"bg" + s} d={`M ${f(16.5)} ${W / 2 - d} A 9.15 9.15 0 0 ${s ? 0 : 1} ${f(16.5)} ${W / 2 + d}`} {...ln} />);
+      marks.push(<rect key={"tor" + s} x={s ? L : -2} y={W / 2 - 3.66} width={2} height={7.32} {...ln} />);
+    });
+  } else if (data.feld === "halb") {
+    marks.push(<rect key="r" x={0} y={0} width={L} height={W} {...ln} />);
+    const d = Math.sqrt(9.15 * 9.15 - 5.5 * 5.5);
+    marks.push(<path key="mk" d={`M 0 ${W / 2 - 9.15} A 9.15 9.15 0 0 1 0 ${W / 2 + 9.15}`} {...ln} />);
+    marks.push(<rect key="sr" x={L - 16.5} y={W / 2 - 20.16} width={16.5} height={40.32} {...ln} />);
+    marks.push(<rect key="fr" x={L - 5.5} y={W / 2 - 9.16} width={5.5} height={18.32} {...ln} />);
+    marks.push(<circle key="ep" cx={L - 11} cy={W / 2} r={0.3} fill={lc} />);
+    marks.push(<path key="bg" d={`M ${L - 16.5} ${W / 2 - d} A 9.15 9.15 0 0 0 ${L - 16.5} ${W / 2 + d}`} {...ln} />);
+    marks.push(<rect key="tor" x={L} y={W / 2 - 3.66} width={2} height={7.32} {...ln} />);
+  } else {
+    marks.push(<rect key="tz0" x={0} y={0} width={6} height={W} fill="rgba(255,255,255,0.10)" />);
+    marks.push(<rect key="tz1" x={L - 6} y={0} width={6} height={W} fill="rgba(255,255,255,0.10)" />);
+    marks.push(<rect key="r" x={0} y={0} width={L} height={W} {...ln} />);
+    marks.push(<line key="m" x1={L / 2} y1={0} x2={L / 2} y2={W} {...ln} />);
+    marks.push(<circle key="mp" cx={L / 2} cy={W / 2} r={0.3} fill={lc} />);
+    marks.push(<line key="t0" x1={6} y1={0} x2={6} y2={W} {...ln} />);
+    marks.push(<line key="t1" x1={L - 6} y1={0} x2={L - 6} y2={W} {...ln} />);
+    marks.push(<rect key="tor0" x={-1.2} y={W / 2 - 1.5} width={1.2} height={3} {...ln} />);
+    marks.push(<rect key="tor1" x={L} y={W / 2 - 1.5} width={1.2} height={3} {...ln} />);
+  }
+  // Zonen: Korridore (Flügel blau, Halbräume grau) und Längszonen
+  const zon = [];
+  if (data.zonen) {
+    let ky, zx, bez, zbez, kz;
+    if (data.feld === "f5") {
+      ky = [0, 7, 18, 25];
+      kz = ["flügel", "mitte", "flügel"];
+      bez = ["A", "B", "C"];
+      zx = [0, 6, 20, 34, 40];
+      zbez = ["1", "2", "3", "4"];
+    } else {
+      ky = [0, 0.18, 0.35, 0.65, 0.82, 1].map((v) => v * W);
+      kz = ["flügel", "halbraum", "mitte", "halbraum", "flügel"];
+      bez = ["A", "B", "C", "D", "E"];
+      const z0 = data.feld === "halb" ? 3 : 0;
+      zx = Array.from({ length: (data.feld === "halb" ? 3 : 6) + 1 }, (_, i) => (i * 17.5));
+      zbez = Array.from({ length: data.feld === "halb" ? 3 : 6 }, (_, i) => String(i + 1 + z0));
+    }
+    kz.forEach((t, i) => {
+      if (t === "mitte") return;
+      zon.push(<rect key={"k" + i} x={0} y={ky[i]} width={L} height={ky[i + 1] - ky[i]} fill={t === "flügel" ? `url(#tkHB-${data.feld})` : `url(#tkHG-${data.feld})`} />);
+    });
+    ky.slice(1, -1).forEach((y, i) => zon.push(<line key={"kl" + i} x1={0} y1={y} x2={L} y2={y} stroke="rgba(255,255,255,0.55)" strokeWidth={sw * 0.8} strokeDasharray={`${sw * 4} ${sw * 3}`} />));
+    zx.slice(1, -1).forEach((x, i) => zon.push(<line key={"zl" + i} x1={x} y1={0} x2={x} y2={W} stroke="rgba(255,255,255,0.55)" strokeWidth={sw * 0.8} strokeDasharray={`${sw * 4} ${sw * 3}`} />));
+    bez.forEach((b, i) => zon.push(txt("kb" + i, fs * 0.9, (ky[i] + ky[i + 1]) / 2, b, { opacity: 0.9 })));
+    zbez.forEach((b, i) => zon.push(txt("zb" + i, (zx[i] + zx[i + 1]) / 2, fs * 0.9, b, { opacity: 0.9 })));
+  }
+  return (
+    <g transform={tr}>
+      {streifen}
+      {zon}
+      {marks}
+    </g>
+  );
+}
+
+const tkRadius = (o, g) => {
+  const R = g.R;
+  if (o.art === "ball") return R * 0.75;
+  if (o.art === "huetchen") return R * 0.8;
+  if (o.art === "tor") return (o.klein ? g.W * 0.05 : g.W * 0.108) * 0.55;
+  if (o.art === "text") return Math.max(R * 1.2, (String(o.text || "").length * R * 0.9 * 0.6) / 2 + R * 0.5);
+  return R * 1.12;
+};
+
+function TkObjekt({ o, g, anzeige, namen, players, sel, opacity = 1, pos }) {
+  const R = g.R;
+  const [x, y] = pos || g.toS(o.x, o.y);
+  const p = o.spielerId ? players.find((q) => q.id === o.spielerId) : null;
+  const gk = o.art === "torwart";
+  let body = null;
+  if (o.art === "spieler" || gk || o.art === "gegner") {
+    const farbe = o.art === "gegner" ? TK_BLAU : gk ? TK_GOLD : TK_ROT;
+    const nr = p ? (p.trikotnummer != null ? p.trikotnummer : tkVorname(p.name).slice(0, 1)) : o.nr != null && o.nr !== "" ? o.nr : "";
+    const foto = anzeige === "foto" && p && p.photo_url ? p.photo_url : null;
+    const klar = "tkc" + String(o.id).replace(/[^a-z0-9]/gi, "");
+    body = (
+      <>
+        <circle r={R} fill={farbe} stroke="#fff" strokeWidth={R * 0.12} />
+        {foto ? (
+          <>
+            <clipPath id={klar}><circle r={R * 0.9} /></clipPath>
+            <image href={foto} x={-R} y={-R} width={R * 2} height={R * 2} clipPath={`url(#${klar})`} preserveAspectRatio="xMidYMid slice" />
+            {nr !== "" && (
+              <g transform={`translate(${-R * 0.72} ${R * 0.72})`}>
+                <circle r={R * 0.42} fill={farbe} stroke="#fff" strokeWidth={R * 0.08} />
+                <text fontSize={R * 0.62} fontWeight="800" fill="#fff" textAnchor="middle" dominantBaseline="central">{nr}</text>
+              </g>
+            )}
+          </>
+        ) : (
+          nr !== "" && <text fontSize={R * (String(nr).length > 1 ? 0.95 : 1.15)} fontWeight="800" fill={gk ? "#3B2A05" : "#fff"} textAnchor="middle" dominantBaseline="central">{nr}</text>
+        )}
+        {namen && p && <text y={R * 1.9} fontSize={R * 0.78} fontWeight="700" fill="#fff" stroke="rgba(0,0,0,0.55)" strokeWidth={R * 0.2} paintOrder="stroke" textAnchor="middle">{tkVorname(p.name)}</text>}
+        {namen && !p && o.name && <text y={R * 1.9} fontSize={R * 0.78} fontWeight="700" fill="#fff" stroke="rgba(0,0,0,0.55)" strokeWidth={R * 0.2} paintOrder="stroke" textAnchor="middle">{o.name}</text>}
+      </>
+    );
+  } else if (o.art === "ball") {
+    body = (
+      <>
+        <circle r={R * 0.55} fill="#fff" stroke="#111" strokeWidth={R * 0.09} />
+        <polygon points={`0,${-R * 0.26} ${R * 0.25},${-R * 0.08} ${R * 0.15},${R * 0.21} ${-R * 0.15},${R * 0.21} ${-R * 0.25},${-R * 0.08}`} fill="#111" />
+      </>
+    );
+  } else if (o.art === "huetchen") {
+    body = <path d={`M 0 ${-R * 0.7} L ${R * 0.6} ${R * 0.55} L ${-R * 0.6} ${R * 0.55} Z`} fill={o.farbe || "#F28C28"} stroke="#fff" strokeWidth={R * 0.09} strokeLinejoin="round" />;
+  } else if (o.art === "tor") {
+    const w = o.klein ? g.W * 0.05 : g.W * 0.108;
+    const h = w * 0.38;
+    const netz = [];
+    for (let i = 1; i < 6; i++) netz.push(<line key={i} x1={-w / 2 + (w * i) / 6} y1={-h / 2} x2={-w / 2 + (w * i) / 6} y2={h / 2} stroke="rgba(255,255,255,0.55)" strokeWidth={w * 0.012} />);
+    body = (
+      <g transform={`rotate(${o.rot || 0})`}>
+        <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="rgba(255,255,255,0.22)" stroke="#fff" strokeWidth={w * 0.045} rx={w * 0.01} />
+        {netz}
+      </g>
+    );
+  } else if (o.art === "text") {
+    const fs = R * 0.95;
+    const w = Math.max(fs * 1.4, String(o.text || "").length * fs * 0.6 + fs);
+    body = (
+      <>
+        <rect x={-w / 2} y={-fs * 0.8} width={w} height={fs * 1.6} rx={fs * 0.35} fill="rgba(20,20,20,0.72)" stroke="rgba(255,255,255,0.8)" strokeWidth={fs * 0.06} />
+        <text fontSize={fs} fontWeight="700" fill="#fff" textAnchor="middle" dominantBaseline="central">{o.text || "Text"}</text>
+      </>
+    );
+  }
+  const rr = tkRadius(o, g);
+  return (
+    <g transform={`translate(${x} ${y})`} opacity={opacity}>
+      {sel && <circle data-skip="1" r={rr * 1.25} fill="none" stroke="#FFD84D" strokeWidth={R * 0.14} strokeDasharray={`${R * 0.35} ${R * 0.25}`} />}
+      {body}
+    </g>
+  );
+}
+
+function TkLinie({ l, g, objMap, sel, opacity = 1 }) {
+  const lw = Math.max(0.45, g.W * 0.011);
+  let pts;
+  if (l.art === "verbindung") {
+    const a = objMap[l.von], b = objMap[l.zu];
+    if (!a || !b) return null;
+    pts = [g.toS(a.x, a.y), g.toS(b.x, b.y)];
+  } else {
+    pts = (l.punkte || []).map(([x, y]) => g.toS(x, y));
+  }
+  if (pts.length < 2) return null;
+  const farbe = l.farbe || "#FFFFFF";
+  const verb = l.art === "verbindung";
+  const breite = verb ? lw * 1.7 : lw;
+  let head = null;
+  let linePts = pts;
+  if (!verb) {
+    const e = pts[pts.length - 1];
+    const hl = lw * 4.2;
+    let q = pts[0];
+    for (let i = pts.length - 2; i >= 0; i--) {
+      q = pts[i];
+      if (Math.hypot(e[0] - q[0], e[1] - q[1]) >= hl * 0.8) break;
+    }
+    const dx = e[0] - q[0], dy = e[1] - q[1];
+    const d = Math.hypot(dx, dy) || 1;
+    const ux = dx / d, uy = dy / d;
+    const bx = e[0] - ux * hl, by = e[1] - uy * hl;
+    head = `${e[0]},${e[1]} ${bx - uy * hl * 0.5},${by + ux * hl * 0.5} ${bx + uy * hl * 0.5},${by - ux * hl * 0.5}`;
+    linePts = [...pts.slice(0, -1), [e[0] - ux * hl * 0.6, e[1] - uy * hl * 0.6]];
+  }
+  const dstr = linePts.map((p) => p.join(",")).join(" ");
+  return (
+    <g opacity={opacity}>
+      {sel && <polyline data-skip="1" points={dstr} fill="none" stroke="#FFD84D" strokeWidth={breite + lw * 1.6} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />}
+      <polyline points={dstr} fill="none" stroke={farbe} strokeWidth={breite} strokeLinecap="round" strokeLinejoin="round"
+        strokeDasharray={l.art === "lauf" ? `${lw * 2.4} ${lw * 1.9}` : undefined} opacity={verb ? 0.8 : 1} />
+      {head && <polygon points={head} fill={farbe} />}
+    </g>
+  );
+}
+
+function TkDefs({ data, g }) {
+  const h = Math.max(1, g.W * 0.03);
+  return (
+    <defs>
+      <pattern id={`tkHB-${data.feld}`} patternUnits="userSpaceOnUse" width={h} height={h} patternTransform="rotate(45)">
+        <rect width={h} height={h} fill="rgba(70,140,255,0.22)" />
+        <line x1="0" y1="0" x2="0" y2={h} stroke="rgba(130,185,255,0.8)" strokeWidth={h * 0.22} />
+      </pattern>
+      <pattern id={`tkHG-${data.feld}`} patternUnits="userSpaceOnUse" width={h} height={h} patternTransform="rotate(45)">
+        <rect width={h} height={h} fill="rgba(220,220,220,0.14)" />
+        <line x1="0" y1="0" x2="0" y2={h} stroke="rgba(230,230,230,0.7)" strokeWidth={h * 0.22} />
+      </pattern>
+    </defs>
+  );
+}
+
+const tkEase = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const tkLerp = (a, b, t) => a + (b - a) * t;
+function tkAbstandSegment(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const l2 = dx * dx + dy * dy;
+  let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+}
+function tkNormalisiere(d) {
+  const n = { ...tkNeuesBoard(), ...(d || {}) };
+  if (!Array.isArray(n.schritte) || n.schritte.length === 0) n.schritte = [{ objekte: [], linien: [] }];
+  return n;
+}
+
+/* Interpolierte Ansicht zwischen Schritt A und B (t = 0..1) */
+function tkZwischen(A, B, t) {
+  const k = tkEase(t);
+  const mapB = {};
+  B.objekte.forEach((o) => (mapB[o.id] = o));
+  const mapA = {};
+  A.objekte.forEach((o) => (mapA[o.id] = o));
+  const objekte = [];
+  A.objekte.forEach((o) => {
+    const b = mapB[o.id];
+    objekte.push(b ? { ...o, x: tkLerp(o.x, b.x, k), y: tkLerp(o.y, b.y, k), rot: b.rot != null ? b.rot : o.rot } : { ...o, _op: 1 - k });
+  });
+  B.objekte.forEach((o) => { if (!mapA[o.id]) objekte.push({ ...o, _op: k }); });
+  return objekte;
+}
+
+function TkBrett({ data, g, players, objekte, linien, linienOp = 1, selId, draft, svgRef, handlers, nurAnzeige }) {
+  const objMap = {};
+  objekte.forEach((o) => (objMap[o.id] = o));
+  let draftEl = null;
+  if (draft) {
+    const lw = Math.max(0.45, g.W * 0.011);
+    if (draft.art === "verbindung") {
+      const a = objMap[draft.von];
+      if (a) {
+        const p1 = g.toS(a.x, a.y), p2 = g.toS(draft.ende[0], draft.ende[1]);
+        draftEl = <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke={draft.farbe} strokeWidth={lw * 1.7} strokeLinecap="round" opacity={0.6} />;
+      }
+    } else {
+      draftEl = <TkLinie l={{ art: draft.art, farbe: draft.farbe, punkte: draft.punkte }} g={g} objMap={objMap} />;
+    }
+  }
+  return (
+    <svg ref={svgRef} viewBox={`0 0 ${g.vbW} ${g.vbH}`} preserveAspectRatio="xMidYMid meet"
+      style={{ width: "100%", height: "100%", display: "block", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", borderRadius: nurAnzeige ? 8 : 12 }}
+      {...(handlers || {})}>
+      <TkDefs data={data} g={g} />
+      <rect x={0} y={0} width={g.vbW} height={g.vbH} fill="#2F7A39" />
+      <TkFeld data={data} g={g} />
+      {linien.map((l) => <TkLinie key={l.id} l={l} g={g} objMap={objMap} sel={selId === l.id} opacity={linienOp} />)}
+      {draftEl}
+      {objekte.map((o) => (
+        <TkObjekt key={o.id} o={o} g={g} anzeige={data.anzeige} namen={data.namen} players={players} sel={selId === o.id} opacity={o._op != null ? o._op : 1} />
+      ))}
+    </svg>
+  );
+}
+
+function TaktikEditor({ board, players, onSave, onClose }) {
+  const [name, setName] = useState(board.name || "Neues Board");
+  const [data, setData] = useState(() => tkNormalisiere(tkKopie(board.data)));
+  const [schritt, setSchritt] = useState(0);
+  const [tool, setTool] = useState("bewegen");
+  const [farbe, setFarbe] = useState("#FFFFFF");
+  const [sel, setSel] = useState(null); // { typ: "o" | "l", id }
+  const [draft, setDraft] = useState(null);
+  const [anim, setAnim] = useState(null); // { i, t }
+  const [voll, setVoll] = useState(false);
+  const [status, setStatus] = useState("");
+  const [dirty, setDirty] = useState(0);
+  const [breit, setBreit] = useState(() => window.innerWidth >= window.innerHeight);
+  const [exportiert, setExportiert] = useState(false);
+  const svgRef = useRef(null);
+  const dragRef = useRef(null);
+  const rafRef = useRef(0);
+  const past = useRef([]);
+  const future = useRef([]);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const schrittRef = useRef(0);
+  const nameRef = useRef(name);
+  nameRef.current = name;
+  const letzterStand = useRef(null);
+
+  const g = useMemo(() => tkGeo(data), [data.feld, data.ausr]);
+  const sIdx = Math.min(schritt, data.schritte.length - 1);
+  schrittRef.current = sIdx;
+  const st = data.schritte[sIdx];
+  const aktivePlayers = useMemo(
+    () => players.filter((p) => p.active !== false).slice().sort((a, b) => (a.trikotnummer ?? 999) - (b.trikotnummer ?? 999) || (a.name || "").localeCompare(b.name || "", "de")),
+    [players]
+  );
+
+  useEffect(() => {
+    const h = () => setBreit(window.innerWidth >= window.innerHeight);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  useEffect(() => {
+    const h = () => { if (!document.fullscreenElement) setVoll((v) => (v && document.fullscreenElement === null && letzterStand.current === "fs" ? false : v)); };
+    document.addEventListener("fullscreenchange", h);
+    return () => document.removeEventListener("fullscreenchange", h);
+  }, []);
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
+  // Automatisches Speichern (kurz nach der letzten Änderung)
+  useEffect(() => {
+    if (dirty === 0) return;
+    setStatus("Ungespeichert …");
+    const t = setTimeout(() => speichernJetzt(), 1200);
+    return () => clearTimeout(t);
+  }, [dirty]);
+  const speichernJetzt = async () => {
+    try {
+      setStatus("Speichert …");
+      await onSave({ id: board.id, name: nameRef.current.trim() || "Board", data: dataRef.current });
+      setStatus("Gespeichert ✓");
+    } catch (e) {
+      setStatus("Fehler beim Speichern");
+    }
+  };
+  const schliessen = async () => {
+    cancelAnimationFrame(rafRef.current);
+    if (dirty > 0) await speichernJetzt();
+    if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (e) {} }
+    onClose();
+  };
+
+  const commit = (neu, ohneHistorie) => {
+    if (!ohneHistorie) {
+      past.current.push(JSON.stringify(dataRef.current));
+      if (past.current.length > 80) past.current.shift();
+      future.current = [];
+    }
+    dataRef.current = neu;
+    setData(neu);
+    setDirty((n) => n + 1);
+  };
+  const aendern = (fn) => {
+    const d = tkKopie(dataRef.current);
+    fn(d, d.schritte[schrittRef.current], schrittRef.current);
+    commit(d);
+  };
+  const rueckgaengig = () => {
+    if (!past.current.length) return;
+    future.current.push(JSON.stringify(dataRef.current));
+    const d = JSON.parse(past.current.pop());
+    dataRef.current = d;
+    setData(d);
+    setSchritt((s) => Math.min(s, d.schritte.length - 1));
+    setSel(null);
+    setDirty((n) => n + 1);
+  };
+  const wiederholen = () => {
+    if (!future.current.length) return;
+    past.current.push(JSON.stringify(dataRef.current));
+    const d = JSON.parse(future.current.pop());
+    dataRef.current = d;
+    setData(d);
+    setSchritt((s) => Math.min(s, d.schritte.length - 1));
+    setSel(null);
+    setDirty((n) => n + 1);
+  };
+
+  const punkt = (e) => {
+    const svg = svgRef.current;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return [p.x, p.y];
+  };
+  const klemme = (v) => Math.max(-0.04, Math.min(1.04, v));
+  const treffer = (s) =>
+    [...st.objekte].reverse().find((o) => {
+      const [ox, oy] = g.toS(o.x, o.y);
+      return Math.hypot(ox - s[0], oy - s[1]) <= tkRadius(o, g);
+    });
+  const linienTreffer = (s) => {
+    const map = {};
+    st.objekte.forEach((o) => (map[o.id] = o));
+    const tol = Math.max(1.4, g.W * 0.03);
+    return [...st.linien].reverse().find((l) => {
+      let pts;
+      if (l.art === "verbindung") {
+        const a = map[l.von], b = map[l.zu];
+        if (!a || !b) return false;
+        pts = [g.toS(a.x, a.y), g.toS(b.x, b.y)];
+      } else pts = (l.punkte || []).map(([x, y]) => g.toS(x, y));
+      for (let i = 0; i < pts.length - 1; i++) if (tkAbstandSegment(s, pts[i], pts[i + 1]) <= tol) return true;
+      return false;
+    });
+  };
+
+  const onDown = (e) => {
+    if (anim || dragRef.current) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const s = punkt(e);
+    const [nx, ny] = g.toN(s[0], s[1]);
+    const hit = treffer(s);
+    const svg = svgRef.current;
+    if (tool === "bewegen") {
+      if (hit) {
+        setSel({ typ: "o", id: hit.id });
+        dragRef.current = { kind: "obj", id: hit.id, pid: e.pointerId, dx: hit.x - nx, dy: hit.y - ny, moved: false, start: JSON.stringify(dataRef.current) };
+        svg.setPointerCapture(e.pointerId);
+      } else {
+        const l = linienTreffer(s);
+        setSel(l ? { typ: "l", id: l.id } : null);
+      }
+    } else if (tool === "verbinden") {
+      if (hit && ["spieler", "torwart", "gegner", "ball", "huetchen"].includes(hit.art)) {
+        dragRef.current = { kind: "verb", von: hit.id, pid: e.pointerId };
+        setDraft({ art: "verbindung", von: hit.id, ende: [hit.x, hit.y], farbe });
+        svg.setPointerCapture(e.pointerId);
+      }
+    } else {
+      dragRef.current = { kind: "draw", pid: e.pointerId };
+      setDraft({ art: tool, punkte: [[nx, ny]], farbe });
+      svg.setPointerCapture(e.pointerId);
+    }
+  };
+  const onMove = (e) => {
+    const d = dragRef.current;
+    if (!d || d.pid !== e.pointerId) return;
+    const s = punkt(e);
+    const [nx, ny] = g.toN(s[0], s[1]);
+    if (d.kind === "obj") {
+      d.moved = true;
+      const neu = tkKopie(dataRef.current);
+      const o = neu.schritte[schrittRef.current].objekte.find((q) => q.id === d.id);
+      if (o) { o.x = klemme(nx + d.dx); o.y = klemme(ny + d.dy); }
+      dataRef.current = neu;
+      setData(neu);
+    } else if (d.kind === "verb") {
+      setDraft((dr) => (dr ? { ...dr, ende: [nx, ny] } : dr));
+    } else if (d.kind === "draw") {
+      setDraft((dr) => {
+        if (!dr) return dr;
+        if (dr.art === "frei") {
+          const l = dr.punkte[dr.punkte.length - 1];
+          const [ax, ay] = g.toS(l[0], l[1]);
+          if (Math.hypot(ax - s[0], ay - s[1]) < Math.max(0.5, g.W * 0.012)) return dr;
+          return { ...dr, punkte: [...dr.punkte, [nx, ny]] };
+        }
+        return { ...dr, punkte: [dr.punkte[0], [nx, ny]] };
+      });
+    }
+  };
+  const onUp = (e) => {
+    const d = dragRef.current;
+    if (!d || d.pid !== e.pointerId) return;
+    dragRef.current = null;
+    try { svgRef.current.releasePointerCapture(e.pointerId); } catch (er) {}
+    if (d.kind === "obj") {
+      if (d.moved) {
+        past.current.push(d.start);
+        if (past.current.length > 80) past.current.shift();
+        future.current = [];
+        setDirty((n) => n + 1);
+      }
+    } else if (d.kind === "verb") {
+      const s = punkt(e);
+      const ziel = treffer(s);
+      setDraft(null);
+      if (ziel && ziel.id !== d.von && ["spieler", "torwart", "gegner", "ball", "huetchen"].includes(ziel.art)) {
+        aendern((nd, step) => {
+          const idx = step.linien.findIndex((l) => l.art === "verbindung" && ((l.von === d.von && l.zu === ziel.id) || (l.von === ziel.id && l.zu === d.von)));
+          if (idx >= 0) step.linien.splice(idx, 1);
+          else step.linien.push({ id: uid(), art: "verbindung", von: d.von, zu: ziel.id, farbe });
+        });
+      }
+    } else if (d.kind === "draw") {
+      const dr = draft;
+      setDraft(null);
+      if (dr && dr.punkte.length >= 2) {
+        const a = g.toS(dr.punkte[0][0], dr.punkte[0][1]);
+        const b = g.toS(dr.punkte[dr.punkte.length - 1][0], dr.punkte[dr.punkte.length - 1][1]);
+        if (Math.hypot(a[0] - b[0], a[1] - b[1]) >= Math.max(2, g.W * 0.05)) {
+          const id = uid();
+          aendern((nd, step) => step.linien.push({ id, art: dr.art, farbe: dr.farbe, punkte: dr.punkte }));
+          setSel({ typ: "l", id });
+        }
+      }
+    }
+  };
+  const onCancel = () => { dragRef.current = null; setDraft(null); };
+
+  const hinzu = (o) => {
+    const id = uid();
+    aendern((nd, step, idx) => {
+      const x = 0.5 + (Math.random() - 0.5) * 0.18, y = 0.5 + (Math.random() - 0.5) * 0.3;
+      for (let k = idx; k < nd.schritte.length; k++) nd.schritte[k].objekte.push({ ...o, id, x: o.art === "tor" ? 0.5 : x, y: o.art === "tor" ? 0.5 : y });
+    });
+    setSel({ typ: "o", id });
+    setTool("bewegen");
+  };
+  const naechsteNr = (art) => {
+    const nr = st.objekte.filter((o) => o.art === art && !o.spielerId).map((o) => Number(o.nr) || 0);
+    return Math.max(0, ...nr) + 1;
+  };
+  const loeschen = () => {
+    if (!sel) return;
+    aendern((nd, step, idx) => {
+      if (sel.typ === "o") {
+        for (let k = idx; k < nd.schritte.length; k++) {
+          nd.schritte[k].objekte = nd.schritte[k].objekte.filter((o) => o.id !== sel.id);
+          nd.schritte[k].linien = nd.schritte[k].linien.filter((l) => l.von !== sel.id && l.zu !== sel.id);
+        }
+      } else step.linien = step.linien.filter((l) => l.id !== sel.id);
+    });
+    setSel(null);
+  };
+  const objAendern = (fn) => {
+    if (!sel || sel.typ !== "o") return;
+    aendern((nd, step, idx) => {
+      for (let k = idx; k < nd.schritte.length; k++) {
+        const o = nd.schritte[k].objekte.find((q) => q.id === sel.id);
+        if (o) fn(o);
+      }
+    });
+  };
+  const waehleFarbe = (f) => {
+    setFarbe(f);
+    if (sel && sel.typ === "l") aendern((nd, step) => { const l = step.linien.find((q) => q.id === sel.id); if (l) l.farbe = f; });
+  };
+  const selObj = sel && sel.typ === "o" ? st.objekte.find((o) => o.id === sel.id) : null;
+  const selLinie = sel && sel.typ === "l" ? st.linien.find((l) => l.id === sel.id) : null;
+
+  const neuerSchritt = () =>
+    aendern((nd, step, idx) => {
+      const kopie = { objekte: tkKopie(step.objekte), linien: tkKopie(step.linien.filter((l) => l.art === "verbindung")) };
+      nd.schritte.splice(idx + 1, 0, kopie);
+    }) || setSchritt(sIdx + 1);
+  const schrittLoeschen = () => {
+    if (data.schritte.length < 2) return;
+    if (!window.confirm(`Schritt ${sIdx + 1} löschen?`)) return;
+    aendern((nd, step, idx) => nd.schritte.splice(idx, 1));
+    setSchritt(Math.max(0, sIdx - 1));
+    setSel(null);
+  };
+
+  const stoppen = () => { cancelAnimationFrame(rafRef.current); setAnim(null); };
+  const abspielen = () => {
+    const n = dataRef.current.schritte.length;
+    if (n < 2) return;
+    setSel(null);
+    setDraft(null);
+    let i = sIdx >= n - 1 ? 0 : sIdx;
+    let t0 = performance.now();
+    const DAUER = 1700, HALT = 600;
+    const loop = (now) => {
+      const el = now - t0;
+      if (el < DAUER) setAnim({ i, t: el / DAUER });
+      else if (el < DAUER + HALT) setAnim({ i, t: 1 });
+      else {
+        i++;
+        t0 = now;
+        if (i >= n - 1) {
+          setAnim(null);
+          setSchritt(n - 1);
+          return;
+        }
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    setSchritt(i);
+    rafRef.current = requestAnimationFrame(loop);
+  };
+
+  let objekte = st.objekte, linien = st.linien, linienOp = 1, anzSchritt = sIdx;
+  if (anim) {
+    const A = data.schritte[anim.i], B = data.schritte[anim.i + 1];
+    objekte = tkZwischen(A, B, anim.t);
+    linien = A.linien;
+    linienOp = 1 - Math.max(0, (anim.t - 0.6) / 0.4);
+    anzSchritt = anim.t > 0.5 ? anim.i + 1 : anim.i;
+  }
+
+  const toggleVoll = async () => {
+    const neu = !voll;
+    setVoll(neu);
+    letzterStand.current = neu ? "fs" : null;
+    try {
+      if (neu && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+      else if (!neu && document.fullscreenElement) await document.exitFullscreen();
+    } catch (e) {}
+  };
+
+  const exportPng = async () => {
+    try {
+      const svg = svgRef.current;
+      const clone = svg.cloneNode(true);
+      clone.querySelectorAll("[data-skip]").forEach((n) => n.remove());
+      const bilder = Array.from(clone.querySelectorAll("image"));
+      for (const im of bilder) {
+        const url = im.getAttribute("href");
+        try {
+          const blob = await (await fetch(url)).blob();
+          const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+          im.setAttribute("href", dataUrl);
+        } catch (e) { im.remove(); }
+      }
+      const B = 1800;
+      const H = Math.round((B * g.vbH) / g.vbW);
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      clone.setAttribute("width", B);
+      clone.setAttribute("height", H);
+      const xml = new XMLSerializer().serializeToString(clone);
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml); });
+      const c = document.createElement("canvas");
+      c.width = B; c.height = H;
+      c.getContext("2d").drawImage(img, 0, 0, B, H);
+      const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+      const dateiname = `${(name || "taktik").replace(/[^a-z0-9äöüß ]+/gi, "").trim() || "taktik"}.png`;
+      const file = new File([blob], dateiname, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+      } else {
+        const u = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = u; a.download = dateiname;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 4000);
+      }
+      setExportiert(true);
+      setTimeout(() => setExportiert(false), 2000);
+    } catch (e) {
+      if (!(e && e.name === "AbortError")) window.alert("Das Bild konnte nicht erstellt werden.");
+    }
+  };
+
+  const chip = (an, extra) => ({ border: `1.5px solid ${an ? TK_ROT : "var(--border)"}`, background: an ? TK_ROT : "var(--surface)", color: an ? "#fff" : "var(--text)", borderRadius: 999, padding: "9px 14px", minHeight: 40, fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", ...extra });
+  const grp = { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" };
+  const setz = (patch) => aendern((nd) => Object.assign(nd, patch));
+  const imFeld = (pid) => st.objekte.some((o) => o.spielerId === pid);
+
+  const werkzeuge = [["bewegen", "Bewegen"], ["pass", "Pass"], ["lauf", "Laufweg"], ["frei", "Frei"], ["verbinden", "Verbinden"]];
+  const magnete = [
+    ["Spieler", () => hinzu({ art: "spieler", nr: naechsteNr("spieler") })],
+    ["Torwart", () => hinzu({ art: "torwart", nr: 1 })],
+    ["Gegner", () => hinzu({ art: "gegner", nr: naechsteNr("gegner") })],
+    ["Ball", () => hinzu({ art: "ball" })],
+    ["Hütchen gelb", () => hinzu({ art: "huetchen", farbe: "#FFD84D" })],
+    ["Hütchen orange", () => hinzu({ art: "huetchen", farbe: "#F28C28" })],
+    ["Hütchen blau", () => hinzu({ art: "huetchen", farbe: "#4DA3FF" })],
+    ["Tor", () => hinzu({ art: "tor" })],
+    ["Minitor", () => hinzu({ art: "tor", klein: true })],
+    ["Text", () => { const t = window.prompt("Text"); if (t && t.trim()) hinzu({ art: "text", text: t.trim() }); }],
+  ];
+
+  const root = voll
+    ? { position: "fixed", inset: 0, zIndex: 1000, background: "var(--bg)", display: "flex", flexDirection: "column", padding: "8px 10px", gap: 8, overflow: "auto" }
+    : { display: "flex", flexDirection: "column", gap: 8, minHeight: 560 };
+
+  return (
+    <div style={root}>
+      <div style={{ ...grp, justifyContent: "space-between" }}>
+        <div style={grp}>
+          <button style={chip(false)} onClick={schliessen}>‹ Boards</button>
+          <input value={name} onChange={(e) => { setName(e.target.value); setDirty((n) => n + 1); }} aria-label="Name des Boards"
+            style={{ ...styles.textarea, marginTop: 0, minWidth: 140, maxWidth: 260, fontSize: 15, fontWeight: 700, padding: "8px 12px" }} />
+          <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{status}</span>
+        </div>
+        <div style={grp}>
+          <button style={chip(false, { opacity: past.current.length ? 1 : 0.45 })} onClick={rueckgaengig} disabled={!past.current.length}>Zurück</button>
+          <button style={chip(false, { opacity: future.current.length ? 1 : 0.45 })} onClick={wiederholen} disabled={!future.current.length}>Vor</button>
+          <button style={chip(false)} onClick={exportPng}>{exportiert ? "Fertig ✓" : "Als Bild"}</button>
+          <button style={chip(voll)} onClick={toggleVoll}>{voll ? "Vollbild aus" : "Vollbild"}</button>
+        </div>
+      </div>
+
+      <div style={{ ...grp, rowGap: 6 }}>
+        {Object.entries(TK_FELDER).map(([k, f]) => (
+          <button key={k} style={chip(data.feld === k)} onClick={() => setz({ feld: k })}>{f.label}</button>
+        ))}
+        <span style={{ width: 6 }} />
+        <button style={chip(data.ausr === "quer")} onClick={() => setz({ ausr: "quer" })}>Quer</button>
+        <button style={chip(data.ausr === "hoch")} onClick={() => setz({ ausr: "hoch" })}>Hoch</button>
+        <span style={{ width: 6 }} />
+        <button style={chip(data.zonen)} onClick={() => setz({ zonen: !data.zonen })}>Zonen</button>
+        <button style={chip(data.anzeige === "nummer")} onClick={() => setz({ anzeige: "nummer" })}>Nummern</button>
+        <button style={chip(data.anzeige === "foto")} onClick={() => setz({ anzeige: "foto" })}>Fotos</button>
+        <button style={chip(data.namen)} onClick={() => setz({ namen: !data.namen })}>Namen</button>
+      </div>
+
+      <div style={{ ...grp, rowGap: 6 }}>
+        {werkzeuge.map(([k, l]) => (
+          <button key={k} style={chip(tool === k)} onClick={() => { setTool(k); if (k !== "bewegen") setSel(null); }}>{l}</button>
+        ))}
+        <span style={{ width: 6 }} />
+        {TK_FARBEN.map(([f, l]) => (
+          <button key={f} aria-label={l} title={l} onClick={() => waehleFarbe(f)}
+            style={{ width: 34, height: 34, borderRadius: 999, background: f, cursor: "pointer", border: farbe === f ? `3px solid ${TK_ROT}` : "2px solid var(--border-strong)", padding: 0 }} />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: breit ? "row" : "column", gap: 10, flex: voll ? 1 : undefined, minHeight: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, height: voll ? undefined : breit ? "min(66vh, 640px)" : "min(58vh, 640px)", minHeight: voll ? 260 : 300 }}>
+          <TkBrett data={data} g={g} players={players} objekte={objekte} linien={linien} linienOp={linienOp} selId={sel ? sel.id : null}
+            draft={draft} svgRef={svgRef}
+            handlers={{ onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onCancel }} />
+        </div>
+        <div style={{ width: breit ? 250 : "100%", flex: "none", overflowY: "auto", maxHeight: breit ? (voll ? "none" : "min(66vh, 640px)") : 240, display: "flex", flexDirection: "column", gap: 10 }}>
+          {selObj || selLinie ? (
+            <div style={{ ...styles.card, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Ausgewählt</div>
+              <div style={grp}>
+                {selObj && ["spieler", "gegner", "torwart"].includes(selObj.art) && !selObj.spielerId && (
+                  <>
+                    <button style={chip(false)} onClick={() => { const v = window.prompt("Nummer", selObj.nr != null ? String(selObj.nr) : ""); if (v != null) objAendern((o) => (o.nr = v.trim())); }}>Nummer</button>
+                    <button style={chip(false)} onClick={() => { const v = window.prompt("Name (optional)", selObj.name || ""); if (v != null) objAendern((o) => (o.name = v.trim())); }}>Name</button>
+                  </>
+                )}
+                {selObj && ["spieler", "torwart"].includes(selObj.art) && (
+                  <button style={chip(false)} onClick={() => objAendern((o) => (o.art = o.art === "torwart" ? "spieler" : "torwart"))}>{selObj.art === "torwart" ? "Feldspieler" : "Torwart"}</button>
+                )}
+                {selObj && selObj.art === "tor" && <button style={chip(false)} onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 90) % 180))}>Drehen</button>}
+                {selObj && selObj.art === "text" && <button style={chip(false)} onClick={() => { const v = window.prompt("Text", selObj.text || ""); if (v != null && v.trim()) objAendern((o) => (o.text = v.trim())); }}>Text ändern</button>}
+                {selLinie && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Farbe oben wählen</span>}
+                <button style={chip(false, { color: "var(--danger-text)" })} onClick={loeschen}>Löschen</button>
+              </div>
+            </div>
+          ) : null}
+          <div style={{ ...styles.card, padding: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Magnete</div>
+            <div style={grp}>
+              {magnete.map(([l, fn]) => <button key={l} style={chip(false, { padding: "8px 12px" })} onClick={fn}>{l}</button>)}
+            </div>
+          </div>
+          {aktivePlayers.length > 0 && (
+            <div style={{ ...styles.card, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Mannschaft</div>
+              <div style={grp}>
+                {aktivePlayers.map((p) => {
+                  const da = imFeld(p.id);
+                  return (
+                    <button key={p.id} disabled={da} onClick={() => hinzu({ art: "spieler", spielerId: p.id })}
+                      style={chip(false, { padding: "7px 11px", opacity: da ? 0.4 : 1 })}>
+                      {p.trikotnummer != null ? p.trikotnummer + " " : ""}{tkVorname(p.name)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ ...grp, rowGap: 6 }}>
+        {data.schritte.map((_, i) => (
+          <button key={i} style={chip(anzSchritt === i, { minWidth: 44, padding: "9px 12px" })} onClick={() => { if (!anim) { setSchritt(i); setSel(null); } }}>{i + 1}</button>
+        ))}
+        <button style={chip(false)} onClick={neuerSchritt} disabled={!!anim}>+ Schritt</button>
+        {data.schritte.length > 1 && <button style={chip(false, { color: "var(--danger-text)" })} onClick={schrittLoeschen} disabled={!!anim}>Schritt löschen</button>}
+        <span style={{ width: 6 }} />
+        {anim ? (
+          <button style={chip(true)} onClick={stoppen}>Stopp</button>
+        ) : (
+          <button style={chip(false, { opacity: data.schritte.length > 1 ? 1 : 0.45 })} onClick={abspielen} disabled={data.schritte.length < 2}>Abspielen</button>
+        )}
+        {data.schritte.length < 2 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Mit „+ Schritt“ den nächsten Moment anlegen und die Magnete neu stellen, dann „Abspielen“.</span>}
+      </div>
+    </div>
+  );
+}
+
+function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
+  const [offenId, setOffenId] = useState(null);
+  const aktiv = boards.find((b) => b.id === offenId);
+  if (fehlt) {
+    return (
+      <div style={styles.card}>
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>Taktik-Board einrichten</div>
+        <div style={{ fontSize: 13.5, marginBottom: 8 }}>Für die Boards fehlt noch eine Tabelle. Bitte einmal in Supabase (SQL Editor) ausführen, danach die Seite neu laden:</div>
+        <pre style={{ fontSize: 11.5, whiteSpace: "pre-wrap", margin: 0, userSelect: "all" }}>{SQL_TAKTIK}</pre>
+      </div>
+    );
+  }
+  if (aktiv) return <TaktikEditor key={aktiv.id} board={aktiv} players={players} onSave={onSave} onClose={() => setOffenId(null)} />;
+  const neu = async () => {
+    const b = { id: uid(), name: "Neues Board", data: tkNeuesBoard() };
+    await onSave(b, true);
+    setOffenId(b.id);
+  };
+  const liste = boards.slice().sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <h3 style={{ ...styles.h3, margin: 0 }}>Taktik-Boards</h3>
+        <button style={styles.secondaryBtn} onClick={neu}>+ Neues Board</button>
+      </div>
+      {liste.length === 0 && <EmptyState text="Noch kein Board angelegt. Mit „+ Neues Board“ geht es los." />}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+        {liste.map((b) => {
+          const d = tkNormalisiere(b.data);
+          const g = tkGeo(d);
+          const s0 = d.schritte[0];
+          return (
+            <div key={b.id} style={{ ...styles.card, padding: 10 }}>
+              <button onClick={() => setOffenId(b.id)} style={{ display: "block", width: "100%", border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "inherit" }}>
+                <div style={{ height: 150 }}>
+                  <TkBrett data={d} g={g} players={players} objekte={s0.objekte} linien={s0.linien} nurAnzeige />
+                </div>
+                <div style={{ fontWeight: 700, marginTop: 8 }}>{b.name}</div>
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                  {(TK_FELDER[d.feld] || TK_FELDER.f5).label} · {d.ausr === "hoch" ? "hoch" : "quer"} · {d.schritte.length} {d.schritte.length === 1 ? "Schritt" : "Schritte"}
+                </div>
+              </button>
+              <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
+                <button style={styles.linkBtn} onClick={() => setOffenId(b.id)}>Öffnen</button>
+                <button style={styles.linkBtn} onClick={() => onDuplicate(b)}>Duplizieren</button>
+                <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => { if (window.confirm(`Board „${b.name}“ löschen?`)) onDelete(b.id); }}>Löschen</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 /* ---------- Header ---------- */
 
 function Header({ tab, setTab }) {
   const fEntwicklung = useFeature("entwicklung");
   const fSpieltage = useFeature("spieltage");
+  const fTaktik = useFeature("taktik");
   const items = [
     ["dashboard", "Übersicht"],
     ["training", "Training bewerten"],
     fEntwicklung && ["entwicklung", "Monatsentwicklung"],
     fSpieltage && ["spieltage", "Spieltage"],
+    fTaktik && ["taktik", "Taktik"],
     ["verwaltung", "Verwaltung"],
   ].filter(Boolean);
   const navRef = useRef(null);
