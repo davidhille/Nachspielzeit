@@ -616,6 +616,14 @@ const FEATURES = [
   { key: "teilen", label: "Spieltag teilen", beschreibung: "Button „Teilen“ (WhatsApp-Bild) an den Spieltagen" },
   { key: "uebungen", label: "Übungsbibliothek", beschreibung: "Verwaltung → Übungen sowie Übungen und Notizen im Trainingsplan" },
   { key: "material", label: "Material", beschreibung: "Verwaltung → Material (Bestandsführung)" },
+  { key: "eltern_seite", label: "Eltern-Seite („Unsere Saison“)", beschreibung: "Öffentliche Seite für die Eltern inkl. Link-Box unter Verwaltung. Ausgeschaltet: Link zeigt nur „nicht verfügbar“, die Link-Box verschwindet." },
+  { key: "eltern_bilanz", label: "Bereich Bilanz", beschreibung: "Tab „Bilanz“ auf der Eltern-Seite", unter: "eltern_seite" },
+  { key: "eltern_bilanz_saison", label: "Saisonbilanz", beschreibung: "Spiele, Siege, Unentschieden, Niederlagen, Tore", unter: "eltern_bilanz", ebene: 2 },
+  { key: "eltern_bilanz_torschuetzen", label: "Torschützenliste", beschreibung: "Torschützen der Saison", unter: "eltern_bilanz", ebene: 2 },
+  { key: "eltern_bilanz_gegner", label: "Bilanz pro Gegner", beschreibung: "Tabelle mit Ergebnissen je Gegner", unter: "eltern_bilanz", ebene: 2 },
+  { key: "eltern_spieltage", label: "Bereich Spieltage", beschreibung: "Tab „Spieltage“ mit den Spieltagskarten", unter: "eltern_seite" },
+  { key: "eltern_karten", label: "Bereich Karten", beschreibung: "Tab „Karten“ mit den Sammelkarten", unter: "eltern_seite" },
+  { key: "eltern_songs", label: "Bereich Songs", beschreibung: "Tab „Songs“ mit Player und Liedtext", unter: "eltern_seite" },
   { key: "taktik", label: "Taktik-Board", beschreibung: "Tab „Taktik“ (interaktives Taktikboard mit Spielern, Laufwegen und Animation)" },
   { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Übersichtsseite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
@@ -1723,8 +1731,10 @@ notify pgrst, 'reload schema';`;
               <div className="card-list" style={styles.cardList}>
                 {FEATURES.map((f) => {
                   const an = features[f.key] !== false;
+                  const elternOben = (k) => { const x = FEATURES.find((q) => q.key === k); return !x || (features[k] !== false && (!x.unter || elternOben(x.unter))); };
+                  const aktiv = !f.unter || elternOben(f.unter);
                   return (
-                    <div key={f.key} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12 }}>
+                    <div key={f.key} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, marginLeft: f.unter ? (f.ebene === 2 ? 56 : 28) : 0, opacity: aktiv ? 1 : 0.5 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{f.label}</div>
                         <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{f.beschreibung}</div>
@@ -2042,15 +2052,14 @@ function App() {
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
   const kartenAltKey = kartenAlt.join(",");
-  const kartenSnapshot = useMemo(
-    () => (kartenToken && !loading ? berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll) : null),
-    [kartenToken, loading, players, trainings, spieltage, teamInfo]
+  const elternAn = features.eltern_seite !== false;
+  const pakete = useMemo(
+    () => (kartenToken && !loading ? elternPakete(features, players, trainings, spieltage, gegner, teamInfo) : null),
+    [kartenToken, loading, features, players, trainings, spieltage, gegner, teamInfo]
   );
+  const kartenSnapshot = pakete ? pakete.snap : null;
   const kartenHash = kartenSnapshot ? JSON.stringify(kartenSnapshot) : null;
-  const kartenPlus = useMemo(
-    () => (kartenToken && !loading ? berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url) : null),
-    [kartenToken, loading, spieltage, gegner, players, teamInfo]
-  );
+  const kartenPlus = pakete ? pakete.plus : null;
   const kartenPlusJson = kartenPlus ? JSON.stringify(kartenPlus) : null;
   useEffect(() => {
     if (!kartenHash || !kartenToken) return;
@@ -2070,11 +2079,11 @@ function App() {
   const kartenLinkErzeugen = (name, code) =>
     wrapAction(async () => {
       const neu = neuerKartenToken(name, code);
-      const snap = berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll);
-      await veroeffentlicheKarten(neu, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
+      const { snap, plus: plusNeu } = elternPakete(features, players, trainings, spieltage, gegner, teamInfo);
+      await veroeffentlicheKarten(neu, snap, plusNeu);
       // der bisherige Link bleibt vorerst aktiv (schon verschickt) und kann unten abgeschaltet werden
       const alt = kartenToken ? [kartenToken, ...kartenAlt] : kartenAlt;
-      await veroeffentlicheAlle(alt, snap, berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
+      await veroeffentlicheAlle(alt, snap, plusNeu);
       await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu, share_alt: alt } });
     }, "Karten-Link erstellt");
   const kartenAltAbschalten = (tok) =>
@@ -2129,7 +2138,8 @@ function App() {
     }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
-      await veroeffentlicheAlle([kartenToken, ...kartenAlt], berechneKartenSnapshot(players, trainings, spieltage, teamInfo?.name || "U8", !!teamInfo?.config?.share_voll), berechneKartenPlus(spieltage, gegner, players, teamInfo?.name || "U8", teamInfo?.config?.songs, teamInfo?.config?.team_photo_url));
+      const { snap, plus: plusNeu } = elternPakete(features, players, trainings, spieltage, gegner, teamInfo);
+      await veroeffentlicheAlle([kartenToken, ...kartenAlt], snap, plusNeu);
     }, "Karten aktualisiert");
 
   const softDelete = (table, id, entityLabel) =>
@@ -2413,7 +2423,7 @@ function App() {
         {tab === "verwaltung" && (
           <Verwaltung
             kartenBox={
-              teamInfo ? (
+              teamInfo && elternAn ? (
                 <KartenLinkBox token={kartenToken} altTokens={kartenAlt} onAltOff={kartenAltAbschalten} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} songs={teamInfo?.config?.songs || []} onSongAdd={songHinzufuegen} onSongChange={songAendern} />
               ) : null
             }
@@ -4113,6 +4123,24 @@ async function veroeffentlicheKarten(token, snapshot, plus) {
 async function veroeffentlicheAlle(tokens, snapshot, plus) {
   for (const t of tokens) await veroeffentlicheKarten(t, snapshot, plus);
 }
+/* Pakete für den öffentlichen Link, abhängig von den Schaltern unter Verwaltung → Funktionen */
+function elternPakete(f, players, trainings, spieltage, gegner, teamInfo) {
+  const an = (k) => f[k] !== false;
+  const name = teamInfo?.name || "U8";
+  if (!an("eltern_seite")) return { snap: { version: 1, inaktiv: true, team: name, saison: "", spieler: null }, plus: { version: 1, inaktiv: true } };
+  const snap = berechneKartenSnapshot(players, trainings, spieltage, name, !!teamInfo?.config?.share_voll);
+  if (!an("eltern_karten")) snap.spieler = [];
+  const plus = berechneKartenPlus(spieltage, gegner, players, name, teamInfo?.config?.songs, teamInfo?.config?.team_photo_url, {
+    bilanz: an("eltern_bilanz"),
+    saison: an("eltern_bilanz_saison"),
+    torschuetzen: an("eltern_bilanz_torschuetzen"),
+    gegner: an("eltern_bilanz_gegner"),
+    spieltage: an("eltern_spieltage"),
+    songs: an("eltern_songs"),
+    karten: an("eltern_karten"),
+  });
+  return { snap, plus };
+}
 async function loescheKarten(token) {
   for (const pfad of [`karten/${token}.json`, `karten/${token}-plus.json`]) {
     try {
@@ -4129,7 +4157,8 @@ function kurzHash(str) {
   return String(h);
 }
 /* Erweiterter Snapshot: Spieltagskarten, Saisonbilanz, Bilanz pro Gegner */
-function berechneKartenPlus(spieltage, gegner, players, teamName, songs, cover) {
+function berechneKartenPlus(spieltage, gegner, players, teamName, songs, cover, opt = {}) {
+  const o = { bilanz: true, saison: true, torschuetzen: true, gegner: true, spieltage: true, songs: true, ...opt };
   const heute = todayISO();
   const saison = seasonKeyOf(heute.slice(0, 7));
   const nr = spieltagNummern(spieltage);
@@ -4181,7 +4210,19 @@ function berechneKartenPlus(spieltage, gegner, players, teamName, songs, cover) 
     else b.unentschieden++;
   });
   const gegnerBilanz = Object.values(gmap).sort((a, b) => b.spiele - a.spiele || a.name.localeCompare(b.name, "de"));
-  return { version: 1, team: teamName, saison: saison ? saison.replace("-", "/") : "", spieltage: tage, saisonBilanz: bil, torschuetzen, gegnerBilanz, songs: (songs || []).map((x) => ({ titel: x.titel, url: songUrl(x.pfad), text: x.text || "" })), cover: cover || null };
+  const mitBilanz = o.bilanz;
+  return {
+    version: 1,
+    team: teamName,
+    saison: saison ? saison.replace("-", "/") : "",
+    bereiche: { bilanz: mitBilanz, spieltage: o.spieltage, karten: o.karten !== false, songs: o.songs },
+    spieltage: o.spieltage ? tage : [],
+    saisonBilanz: mitBilanz && o.saison ? bil : null,
+    torschuetzen: mitBilanz && o.torschuetzen ? torschuetzen : [],
+    gegnerBilanz: mitBilanz && o.gegner ? gegnerBilanz : [],
+    songs: o.songs ? (songs || []).map((x) => ({ titel: x.titel, url: songUrl(x.pfad), text: x.text || "" })) : [],
+    cover: cover || null,
+  };
 }
 async function ladeKartenSnapshot(token, suffix = "") {
   const res = await fetch(`${KARTEN_OBJ}/public/${PHOTO_BUCKET}/karten/${encodeURIComponent(token)}${suffix}.json?t=${Date.now()}`, { cache: "no-store" });
@@ -4683,20 +4724,25 @@ function KartenSeitePlus({ token }) {
     return () => m.remove();
   }, [token]);
   if (karten === undefined || plus === undefined) return <div style={styles.loadingScreen}>Lade …</div>;
+  if (karten && (karten.inaktiv || (plus && plus.inaktiv))) {
+    return <div style={styles.loadingScreen}>Diese Seite ist derzeit nicht verfügbar.</div>;
+  }
   if (!karten || !Array.isArray(karten.spieler)) {
     return <div style={styles.loadingScreen}>Dieser Link ist nicht (mehr) gültig.</div>;
   }
   const stand = karten.stand ? new Date(karten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   const b = plus && plus.saisonBilanz;
+  const be = (plus && plus.bereiche) || { bilanz: true, spieltage: true, karten: true, songs: true };
+  const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3, marginTop: 28 }}>{t}</h3>;
   const tabs = [];
-  if (b) tabs.push({ k: "bilanz", label: "Bilanz" });
-  if (b && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
-  tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
-  if (plus && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
-  const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs[0].k;
+  if (be.bilanz && bilanzHat) tabs.push({ k: "bilanz", label: "Bilanz" });
+  if (plus && be.spieltage && plus.spieltage && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
+  if (be.karten && karten.spieler.length > 0) tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
+  if (plus && be.songs && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
+  const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs.length ? tabs[0].k : null;
   const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
   // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
   const panel = (k, inhalt) => (besucht[k] || aktTab === k ? <div style={{ display: aktTab === k ? "block" : "none" }}>{inhalt}</div> : null);
@@ -4734,10 +4780,12 @@ function KartenSeitePlus({ token }) {
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
         {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
-        {b && (
+        {plus && !plus.inaktiv && tabs.length === 0 && <div style={{ ...styles.card, marginTop: 18 }}>Hier gibt es im Moment nichts zu sehen.</div>}
+        {plus && (
           <>
-            {panel("bilanz", (
+            {be.bilanz && bilanzHat && panel("bilanz", (
             <section style={{ ...styles.card, marginTop: 16 }}>
+              {b && (<>
               <h3 style={{ ...styles.h3, marginTop: 0 }}>Saisonbilanz {plus.saison}</h3>
               <div style={styles.statsRow}>
                 {[["Spiele", b.spiele], ["Siege", b.siege], ["Unentschieden", b.unentschieden], ["Niederlagen", b.niederlagen], ["Tore", `${b.toreFuer}:${b.toreGegen}`]].map(([l, v]) => (
@@ -4747,6 +4795,7 @@ function KartenSeitePlus({ token }) {
                   </div>
                 ))}
               </div>
+              </>)}
               {plus.torschuetzen.length > 0 && (
                 <div style={{ marginTop: 18 }}>
                   <div style={styles.subheading}>Torschützenliste</div>
@@ -4797,7 +4846,7 @@ function KartenSeitePlus({ token }) {
               )}
             </section>
             ))}
-            {plus.spieltage.length > 0 && panel("spieltage", (
+            {be.spieltage && plus.spieltage.length > 0 && panel("spieltage", (
               <section style={{ ...styles.card, marginTop: 16 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
                   {plus.spieltage.map((t) => (
@@ -4808,7 +4857,7 @@ function KartenSeitePlus({ token }) {
             ))}
           </>
         )}
-        {panel("karten", (
+        {be.karten && panel("karten", (
         <section style={{ ...styles.card, marginTop: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
             {karten.spieler.map((sp) => (
@@ -4817,7 +4866,7 @@ function KartenSeitePlus({ token }) {
           </div>
         </section>
         ))}
-        {plus && plus.songs && plus.songs.length > 0 && panel("songs", (
+        {plus && be.songs && plus.songs && plus.songs.length > 0 && panel("songs", (
           <section style={{ ...styles.card, marginTop: 16 }}>
             <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} />
           </section>
@@ -4853,20 +4902,25 @@ function KartenSeiteVorschau({ token }) {
     return () => m.remove();
   }, [token]);
   if (karten === undefined || plus === undefined) return <div style={styles.loadingScreen}>Lade …</div>;
+  if (karten && (karten.inaktiv || (plus && plus.inaktiv))) {
+    return <div style={styles.loadingScreen}>Diese Seite ist derzeit nicht verfügbar.</div>;
+  }
   if (!karten || !Array.isArray(karten.spieler)) {
     return <div style={styles.loadingScreen}>Dieser Link ist nicht (mehr) gültig.</div>;
   }
   const stand = karten.stand ? new Date(karten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   const b = plus && plus.saisonBilanz;
+  const be = (plus && plus.bereiche) || { bilanz: true, spieltage: true, karten: true, songs: true };
+  const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3, marginTop: 28 }}>{t}</h3>;
   const tabs = [];
-  if (b) tabs.push({ k: "bilanz", label: "Bilanz" });
-  if (b && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
-  tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
-  if (plus && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
-  const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs[0].k;
+  if (be.bilanz && bilanzHat) tabs.push({ k: "bilanz", label: "Bilanz" });
+  if (plus && be.spieltage && plus.spieltage && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
+  if (be.karten && karten.spieler.length > 0) tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
+  if (plus && be.songs && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
+  const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs.length ? tabs[0].k : null;
   const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
   // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
   const panel = (k, inhalt) => (besucht[k] || aktTab === k ? <div style={{ display: aktTab === k ? "block" : "none" }}>{inhalt}</div> : null);
@@ -4905,10 +4959,12 @@ function KartenSeiteVorschau({ token }) {
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
         {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
-        {b && (
+        {plus && !plus.inaktiv && tabs.length === 0 && <div style={{ ...styles.card, marginTop: 18 }}>Hier gibt es im Moment nichts zu sehen.</div>}
+        {plus && (
           <>
-            {panel("bilanz", (
+            {be.bilanz && bilanzHat && panel("bilanz", (
             <section style={{ ...styles.card, marginTop: 16 }}>
+              {b && (<>
               <h3 style={{ ...styles.h3, marginTop: 0 }}>Saisonbilanz {plus.saison}</h3>
               <div style={styles.statsRow}>
                 {[["Spiele", b.spiele], ["Siege", b.siege], ["Unentschieden", b.unentschieden], ["Niederlagen", b.niederlagen], ["Tore", `${b.toreFuer}:${b.toreGegen}`]].map(([l, v]) => (
@@ -4918,6 +4974,7 @@ function KartenSeiteVorschau({ token }) {
                   </div>
                 ))}
               </div>
+              </>)}
               {plus.torschuetzen.length > 0 && (
                 <div style={{ marginTop: 18 }}>
                   <div style={styles.subheading}>Torschützenliste</div>
@@ -4968,7 +5025,7 @@ function KartenSeiteVorschau({ token }) {
               )}
             </section>
             ))}
-            {plus.spieltage.length > 0 && panel("spieltage", (
+            {be.spieltage && plus.spieltage.length > 0 && panel("spieltage", (
               <section style={{ ...styles.card, marginTop: 16 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
                   {plus.spieltage.map((t) => (
@@ -4979,7 +5036,7 @@ function KartenSeiteVorschau({ token }) {
             ))}
           </>
         )}
-        {panel("karten", (
+        {be.karten && panel("karten", (
         <section style={{ ...styles.card, marginTop: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
             {karten.spieler.map((sp) => (
@@ -4988,7 +5045,7 @@ function KartenSeiteVorschau({ token }) {
           </div>
         </section>
         ))}
-        {plus && plus.songs && plus.songs.length > 0 && panel("songs", (
+        {plus && be.songs && plus.songs && plus.songs.length > 0 && panel("songs", (
           <section style={{ ...styles.card, marginTop: 16 }}>
             <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} />
           </section>
