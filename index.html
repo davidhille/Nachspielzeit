@@ -7367,9 +7367,9 @@ function PlayerStammdaten({ player, onSave }) {
     setGeb(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
   }, [player.nachname, player.geburtsdatum, player.spitzname]);
   return (
-    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-      <div style={{ flex: "1 1 160px" }}>
-        <label style={styles.label}>Nachname (nur im Profil sichtbar)</label>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px 12px" }}>
+      <div>
+        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Nachname (nur im Profil)</label>
         <input
           style={{ ...styles.input, width: "100%" }}
           value={nachname}
@@ -7377,8 +7377,8 @@ function PlayerStammdaten({ player, onSave }) {
           onBlur={() => nachname.trim() !== (player.nachname || "") && onSave({ nachname: nachname.trim() || null })}
         />
       </div>
-      <div style={{ flex: "1 1 200px" }}>
-        <label style={styles.label}>Spitzname / Spruch (auf der Sammelkarte)</label>
+      <div>
+        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Spitzname (Sammelkarte)</label>
         <input
           style={{ ...styles.input, width: "100%" }}
           value={spitz}
@@ -7388,11 +7388,11 @@ function PlayerStammdaten({ player, onSave }) {
           onBlur={() => spitz.trim() !== (player.spitzname || "") && onSave({ spitzname: spitz.trim() || null })}
         />
       </div>
-      <div style={{ flex: "0 0 auto" }}>
-        <label style={styles.label}>Geburtsdatum</label>
+      <div>
+        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
         <input
           type="date"
-          style={{ ...styles.input, width: 160 }}
+          style={{ ...styles.input, width: "100%" }}
           value={geb}
           onChange={(e) => setGeb(e.target.value)}
           onBlur={() => geb !== (player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "") && onSave({ geburtsdatum: geb || null })}
