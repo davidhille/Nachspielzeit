@@ -7371,25 +7371,30 @@ function formatGeburtsdatum(iso) {
 
 /* Nachname und Geburtsdatum (Spielerverwaltung); Speichern beim Verlassen des Feldes */
 function PlayerStammdaten({ player, onSave, trikot }) {
+  const gebAlt = player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "";
+  const [vorname, setVorname] = useState(player.name || "");
   const [nachname, setNachname] = useState(player.nachname || "");
-  const [geb, setGeb] = useState(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
+  const [geb, setGeb] = useState(gebAlt);
   const [spitz, setSpitz] = useState(player.spitzname || "");
   useEffect(() => {
+    setVorname(player.name || "");
     setSpitz(player.spitzname || "");
     setNachname(player.nachname || "");
     setGeb(player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "");
-  }, [player.nachname, player.geburtsdatum, player.spitzname]);
+  }, [player.name, player.nachname, player.geburtsdatum, player.spitzname]);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px 12px" }}>
-      {trikot}
       <div>
-        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
+        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Vorname</label>
         <input
-          type="date"
           style={{ ...styles.input, width: "100%" }}
-          value={geb}
-          onChange={(e) => setGeb(e.target.value)}
-          onBlur={() => geb !== (player.geburtsdatum ? String(player.geburtsdatum).slice(0, 10) : "") && onSave({ geburtsdatum: geb || null })}
+          value={vorname}
+          onChange={(e) => setVorname(e.target.value)}
+          onBlur={() => {
+            const v = vorname.trim();
+            if (!v) { setVorname(player.name || ""); return; }
+            if (v !== (player.name || "")) onSave({ name: v });
+          }}
         />
       </div>
       <div>
@@ -7399,6 +7404,17 @@ function PlayerStammdaten({ player, onSave, trikot }) {
           value={nachname}
           onChange={(e) => setNachname(e.target.value)}
           onBlur={() => nachname.trim() !== (player.nachname || "") && onSave({ nachname: nachname.trim() || null })}
+        />
+      </div>
+      {trikot}
+      <div>
+        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
+        <input
+          type="date"
+          style={{ ...styles.input, width: "100%" }}
+          value={geb}
+          onChange={(e) => setGeb(e.target.value)}
+          onBlur={() => geb !== gebAlt && onSave({ geburtsdatum: geb || null })}
         />
       </div>
       <div>
