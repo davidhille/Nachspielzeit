@@ -8129,7 +8129,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
           style={{ ...styles.select, minWidth: 150, flexShrink: 0 }}
         />
       </div>
-      <p style={styles.hint}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
+      <p style={styles.hintBlock}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
 
       {players.length === 0 && <EmptyState text="Noch keine aktiven Spieler vorhanden." />}
 
@@ -8252,7 +8252,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
 
       {subTab === "uebersicht" && (
         <div style={{ marginTop: 4 }}>
-          <p style={{ ...styles.hint, marginBottom: 10 }}>
+          <p style={{ ...styles.hintBlock, marginBottom: 10 }}>
             Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
@@ -9511,7 +9511,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
   return (
     <div style={{ marginTop: 4 }}>
       <h3 style={styles.h3}>Papierkorb</h3>
-      <p style={styles.hint}>
+      <p style={styles.hintBlock}>
         Gelöschte Spieler, Gegner und Spieltage bleiben hier, bis du sie endgültig entfernst.
       </p>
 
@@ -9692,7 +9692,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
   return (
     <div style={{ marginTop: 4 }}>
       <h3 style={styles.h3}>Material</h3>
-      <p style={{ ...styles.hint, marginBottom: 16 }}>
+      <p style={{ ...styles.hintBlock, marginBottom: 16 }}>
         Trage zu einem Datum die gezählte Menge ein. So lässt sich im Verlauf erkennen, in welchem Zeitraum etwas
         weniger wurde.
       </p>
@@ -10488,7 +10488,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
         <h3 style={{ ...styles.h3, margin: 0 }}>Übungen</h3>
         <button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>
       </div>
-      <p style={styles.hint}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</p>
+      <p style={styles.hintBlock}>Eigene Übungen mit Bild und Keywords sammeln – und beim Trainingsplan an einen Termin hängen.</p>
 
       {uebungen.length === 0 ? (
         <EmptyState text="Noch keine Übungen angelegt." />
@@ -10942,7 +10942,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
             Anlegen
           </button>
         </div>
-        <div style={{ ...styles.hint, marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere und Hallenturniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</div>
+        <div style={{ ...styles.hintBlock, marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere und Hallenturniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</div>
       </div>
 
       {/* Spieltag-Liste mit Gegner-Zuordnung */}
@@ -11484,6 +11484,7 @@ const styles = {
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
   empty: { background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 14 },
+  hintBlock: { fontSize: 13, lineHeight: 1.45, color: "var(--text-2)", background: "var(--surface-2)", borderLeft: "3px solid var(--accent)", borderRadius: "4px 8px 8px 4px", padding: "8px 12px", margin: "0 0 14px" },
   hint: { fontSize: 13, color: "var(--muted)", marginTop: -4, marginBottom: 6 },
   toast: {
     position: "fixed",
