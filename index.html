@@ -108,12 +108,15 @@
     .card-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); align-items: start; }
   }
   #root { min-height: 100vh; }
+    /* Auf-/zuklappbare Kacheln (KartenTitel) */
+    .nz-zu > :not(.nz-pfad):not(.nz-titel), .nz-zu .nz-pfad > :not(.nz-pfad):not(.nz-titel) { display: none !important; }
+    .nz-zu > .nz-titel, .nz-zu .nz-pfad > .nz-titel { margin-bottom: 0 !important; padding-bottom: 0 !important; border-bottom-color: transparent !important; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/plain" id="app-source">
-const { useState, useEffect, useCallback, useMemo, useRef } = React;
+const { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } = React;
 
 /* ---------- Supabase-Verbindung ---------- */
 const SUPABASE_URL = "https://ttydglqmpkgfqkrovdjf.supabase.co";
@@ -883,7 +886,7 @@ notify pgrst, 'reload schema';`;
   return (
     <section>
       <div style={styles.card}>
-        <h3 style={styles.h3}>Spieler-Import</h3>
+        <KartenTitel>Spieler-Import</KartenTitel>
         <div style={styles.cardDesc}>
         CSV-Export aus dem DFBnet hochladen (Spalten: Name, Vorname, Geb., Passnummer). Übernommen werden Nachname, Geburtsdatum und Passnummer. Es wird nichts gelöscht.
         </div>
@@ -1269,7 +1272,7 @@ function UebungenAdmin({ teams }) {
     <section>
       {fehler && <div style={{ ...styles.editBanner, marginBottom: 12 }}>{fehler}</div>}
       <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-        <h3 style={{ ...styles.h3, marginBottom: 0 }}>Übungen importieren</h3>
+        <KartenTitel style={{ marginBottom: 0 }}>Übungen importieren</KartenTitel>
         <div style={styles.cardDesc}>Übungen importieren und Teams zuordnen. Eine Übung gehört entweder einem Team oder allen Teams (dann ist sie in jeder Team-App sichtbar, ändern können sie nur Admins).</div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Zuordnung der importierten Übungen
@@ -1415,7 +1418,7 @@ function ZugaengeVerwaltung({ teams }) {
   return (
     <section>
       <div style={{ ...styles.card, marginBottom: 14 }}>
-        <h3 style={styles.h3}>Zugänge</h3>
+        <KartenTitel>Zugänge</KartenTitel>
         <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
         Jedes Team hat eigene Zugangscodes und sieht nur seine Daten. Ein Code ohne Team („Alle Teams“) ist ein Admin-Code und funktioniert auch in der Administration.
         </div>
@@ -1460,7 +1463,7 @@ function ZugaengeVerwaltung({ teams }) {
       )}
       {!fehler && codes !== null && (
         <div style={{ ...styles.card, marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <h3 style={styles.h3}>Neuen Code anlegen</h3>
+          <KartenTitel>Neuen Code anlegen</KartenTitel>
           <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
           <select style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
             {teams.map((t) => (
@@ -1586,7 +1589,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
     <section>
       <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
-          <h3 style={styles.h3}>Einstellungen · {teamRow.name}</h3>
+          <KartenTitel>Einstellungen · {teamRow.name}</KartenTitel>
           <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
         Einstellungen gelten nur für dieses Team. Die Änderung gilt nach dem nächsten Laden der App.
           </div>
@@ -1797,7 +1800,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
   return (
     <section>
       <div style={{ ...styles.card, marginBottom: 14 }}>
-        <h3 style={styles.h3}>Teams</h3>
+        <KartenTitel>Teams</KartenTitel>
         <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
         Jedes Team hat eigene Spieler, Trainings, Spieltage und Übungen sowie eigene Funktionen und Einstellungen. Die App eines Teams läuft unter <b>kürzel.nachspielzeit.app</b>.
         </div>
@@ -1805,7 +1808,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
       {fehler && <SqlHinweis fehler={fehler} />}
       {!fehler && (
         <div style={{ ...styles.card, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <h3 style={styles.h3}>Neues Team anlegen</h3>
+          <KartenTitel>Neues Team anlegen</KartenTitel>
           <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. U9)" value={name} onChange={(e) => setName(e.target.value)} />
           <input
             style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
@@ -2043,7 +2046,7 @@ notify pgrst, 'reload schema';`;
         {tab === "backup" && (
           <section>
             <div style={styles.card}>
-              <h3 style={styles.h3}>Backup</h3>
+              <KartenTitel>Backup</KartenTitel>
               <div style={styles.cardDesc}>
                 Lädt alle Daten der App (Spieler, Trainings, Spieltage, Übungen, Notizen, Einstellungen …) als eine JSON-Datei herunter. Bilder liegen im Supabase-Storage und sind nur als Link enthalten.
               </div>
@@ -2078,7 +2081,7 @@ notify pgrst, 'reload schema';`;
         {tab === "funktionen" && (
           <section>
             <div style={{ ...styles.card, marginBottom: 14 }}>
-              <h3 style={styles.h3}>Funktionen · {teamName}</h3>
+              <KartenTitel>Funktionen · {teamName}</KartenTitel>
               <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
               Deaktivierte Funktionen verschwinden in der App dieses Teams ({team}.nachspielzeit.app). Die Daten bleiben erhalten. Die Änderung gilt nach dem nächsten Laden der App.
               </div>
@@ -2127,7 +2130,7 @@ notify pgrst, 'reload schema';`;
                       ))}
                     </div>
                     <div style={{ ...styles.card, marginBottom: 16 }}>
-                      <h3 style={styles.h3}>Eltern-Seite</h3>
+                      <KartenTitel>Eltern-Seite</KartenTitel>
                       {eltern.map((f) => zeile(f, true))}
                     </div>
                   </>
@@ -4162,7 +4165,7 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
   if (fehlt) {
     return (
       <div style={styles.card}>
-        <h3 style={styles.h3}>Taktik-Board einrichten</h3>
+        <KartenTitel>Taktik-Board einrichten</KartenTitel>
         <div style={{ fontSize: 13.5, marginBottom: 8 }}>Für die Boards fehlt noch eine Tabelle. Bitte einmal in Supabase (SQL Editor) ausführen, danach die Seite neu laden:</div>
         <pre style={{ fontSize: 11.5, whiteSpace: "pre-wrap", margin: 0, userSelect: "all" }}>{SQL_TAKTIK}</pre>
       </div>
@@ -5608,7 +5611,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
   return (
     <section>
     <div style={{ ...styles.card, marginBottom: 12 }}>
-      <h3 style={styles.h3}>Link für Eltern</h3>
+      <KartenTitel>Link für Eltern</KartenTitel>
       <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
         Eine Seite mit Saisonbilanz, Spieltagskarten, Sammelkarten und Mannschaftssongs. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
       </div>
@@ -5647,7 +5650,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
       <>
     <div style={{ ...styles.card, marginBottom: 12 }}>
           <div>
-            <h3 style={styles.h3}>Vorschau-Link (zum Testen)</h3>
+            <KartenTitel>Vorschau-Link (zum Testen)</KartenTitel>
             <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 10 }}>
               Hier siehst du Änderungen an der Eltern-Seite, bevor sie freigegeben werden. Gleiche Daten wie der Eltern-Link, nur eine andere Darstellung. Eltern sehen sie nicht.
             </div>
@@ -5660,7 +5663,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
     </div>
     <div style={{ ...styles.card, marginBottom: 12 }}>
           <div>
-            <h3 style={styles.h3}>Mannschaftssongs (Player auf der Eltern-Seite)</h3>
+            <KartenTitel>Mannschaftssongs (Player auf der Eltern-Seite)</KartenTitel>
             {songs.map((x, i) => (
               <div key={x.pfad} style={{ fontSize: 13.5, padding: "8px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
                 <div style={{ marginBottom: 4 }}>{i + 1}. {x.titel}</div>
@@ -6855,7 +6858,7 @@ function Dashboard({
       </div>
 
       <div style={{ ...styles.card, marginTop: 20, marginBottom: 18 }}>
-        <h3 style={styles.h3}>Übersicht</h3>
+        <KartenTitel>Übersicht</KartenTitel>
         <div style={{ ...styles.segNav, marginBottom: 12 }}>
           <button
             onClick={() => setUebersichtTab("training")}
@@ -6898,12 +6901,11 @@ function Dashboard({
           )}
         </div>
         )}
-      </div>
-
-      {uebersichtTab === "training" && <h3 style={styles.h3Block}>Punktestand</h3>}
 
       {uebersichtTab === "training" && (
         <>
+          <div style={{ marginTop: 16 }}>
+          <KartenTitel block>Punktestand</KartenTitel>
           {rows.length === 0 && <EmptyState text="Noch keine Spieler angelegt. Starte unter „Verwaltung“." />}
 
           {rows.length > 0 && (
@@ -6942,6 +6944,7 @@ function Dashboard({
               </table>
             </div>
           )}
+          </div>
 
           <AnwesenheitsStatistik trainings={trainings} players={players} month={month} onOpenPlayer={onSelectPlayer} />
           <EntwicklungsVerlauf players={players} basis={basis} entwicklungen={entwicklungen} months={months} month={month} onOpenPlayer={onSelectPlayer} />
@@ -6957,6 +6960,7 @@ function Dashboard({
           <SpieltagNotizenUebersicht spieltage={spieltage} month={month} />
         </>
       )}
+      </div>
     </section>
   );
 }
@@ -7017,7 +7021,7 @@ function AnwesenheitsStatistik({ trainings, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Anwesenheit {saison ? saison.replace("-", "/") : ""}</h3>
+      <KartenTitel block>Anwesenheit {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       {rows.length === 0 && <EmptyState text="Noch keine Trainingsbewertungen in dieser Saison erfasst." />}
       {rows.length > 0 && (
         <div style={styles.tableWrap}>
@@ -7077,7 +7081,7 @@ function TrainerNotizen({ trainings, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</h3>
+      <KartenTitel block>Trainer-Notizen {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       <div className="card-list" style={styles.cardList}>
         {gruppen.map((g) => {
           const isOpen = !!offen[g.id];
@@ -7150,7 +7154,7 @@ function SpieltagAnwesenheit({ spieltage, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Anwesenheit Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
+      <KartenTitel block>Anwesenheit Spieltage {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       {gesamt === 0 ? (
         <EmptyState text="Noch keine Spieltage in dieser Saison erfasst." />
       ) : (
@@ -7193,7 +7197,7 @@ function SpieltagNotizenUebersicht({ spieltage, month }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</h3>
+      <KartenTitel block>Notizen Spieltage {saison ? saison.replace("-", "/") : ""}</KartenTitel>
       <div className="card-list" style={styles.cardList}>
         {notizen.map((s) => (
           <div key={s.id} style={styles.card}>
@@ -7698,7 +7702,7 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</h3>
+      <KartenTitel block>Saisonbilanz {saison ? saison.replace("-", "/") : ""}</KartenTitel>
 
       {spieleDerSaison.length === 0 && (
         <EmptyState text="Noch keine Spiele in dieser Saison erfasst. Lege sie unter „Spieltage“ an." />
@@ -7782,7 +7786,7 @@ function GegnerBilanzTabelle({ spieltage, gegner }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Bilanz pro Gegner</h3>
+      <KartenTitel block>Bilanz pro Gegner</KartenTitel>
       {bilanzen.length === 0 ? (
         <EmptyState text="Noch keine Spiele gegen hinterlegte Gegner erfasst." />
       ) : (
@@ -7835,7 +7839,7 @@ function EntwicklungsVerlauf({ players, basis, entwicklungen, months, month, onO
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h3 style={styles.h3Block}>Entwicklungsverlauf (Basis-Qualität)</h3>
+      <KartenTitel block>Entwicklungsverlauf (Basis-Qualität)</KartenTitel>
       {saisonMonate.length < 2 ? (
         <EmptyState text="Noch nicht genug Monate mit Daten für einen Verlauf." />
       ) : (
@@ -8129,7 +8133,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
     <section>
       <h2 style={styles.h2}>Monatsentwicklung</h2>
       <div style={{ ...styles.card, marginBottom: 14 }}>
-        <h3 style={styles.h3}>Monat wählen</h3>
+        <KartenTitel>Monat wählen</KartenTitel>
         <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
           Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.
         </div>
@@ -8263,7 +8267,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
       {subTab === "uebersicht" && (
         <div style={{ marginTop: 4 }}>
           <div style={{ ...styles.card, marginBottom: 16 }}>
-          <h3 style={styles.h3}>Sortieren nach</h3>
+          <KartenTitel>Sortieren nach</KartenTitel>
           <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
             Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
           </div>
@@ -8432,6 +8436,56 @@ function ChevronIcon({ size = 14, open }) {
     >
       <path d="m6 9 6 6 6-6" />
     </svg>
+  );
+}
+
+/* Kachel-Titel: Klick klappt die ganze Kachel (Eltern-Element) auf/zu. Zustand bleibt pro Titel bis zum Neuladen erhalten. */
+const NZ_ZU = {};
+function KartenTitel({ children, block = false, aktion = null, style }) {
+  const ref = useRef(null);
+  const key = [].concat(children).join("");
+  const [zu, setZu] = useState(!!NZ_ZU[key]);
+  const anwenden = (wert) => {
+    const h = ref.current;
+    if (!h) return;
+    let karte = h.parentElement;
+    const pfad = [];
+    if (!block) {
+      let el = h.parentElement;
+      for (let i = 0; el && i < 2; i++) {
+        const cs = getComputedStyle(el);
+        if (parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderTopLeftRadius) > 0) { karte = el; break; }
+        pfad.push(el);
+        el = el.parentElement;
+      }
+      if (karte !== el) pfad.length = 0;
+    }
+    pfad.forEach((p) => p.classList.add("nz-pfad"));
+    if (karte) karte.classList.toggle("nz-zu", wert);
+  };
+  useLayoutEffect(() => { anwenden(zu); }, []);
+  const umschalten = (e) => {
+    if (e.target !== e.currentTarget && e.target.closest("button, a, input, select, textarea")) return;
+    const neu = !zu;
+    NZ_ZU[key] = neu;
+    setZu(neu);
+    anwenden(neu);
+  };
+  return (
+    <h3
+      ref={ref}
+      className="nz-titel"
+      role="button"
+      tabIndex={0}
+      aria-expanded={!zu}
+      onClick={umschalten}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); umschalten(e); } }}
+      style={{ ...(block ? styles.h3Block : styles.h3), display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", ...style }}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
+      {aktion}
+      <span aria-hidden="true" style={{ flex: "none", fontSize: 14, color: "var(--muted)", transition: "transform 0.15s", transform: zu ? "rotate(-90deg)" : "none" }}>▾</span>
+    </h3>
   );
 }
 
@@ -9917,7 +9971,7 @@ function SpielerBereich({
         onChange={handleFileChange}
       />
       <div style={{ ...styles.card, marginBottom: 14 }}>
-      <h3 style={styles.h3}>Spieler hinzufügen</h3>
+      <KartenTitel>Spieler hinzufügen</KartenTitel>
       <div style={styles.addRow}>
         <input
           style={styles.input}
@@ -10141,7 +10195,7 @@ function TrainingsplanBereich({
     <div style={{ marginTop: 4 }}>
 
       <div style={styles.card}>
-        <h3 style={styles.h3}>Termine generieren</h3>
+        <KartenTitel>Termine generieren</KartenTitel>
         <div style={styles.fieldRow}>
           <label style={styles.label}>Erstes Training ab</label>
           <input
@@ -10440,10 +10494,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
   return (
     <Huelle {...huelleProps}>
       {karte && (
-        <div style={{ ...styles.h3, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <span>{titel}</span>
-          {aktion}
-        </div>
+        <KartenTitel aktion={aktion}>{titel}</KartenTitel>
       )}
       <input
         style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 10 }}
@@ -10917,7 +10968,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
       {/* Spieltag anlegen */}
       <div style={{ ...styles.card, marginBottom: 14 }}>
-        <h3 style={styles.h3}>Neuen Spieltag anlegen</h3>
+        <KartenTitel>Neuen Spieltag anlegen</KartenTitel>
         <div style={styles.chipGroup}>
           <button
             onClick={(e) => { setNeuerTyp("spieltag"); e.currentTarget.blur(); }}
