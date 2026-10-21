@@ -8120,16 +8120,17 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
   return (
     <section>
-      <div style={styles.rowBetween}>
-        <h2 style={styles.h2}>Monatsentwicklung</h2>
+      <h2 style={styles.h2}>Monatsentwicklung</h2>
+      <p style={styles.hintBlock}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+        <h3 style={styles.h3}>Monat wählen</h3>
         <input
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          style={{ ...styles.select, minWidth: 150, flexShrink: 0 }}
+          style={{ ...styles.select, minWidth: 150 }}
         />
       </div>
-      <p style={styles.hintBlock}>Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.</p>
 
       {players.length === 0 && <EmptyState text="Noch keine aktiven Spieler vorhanden." />}
 
@@ -8255,8 +8256,9 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
           <p style={{ ...styles.hintBlock, marginBottom: 10 }}>
             Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            <span style={styles.label}>Sortieren nach</span>
+          <div style={{ ...styles.card, marginBottom: 16 }}>
+          <h3 style={styles.h3}>Sortieren nach</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <button
               onClick={() => setUebersichtSort("spiele")}
               style={{ ...styles.chip, ...(uebersichtSort === "spiele" ? styles.chipActive : {}) }}
@@ -8275,6 +8277,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
             >
               Tore/Spiel
             </button>
+          </div>
           </div>
           {uebersicht.length === 0 && <EmptyState text="Noch keine Daten vorhanden." />}
           {uebersicht.length > 0 && (
@@ -9901,6 +9904,9 @@ function SpielerBereich({
         onChange={handleFileChange}
       />
       <h3 style={styles.tabLabel}>Spieler</h3>
+      <h3 style={styles.tabLabel}>Spieler</h3>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+      <h3 style={styles.h3}>Spieler hinzufügen</h3>
       <div style={styles.addRow}>
         <input
           style={styles.input}
@@ -9925,6 +9931,7 @@ function SpielerBereich({
         >
           Hinzufügen
         </button>
+      </div>
       </div>
 
       {players.length === 0 && <EmptyState text="Noch keine Spieler angelegt." />}
@@ -10415,11 +10422,14 @@ function alleKeywordsVon(uebungen) {
   return [...new Set(uebungen.flatMap((u) => u.keywords))].sort((a, b) => a.localeCompare(b, "de"));
 }
 
-function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter }) {
+function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, karte = false }) {
   const alle = useMemo(() => alleKeywordsVon(uebungen), [uebungen]);
   const toggle = (k) => setFilter(filter.includes(k) ? filter.filter((x) => x !== k) : [...filter, k]);
+  const Huelle = karte ? "div" : React.Fragment;
+  const huelleProps = karte ? { style: { ...styles.card, marginBottom: 14 } } : {};
   return (
-    <>
+    <Huelle {...huelleProps}>
+      {karte && <h3 style={styles.h3}>Suchen und filtern</h3>}
       <input
         style={{ ...styles.input, width: "100%", flex: "none", marginBottom: 10 }}
         placeholder="Übung suchen …"
@@ -10446,7 +10456,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter }) {
           ))}
         </div>
       )}
-    </>
+    </Huelle>
   );
 }
 
@@ -10492,7 +10502,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
         <EmptyState text="Noch keine Übungen angelegt." />
       ) : (
         <>
-          <UebungFilterLeiste uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
+          <UebungFilterLeiste karte uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
           <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, marginBottom: 10 }}>
             {gefiltert.length} {gefiltert.length === 1 ? "Übung" : "Übungen"}
             {filter.length > 0 ? ` · Filter: ${filter.join(", ")}` : ""}
@@ -10897,7 +10907,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
       </div>
 
       {/* Spieltag anlegen */}
-      <div style={{ marginBottom: 10 }}>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
         <h3 style={styles.h3}>Neuen Spieltag anlegen</h3>
         <div style={styles.chipGroup}>
           <button
