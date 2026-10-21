@@ -7958,10 +7958,10 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
 
   return (
     <section>
-      <div style={styles.rowBetween}>
-        <h2 style={styles.h2}>Training bewerten</h2>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+        <KartenTitel>Training bewerten</KartenTitel>
         {geplanteTermine.length > 0 ? (
-          <select style={styles.select} value={date} onChange={(e) => setDate(e.target.value)}>
+          <select style={{ ...styles.select, width: "100%" }} value={date} onChange={(e) => setDate(e.target.value)}>
             {geplanteTermine.map((t) => (
               <option key={t.id} value={t.date}>
                 {formatTerminLabel(t.date)}
@@ -8133,7 +8133,6 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
   return (
     <section>
-      <h2 style={styles.h2}>Monatsentwicklung</h2>
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <KartenTitel>Monat wählen</KartenTitel>
         <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
@@ -8220,7 +8219,6 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
 
   return (
     <section>
-      <h2 style={styles.h2}>Spieltage</h2>
 
       <div style={styles.segNav}>
         <button
@@ -9509,7 +9507,6 @@ function Verwaltung({
 
   return (
     <section>
-      <h2 style={styles.h2}>Verwaltung</h2>
 
       <div style={styles.subNav}>
         {items.map(([key, label]) => (
