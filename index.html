@@ -119,6 +119,8 @@
       .nav-bottom button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .app-main { padding-bottom: 96px !important; }
     }
+    .nz-leiste { scrollbar-width: none; -ms-overflow-style: none; }
+    .nz-leiste::-webkit-scrollbar { display: none; }
     /* Auf-/zuklappbare Kacheln (KartenTitel) */
     .nz-zu > :not(.nz-pfad):not(.nz-titel), .nz-zu .nz-pfad > :not(.nz-pfad):not(.nz-titel) { display: none !important; }
     .nz-zu > .nz-titel, .nz-zu .nz-pfad > .nz-titel { margin-bottom: 0 !important; padding-bottom: 0 !important; border-bottom-color: transparent !important; }
@@ -4386,7 +4388,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
         ? { top: 0, left: 0, width: window.innerHeight, height: window.innerWidth, transformOrigin: "0 0", transform: `translateX(${window.innerWidth}px) rotate(90deg)` }
         : { inset: 0 }),
     };
-    const leiste = { display: "flex", gap: 6, alignItems: "center", flex: "none", overflowX: "auto", overflowY: "hidden", paddingBottom: 2 };
+    const leiste = { display: "flex", gap: 6, alignItems: "center", flex: "none", overflowX: "auto", overflowY: "hidden" };
     const umbruch = <span aria-hidden="true" style={{ flexBasis: "100%", height: 0 }} />;
     const bMehr = <TkBtn key="mehr" icon="mehr" titel="Magnete und weitere Einstellungen" aktiv={sheetOffen} onClick={() => setSheetOffen((v) => !v)} />;
     const bDrehen = <TkBtn key="dreh" icon="handydrehen" titel="Ansicht drehen" onClick={querformat} />;
@@ -4406,9 +4408,9 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           </>
         ) : (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
-            <div style={leiste}>{steuer}</div>
+            <div className="nz-leiste" style={leiste}>{steuer}</div>
             {brettEl({ width: "100%", aspectRatio: `${g.vbW} / ${g.vbH}`, maxHeight: eff.h - 150, flex: "none" })}
-            <div style={leiste}>{werkzeugeLeiste}</div>
+            <div className="nz-leiste" style={leiste}>{werkzeugeLeiste}</div>
           </div>
         )}
         {sheetOffen && (
