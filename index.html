@@ -3032,9 +3032,14 @@ function tkFormInnen(o, g, s) {
   if (o.form === "oval") return (lx / (o.w / 2)) ** 2 + (ly / (o.h / 2)) ** 2 <= 1;
   return Math.abs(lx) <= o.w / 2 && Math.abs(ly) <= o.h / 2;
 }
-function tkFormGriff(o, g) {
+/* Griffe einer Form: Ecke = Breite und Höhe, rechter Rand = nur Breite, unterer Rand = nur Höhe */
+function tkFormGriffe(o, g) {
   const c = g.toS(o.x, o.y), th = tkFormRad(o, g);
-  return [c[0] + (o.w / 2) * Math.cos(th) - (o.h / 2) * Math.sin(th), c[1] + (o.w / 2) * Math.sin(th) + (o.h / 2) * Math.cos(th)];
+  const p = (fx, fy) => {
+    const lx = fx * o.w / 2, ly = fy * o.h / 2;
+    return [c[0] + lx * Math.cos(th) - ly * Math.sin(th), c[1] + lx * Math.sin(th) + ly * Math.cos(th)];
+  };
+  return [{ achse: "beide", pos: p(1, 1) }, { achse: "w", pos: p(1, 0) }, { achse: "h", pos: p(0, 1) }];
 }
 /* Bildschirmpunkte einer Linie (Bögen als Kurve, ohne Wellen) */
 function tkBasisPunkte(l, g, objMap) {
@@ -3271,6 +3276,8 @@ function TkObjekt({ o, g, anzeige, namen, players, sel, opacity = 1, pos }) {
         )}
         {sel && <rect data-skip="1" x={-o.w / 2} y={-o.h / 2} width={o.w} height={o.h} fill="none" stroke="#FFD84D" strokeWidth={R * 0.12} strokeDasharray={`${R * 0.35} ${R * 0.25}`} />}
         {sel && <circle data-skip="1" cx={o.w / 2} cy={o.h / 2} r={R * 0.5} fill="#FFD84D" stroke="#222" strokeWidth={R * 0.08} />}
+        {sel && <circle data-skip="1" cx={o.w / 2} cy={0} r={R * 0.4} fill="#fff" stroke="#222" strokeWidth={R * 0.08} />}
+        {sel && <circle data-skip="1" cx={0} cy={o.h / 2} r={R * 0.4} fill="#fff" stroke="#222" strokeWidth={R * 0.08} />}
       </g>
     );
   } else if (o.art === "text") {
@@ -3717,17 +3724,18 @@ function TaktikEditor({ board, players, onSave, onClose }) {
     if (tool === "bewegen" && sel) {
       const so = sel.typ === "o" ? st.objekte.find((o) => o.id === sel.id) : null;
       const sl = sel.typ === "l" ? st.linien.find((l) => l.id === sel.id) : null;
-      let griff = null, art = null, ra = g.R * 0.9;
+      let griff = null, art = null, ra = g.R * 0.9, formAchse = null;
       if (so && so.blick != null && TK_SPIELERART.includes(so.art)) {
         const c = g.toS(so.x, so.y), th = tkBlickWinkel(so, g);
         griff = [c[0] + Math.cos(th) * g.R * 2.5, c[1] + Math.sin(th) * g.R * 2.5]; art = "blick";
       } else if (so && so.art === "form") {
-        griff = tkFormGriff(so, g); art = "form";
+        const gf = tkFormGriffe(so, g).map((q) => ({ ...q, d: Math.hypot(q.pos[0] - s[0], q.pos[1] - s[1]) })).sort((a, b) => a.d - b.d)[0];
+        griff = gf.pos; art = "form"; formAchse = gf.achse;
       } else if (sl && sl.bogen) {
         griff = tkBogenGriff(sl, g); art = "bogen"; ra = Math.max(g.W * 0.03, 1.2);
       }
       if (griff && Math.hypot(griff[0] - s[0], griff[1] - s[1]) <= ra) {
-        dragRef.current = { kind: art, id: sel.id, pid: e.pointerId, moved: false, start: JSON.stringify(dataRef.current) };
+        dragRef.current = { kind: art, id: sel.id, pid: e.pointerId, moved: false, achse: formAchse, start: JSON.stringify(dataRef.current) };
         svg.setPointerCapture(e.pointerId);
         return;
       }
@@ -3791,8 +3799,8 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           o.blick = g.hoch ? Math.atan2(-vx, vy) : Math.atan2(vy, vx);
         } else if (o) {
           const [lx, ly] = tkFormLokal(o, g, s);
-          o.w = Math.max(2, Math.min(2 * Math.abs(lx), 200));
-          o.h = Math.max(2, Math.min(2 * Math.abs(ly), 200));
+          if (d.achse !== "h") o.w = Math.max(2, Math.min(2 * Math.abs(lx), 200));
+          if (d.achse !== "w") o.h = Math.max(2, Math.min(2 * Math.abs(ly), 200));
         }
       }
       dataRef.current = neu;
@@ -4245,7 +4253,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
         {selObj && selObj.art === "text" && <TkBtn icon="text" titel="Text ändern" onClick={() => frage("Text", selObj.text || "", (v) => { if (v && v.trim()) objAendern((o) => (o.text = v.trim())); })} />}
         <TkBtn icon="loeschen" titel="Löschen" gefahr onClick={loeschen} />
       </div>
-      {selObj && selObj.art === "form" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Größe: gelben Punkt ziehen. Farbe: unter „Zeichnen“.</div>}
+      {selObj && selObj.art === "form" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Form ändern: gelber Punkt = Breite und Höhe, weiße Punkte = nur Breite oder nur Höhe. Farbe: unter „Zeichnen“.</div>}
       {selObj && selObj.art === "reifen" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
       {selLinie && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
     </div>
