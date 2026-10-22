@@ -171,7 +171,7 @@ let CURRENT_TEAM = (() => {
 })();
 const TEAM_TABLES = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele", "torschuetzen",
-  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards",
+  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards", "training_boards",
 ];
 const TEAM_COL_FEHLT = new Set(); // Tabellen, in denen die Spalte team_id (noch) nicht existiert
 const teamFilterAktiv = (table) => TEAM_TABLES.includes(table) && !TEAM_COL_FEHLT.has(table);
@@ -776,7 +776,7 @@ const IS_ADMIN_HOST = /^admin\./i.test(window.location.hostname) || /[?&]admin=1
 const BACKUP_TABELLEN = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele",
   "torschuetzen", "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "team_settings", "uebungen",
-  "training_uebungen", "app_features", "teams", "taktik_boards",
+  "training_uebungen", "app_features", "teams", "taktik_boards", "training_boards",
 ];
 
 /* ---------- Spieler-Import (BFV/DFBnet-CSV) ---------- */
@@ -2216,6 +2216,8 @@ function App() {
   const [trainingUebungen, setTrainingUebungen] = useState([]);
   const [taktikBoards, setTaktikBoards] = useState([]);
   const [taktikFehlt, setTaktikFehlt] = useState(false);
+  const [trainingBoards, setTrainingBoards] = useState([]);
+  const [trainingBoardsFehlt, setTrainingBoardsFehlt] = useState(false);
   const [teamSettings, setTeamSettings] = useState({});
   const [features, setFeatures] = useState({});
   const [teamInfo, setTeamInfo] = useState(null);
@@ -2301,7 +2303,7 @@ function App() {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw, teamsRaw, taktikRaw] =
+      const [playersRaw, basisRaw, termineRaw, trainingsRaw, entwRaw, gegnerRaw, spieltageRaw, spieleRaw, torRaw, sgRaw, stRaw, materialRaw, teamSettingsRaw, uebungenRaw, trainingUebungenRaw, featuresRaw, teamsRaw, taktikRaw, trainingBoardsRaw] =
         await Promise.all([
           dbSelect("players"),
           dbSelect("basisqualitaet"),
@@ -2322,8 +2324,10 @@ function App() {
           dbSelect("app_features").catch(() => []),
           dbSelect("teams").catch(() => []),
           dbSelect("taktik_boards").then((r) => { setTaktikFehlt(false); return r; }).catch(() => { setTaktikFehlt(true); return []; }),
+          dbSelect("training_boards").then((r) => { setTrainingBoardsFehlt(false); return r; }).catch(() => { setTrainingBoardsFehlt(true); return []; }),
         ]);
       setTaktikBoards(taktikRaw.filter((b) => !b.deleted_at));
+      setTrainingBoards(trainingBoardsRaw.map((t) => ({ id: t.id, terminId: t.termin_id, boardId: t.board_id, position: Number(t.position) || 0 })));
       setPlayers(playersRaw.filter((p) => !p.deleted_at));
       setTrashPlayers(playersRaw.filter((p) => p.deleted_at));
       const basisMap = {};
@@ -2613,6 +2617,24 @@ function App() {
       await dbUpdate("training_uebungen", liste[j].id, { position: liste[i].position });
     });
 
+  const addTrainingBoard = (terminId, boardId) =>
+    wrapAction(async () => {
+      const vorhandene = trainingBoards.filter((t) => t.terminId === terminId);
+      const position = vorhandene.reduce((m, t) => Math.max(m, t.position), 0) + 1;
+      await dbInsert("training_boards", { id: uid(), termin_id: terminId, board_id: boardId, position });
+    }, "Board zum Training hinzugefügt");
+  const removeTrainingBoard = (id) => wrapAction(() => dbDelete("training_boards", id), "Board aus dem Training entfernt");
+  const moveTrainingBoard = (terminId, id, richtung) =>
+    wrapAction(async () => {
+      const liste = trainingBoards.filter((t) => t.terminId === terminId).sort((a, b) => a.position - b.position);
+      const i = liste.findIndex((t) => t.id === id);
+      const j = i + richtung;
+      if (i < 0 || j < 0 || j >= liste.length) return;
+      await dbUpdate("training_boards", liste[i].id, { position: liste[j].position });
+      await dbUpdate("training_boards", liste[j].id, { position: liste[i].position });
+    });
+  const trainingBoardCtx = { boards: taktikBoards, links: trainingBoards, termine, players, fehlt: trainingBoardsFehlt, add: addTrainingBoard, remove: removeTrainingBoard, move: moveTrainingBoard };
+
   if (loading) {
     return (
       <div style={styles.loadingScreen}>
@@ -2636,6 +2658,7 @@ function App() {
 
   return (
     <FeatureCtx.Provider value={features}>
+    <TrainingBoardCtx.Provider value={trainingBoardCtx}>
     <div style={styles.app}>
       <Header tab={tab} setTab={(k) => { setZiel(null); setTab(k); }} />
       <main className="app-main" style={styles.main}>
@@ -2948,11 +2971,93 @@ function App() {
         </div>
       )}
     </div>
+    </TrainingBoardCtx.Provider>
     </FeatureCtx.Provider>
   );
 }
 
 /* ---------- Taktik-Board: Felder, Magnete, Linien, Schritte (Animation) ---------- */
+
+const TrainingBoardCtx = React.createContext(null);
+const SQL_TRAINING_BOARDS = `-- Nachspielzeit: Taktik-Boards einem Training zuordnen (wiederholbar)
+create table if not exists training_boards (
+  id text primary key,
+  team_id text not null default 'u8',
+  termin_id text not null,
+  board_id text not null,
+  position int not null default 1,
+  created_at timestamptz default now()
+);
+alter table training_boards enable row level security;
+grant select, insert, update, delete on table training_boards to anon, authenticated, service_role;
+drop policy if exists "access via code" on training_boards;
+create policy "access via code" on training_boards for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
+notify pgrst, 'reload schema';`;
+
+function TrainingBoardSqlHinweis() {
+  return (
+    <div style={{ fontSize: 13, color: "var(--muted)" }}>
+      <div style={{ marginBottom: 6 }}>Für die Zuordnung fehlt noch eine Tabelle. Bitte einmal in Supabase (SQL Editor) ausführen, danach die Seite neu laden:</div>
+      <pre style={{ fontSize: 11.5, whiteSpace: "pre-wrap", margin: 0, userSelect: "all", color: "var(--text)" }}>{SQL_TRAINING_BOARDS}</pre>
+    </div>
+  );
+}
+
+/* Auswahl im Board-Editor: Board einem oder mehreren Trainings zuordnen (Tippen schaltet um) */
+function TkTrainingWahl({ board, onClose }) {
+  const tb = React.useContext(TrainingBoardCtx);
+  const heute = todayISO();
+  const termine = useMemo(() => {
+    if (!tb) return [];
+    const verlinkt = new Set(tb.links.filter((l) => l.boardId === board.id).map((l) => l.terminId));
+    return tb.termine
+      .filter((t) => t.status !== "abgesagt" && (t.date >= heute || verlinkt.has(t.id)))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .slice(0, 30);
+  }, [tb, board.id, heute]);
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Zu Training hinzufügen" onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(20,12,12,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 420, maxHeight: "80vh", padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 18px 40px rgba(0,0,0,0.3)" }}>
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600 }}>Zu Training hinzufügen</div>
+        {tb && tb.fehlt ? (
+          <TrainingBoardSqlHinweis />
+        ) : termine.length === 0 ? (
+          <div style={{ fontSize: 13.5, color: "var(--muted)" }}>Keine anstehenden Trainings gefunden. Lege sie unter „Verwaltung“ → „Trainingsplan“ an.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" }}>
+            {termine.map((t) => {
+              const link = tb.links.find((l) => l.terminId === t.id && l.boardId === board.id);
+              return (
+                <button key={t.id} type="button" aria-pressed={!!link} onClick={() => (link ? tb.remove(link.id) : tb.add(t.id, board.id))}
+                  style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 12px", borderRadius: 12, textAlign: "left", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                    border: `1.5px solid ${link ? TK_ROT : "var(--border)"}`, background: link ? "rgba(196,39,31,0.10)" : "var(--surface)", color: "var(--text)" }}>
+                  <span style={{ flex: 1 }}>
+                    {formatTerminLabel(t.date)}
+                    {t.start_zeit ? <span style={{ fontWeight: 500, color: "var(--muted)" }}> · {String(t.start_zeit).slice(0, 5)}{t.end_zeit ? `–${String(t.end_zeit).slice(0, 5)}` : ""}</span> : null}
+                  </span>
+                  {link && <span style={{ color: TK_ROT, fontWeight: 700 }}>✓ dabei</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <TkBtn label="Fertig" aktiv onClick={onClose} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Nur-Ansehen-Fenster für ein Board (Training): Schritte wählen, abspielen – ohne Bearbeiten */
+function TkAnsicht({ board, players, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1300, background: "var(--bg)", overflowY: "auto", padding: 10, boxSizing: "border-box" }}>
+      <TaktikEditor board={board} players={players} onSave={() => {}} onClose={onClose} nurLesen />
+    </div>
+  );
+}
 
 const SQL_TAKTIK = `-- Nachspielzeit: Tabelle für die Taktik-Boards (wiederholbar)
 create table if not exists taktik_boards (
@@ -3483,6 +3588,7 @@ const TK_ICONS = {
   nummer: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
   name: <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />,
   mehr: <path d="M4 6h16M4 12h16M4 18h16" />,
+  kalender: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M12 14v4M10 16h4" /></>,
   schliessen: <path d="M6 6l12 12M18 6L6 18" />,
   handydrehen: <><rect x="8" y="2.5" width="8" height="14" rx="1.5" /><path d="M4 14a8 8 0 0 0 6.5 7.8M10.5 22l-2.8-.5M10.5 22l.3-2.8M20 10a8 8 0 0 0-3-3" /></>,
 };
@@ -3570,7 +3676,7 @@ function TkDialog({ dialog, onClose }) {
   );
 }
 
-function TaktikEditor({ board, players, onSave, onClose }) {
+function TaktikEditor({ board, players, onSave, onClose, nurLesen = false }) {
   const [name, setName] = useState(board.name || "Neues Board");
   const [data, setData] = useState(() => tkNormalisiere(tkKopie(board.data)));
   const [schritt, setSchritt] = useState(0);
@@ -4102,6 +4208,9 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const [dialog, setDialog] = useState(null);
   const [gedreht, setGedreht] = useState(false);
   const [sheetOffen, setSheetOffen] = useState(false);
+  const [trainingWahl, setTrainingWahl] = useState(false);
+  const tb = React.useContext(TrainingBoardCtx);
+  const anzTrainings = tb ? tb.links.filter((l) => l.boardId === board.id).length : 0;
   const [seitenTab, setSeitenTab] = useState("magnete");
   const hatAusw = !!(selObj || selLinie);
   useEffect(() => { if (hatAusw) setSeitenTab("auswahl"); else setSeitenTab((t) => (t === "auswahl" ? "magnete" : t)); }, [hatAusw]);
@@ -4160,6 +4269,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   );
   const bUndo = <TkBtn key="undo" icon="undo" titel="Rückgängig" onClick={rueckgaengig} disabled={!past.current.length} />;
   const bRedo = <TkBtn key="redo" icon="redo" titel="Wiederholen" onClick={wiederholen} disabled={!future.current.length} />;
+  const bTraining = nurLesen ? null : <TkBtn key="training" icon="kalender" titel={anzTrainings > 0 ? `Zu Training hinzufügen (in ${anzTrainings} Training${anzTrainings > 1 ? "s" : ""})` : "Zu Training hinzufügen"} aktiv={anzTrainings > 0 ? true : undefined} onClick={() => setTrainingWahl(true)} />;
   const bBild = <TkBtn key="bild" icon="bild" titel={exportiert ? "Bild gespeichert" : "Als Bild speichern"} aktiv={exportiert ? true : undefined} onClick={exportPng} />;
   const bVoll = <TkBtn key="voll" icon={voll ? "vollAus" : "voll"} titel={voll ? "Vollbild beenden" : "Vollbild"} aktiv={voll} onClick={toggleVoll} />;
   const bPlay = anim ? (
@@ -4411,13 +4521,18 @@ function TaktikEditor({ board, players, onSave, onClose }) {
     </div>
   );
 
-  const dialogEl = dialog ? <TkDialog dialog={dialog} onClose={() => setDialog(null)} /> : null;
+  const dialogEl = (
+    <>
+      {dialog ? <TkDialog dialog={dialog} onClose={() => setDialog(null)} /> : null}
+      {trainingWahl ? <TkTrainingWahl board={board} onClose={() => setTrainingWahl(false)} /> : null}
+    </>
+  );
   const statusEl = status ? <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: -2 }}>{status}</div> : null;
   const brettEl = (stil) => (
     <div style={stil}>
       <TkBrett data={data} g={g} players={players} objekte={objekte} linien={linien} linienOp={linienOp} selId={sel ? sel.id : null}
         draft={draft} svgRef={svgRef}
-        handlers={{ onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onCancel }} />
+        handlers={nurLesen ? undefined : { onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onCancel }} />
     </div>
   );
   const kopfEl = (
@@ -4426,10 +4541,46 @@ function TaktikEditor({ board, players, onSave, onClose }) {
       {bName}
       {bUndo}
       {bRedo}
+      {bTraining}
       {bBild}
       {bVoll}
     </div>
   );
+
+  /* ---- Nur ansehen (Training): Brett, Schritte, Abspielen ---- */
+  if (nurLesen) {
+    const verhL = g.vbW / g.vbH;
+    const rootL = voll
+      ? { position: "fixed", inset: 0, zIndex: 1400, background: "var(--bg)", display: "flex", flexDirection: "column", padding: "8px 10px 24px", gap: 8, overflow: "auto" }
+      : { display: "flex", flexDirection: "column", gap: 8, paddingBottom: 16 };
+    return (
+      <div style={rootL}>
+        <div style={{ ...grp, flexWrap: "nowrap" }}>
+          {bZurueck}
+          <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+          {bVoll}
+        </div>
+        {brettEl({ width: `min(100%, calc(${voll ? "(100vh - 190px)" : "68vh"} * ${verhL}))`, aspectRatio: `${g.vbW} / ${g.vbH}`, margin: "0 auto", flex: "none" })}
+        <div style={{ ...kachel, padding: 8 }}>
+          <div style={grp}>
+            {data.schritte.map((_, i) => (
+              <TkBtn key={i} label={String(i + 1)} titel={`Schritt ${i + 1}`} aktiv={anzSchritt === i} onClick={() => { if (!anim) setSchritt(i); }} />
+            ))}
+            {data.schritte.length > 1 && (
+              <>
+                {trenner}
+                {bPlay}
+                <TkBtn icon="wiederholen" titel="Wiederholen" aktiv={schleife} onClick={() => setSchleife(!schleife)} />
+                {[0.5, 1, 2].map((v) => (
+                  <TkBtn key={v} label={`${String(v).replace(".", ",")}×`} titel={`Tempo ${String(v).replace(".", ",")}×`} aktiv={tempo === v} onClick={() => setTempo(v)} />
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* ---- Vollbild am Handy: Brett füllt den Bildschirm, Werkzeuge in Leisten und einem Fenster von unten/rechts ---- */
   if (voll && mobil) {
@@ -4501,6 +4652,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           {bUndo}
           {bRedo}
           <span style={{ flex: 1 }} />
+          {bTraining}
           {bBild}
           {bVoll}
         </div>
@@ -11181,7 +11333,89 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
   );
 }
 
+function TerminBoards({ termin }) {
+  const tb = React.useContext(TrainingBoardCtx);
+  const fTaktik = useFeature("taktik");
+  const [ansicht, setAnsicht] = useState(null);
+  const [waehlen, setWaehlen] = useState(false);
+  if (!tb || !fTaktik) return null;
+  const liste = tb.links
+    .filter((l) => l.terminId === termin.id)
+    .sort((a, b) => a.position - b.position)
+    .map((l) => ({ ...l, board: tb.boards.find((b) => b.id === l.boardId) }))
+    .filter((l) => l.board);
+  const dabei = new Set(liste.map((l) => l.boardId));
+  const verfuegbar = tb.boards.filter((b) => !dabei.has(b.id)).sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
+  const vorschau = (b, h) => {
+    const d = tkNormalisiere(b.data);
+    const g = tkGeo(d);
+    const s0 = d.schritte[0];
+    return (
+      <div style={{ width: h * (g.vbW / g.vbH), height: h, flex: "none", maxWidth: 160 }}>
+        <TkBrett data={d} g={g} players={tb.players} objekte={s0.objekte} linien={s0.linien} nurAnzeige />
+      </div>
+    );
+  };
+  const info = (b) => {
+    const d = tkNormalisiere(b.data);
+    return `${(TK_FELDER[d.feld] || TK_FELDER.f5).label} · ${d.schritte.length} ${d.schritte.length === 1 ? "Schritt" : "Schritte"}`;
+  };
+  return (
+    <div style={{ marginTop: 4 }}>
+      {ansicht && <TkAnsicht board={ansicht} players={tb.players} onClose={() => setAnsicht(null)} />}
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Taktik-Boards{liste.length > 0 ? ` (${liste.length})` : ""}</div>
+      {tb.fehlt && <TrainingBoardSqlHinweis />}
+      {!tb.fehlt && liste.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>Noch kein Board für dieses Training.</div>}
+      {!tb.fehlt && liste.map((l, i) => (
+        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8, marginBottom: 8 }}>
+          <button type="button" onClick={() => setAnsicht(l.board)} aria-label={`Board „${l.board.name}“ ansehen`} style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+            {vorschau(l.board, 72)}
+          </button>
+          <button type="button" onClick={() => setAnsicht(l.board)} style={{ flex: 1, minWidth: 0, border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "inherit" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.board.name}</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{info(l.board)} · ansehen</div>
+          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <button style={styles.linkBtn} disabled={i === 0} onClick={() => tb.move(termin.id, l.id, -1)} aria-label="Nach oben">↑</button>
+            <button style={styles.linkBtn} disabled={i === liste.length - 1} onClick={() => tb.move(termin.id, l.id, 1)} aria-label="Nach unten">↓</button>
+          </div>
+          <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => tb.remove(l.id)} aria-label="Board entfernen">
+            <TrashIcon size={14} />
+          </button>
+        </div>
+      ))}
+      {!tb.fehlt && (!waehlen ? (
+        <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Taktik-Board hinzufügen</button>
+      ) : (
+        <div style={{ ...styles.card, background: "var(--bg, #F7F4F3)" }}>
+          <KartenTitel aktion={<button style={styles.linkBtn} onClick={() => setWaehlen(false)}>Fertig</button>}>Board hinzufügen</KartenTitel>
+          {tb.boards.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch kein Board angelegt – das geht im Tab „Taktik“.</div>
+          ) : verfuegbar.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Alle Boards sind schon in diesem Training.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {verfuegbar.map((b) => (
+                <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
+                  {vorschau(b, 56)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{info(b)}</div>
+                  </div>
+                  <button style={{ ...styles.primaryBtn, padding: "0 16px", height: 40, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }} onClick={() => tb.add(termin.id, b.id)}>Hinzufügen</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, onSaveNotiz }) {
+  const tbCtx = React.useContext(TrainingBoardCtx);
+  const anzBoards = tbCtx ? tbCtx.links.filter((l) => l.terminId === termin.id && tbCtx.boards.some((b) => b.id === l.boardId)).length : 0;
   const mitUebungen = useFeature("uebungen");
   const [offen, setOffen] = useState(false);
   const [ausgeblendet, setAusgeblendet] = useState([]);
@@ -11206,7 +11440,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
       <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setOffen(!offen)}>
-        <ChevronIcon open={offen} /> {mitUebungen ? "Übungen" : "Notizen"}{mitUebungen && liste.length > 0 ? ` (${liste.length})` : ""}{mitUebungen && termin.notizen && termin.notizen.trim() ? " · Notiz" : ""}
+        <ChevronIcon open={offen} /> {mitUebungen ? "Übungen" : "Notizen"}{mitUebungen && liste.length > 0 ? ` (${liste.length})` : ""}{mitUebungen && termin.notizen && termin.notizen.trim() ? " · Notiz" : ""}{anzBoards > 0 ? ` · ${anzBoards} Board${anzBoards > 1 ? "s" : ""}` : ""}
       </button>
 
       {offen && (
@@ -11306,6 +11540,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
               )}
             </div>
           )}
+          <TerminBoards termin={termin} />
         </div>
       )}
     </div>
