@@ -4088,6 +4088,9 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const [dialog, setDialog] = useState(null);
   const [gedreht, setGedreht] = useState(false);
   const [sheetOffen, setSheetOffen] = useState(false);
+  const [seitenTab, setSeitenTab] = useState("magnete");
+  const hatAusw = !!(selObj || selLinie);
+  useEffect(() => { if (hatAusw) setSeitenTab("auswahl"); else setSeitenTab((t) => (t === "auswahl" ? "magnete" : t)); }, [hatAusw]);
   const frage = (titel, wert, onOk, extra) => setDialog({ titel, wert, onOk, ...extra });
 
   // Ansicht: bei „gedreht“ (Notlösung ohne Sperre des Handys) sind Breite und Höhe vertauscht
@@ -4172,9 +4175,8 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   ));
 
   /* ---- Kacheln ---- */
-  const cFeld = (
-    <div style={kachel}>
-      <KartenTitel zuStart={mobil}>Feld und Anzeige</KartenTitel>
+  const inhaltFeld = (
+    <>
       <div style={grp}>
         {Object.entries(TK_FELDER).map(([k, f]) => (
           <TkBtn key={k} icon={k} titel={f.label} aktiv={data.feld === k} onClick={() => setz({ feld: k })} />
@@ -4194,12 +4196,17 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           <TkBtn key={ic} icon={ic} titel={t} aktiv={(data.groesse || 1) === v} onClick={() => setz({ groesse: v })} />
         ))}
       </div>
+    </>
+  );
+  const cFeld = (
+    <div style={kachel}>
+      <KartenTitel zuStart={mobil}>Feld und Anzeige</KartenTitel>
+      {inhaltFeld}
     </div>
   );
 
-  const cZeichnen = (
-    <div style={kachel}>
-      <KartenTitel>Zeichnen</KartenTitel>
+  const inhaltZeichnen = (
+    <>
       <div style={grp}>
         {bWerkzeuge}
         {linienWerkzeug && trenner}
@@ -4207,12 +4214,17 @@ function TaktikEditor({ board, players, onSave, onClose }) {
         {trenner}
         {bFarben}
       </div>
+    </>
+  );
+  const cZeichnen = (
+    <div style={kachel}>
+      <KartenTitel>Zeichnen</KartenTitel>
+      {inhaltZeichnen}
     </div>
   );
 
-  const cAusw = selObj || selLinie ? (
-    <div style={kachel}>
-      <KartenTitel>Ausgewählt</KartenTitel>
+  const inhaltAusw = selObj || selLinie ? (
+    <>
       <div style={grp}>
         {selObj && ["spieler", "gegner", "torwart", "gegnertw"].includes(selObj.art) && !selObj.spielerId && (
           <>
@@ -4260,12 +4272,17 @@ function TaktikEditor({ board, players, onSave, onClose }) {
       {selObj && selObj.art === "form" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Form ändern: gelber Punkt = Breite und Höhe, weiße Punkte = nur Breite oder nur Höhe. Farbe: unter „Zeichnen“.</div>}
       {selObj && selObj.art === "reifen" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
       {selLinie && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
+    </>
+  ) : null;
+  const cAusw = inhaltAusw ? (
+    <div style={kachel}>
+      <KartenTitel>Ausgewählt</KartenTitel>
+      {inhaltAusw}
     </div>
   ) : null;
 
-  const cMagnete = (
-    <div style={kachel}>
-      <KartenTitel>Magnete</KartenTitel>
+  const inhaltMagnete = (
+    <>
       <div style={grp}>
         {magnete.map(([l, ic, fn]) => (
           <TkMagnetKachel key={l} titel={l} onClick={fn}>
@@ -4273,12 +4290,17 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           </TkMagnetKachel>
         ))}
       </div>
+    </>
+  );
+  const cMagnete = (
+    <div style={kachel}>
+      <KartenTitel>Magnete</KartenTitel>
+      {inhaltMagnete}
     </div>
   );
 
-  const cFormation = (
-    <div style={kachel}>
-      <KartenTitel zuStart={mobil}>Formation</KartenTitel>
+  const inhaltFormation = (
+    <>
       <div style={{ ...grp, marginBottom: 8 }}>
         <TkBtn label="Wir" size={36} aktiv={fTeam === "wir"} onClick={() => setFTeam("wir")} />
         <TkBtn label="Gegner" size={36} aktiv={fTeam === "gegner"} onClick={() => setFTeam("gegner")} />
@@ -4292,12 +4314,17 @@ function TaktikEditor({ board, players, onSave, onClose }) {
         ))}
       </div>
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Stellt vorhandene Spieler auf, fehlende kommen aus dem Kader dazu.</div>
+    </>
+  );
+  const cFormation = (
+    <div style={kachel}>
+      <KartenTitel zuStart={mobil}>Formation</KartenTitel>
+      {inhaltFormation}
     </div>
   );
 
-  const cMannschaft = aktivePlayers.length > 0 ? (
-    <div style={kachel}>
-      <KartenTitel zuStart={mobil}>Mannschaft</KartenTitel>
+  const inhaltMannschaft = aktivePlayers.length > 0 ? (
+    <>
       <div style={grp}>
         {aktivePlayers.map((p) => {
           const da = imFeld(p.id);
@@ -4307,12 +4334,17 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           );
         })}
       </div>
+    </>
+  ) : null;
+  const cMannschaft = inhaltMannschaft ? (
+    <div style={kachel}>
+      <KartenTitel zuStart={mobil}>Mannschaft</KartenTitel>
+      {inhaltMannschaft}
     </div>
   ) : null;
 
-  const cSchritte = (
-    <div style={kachel}>
-      <KartenTitel>Schritte und Animation</KartenTitel>
+  const inhaltSchritte = (
+    <>
       <div style={grp}>
         {bSchritte}
         {data.schritte.length > 1 && <TkBtn icon="loeschen" titel="Schritt löschen" gefahr onClick={schrittLoeschen} disabled={!!anim} />}
@@ -4356,6 +4388,12 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           })()}
         </div>
       )}
+    </>
+  );
+  const cSchritte = (
+    <div style={kachel}>
+      <KartenTitel>Schritte und Animation</KartenTitel>
+      {inhaltSchritte}
     </div>
   );
 
@@ -4465,29 +4503,54 @@ function TaktikEditor({ board, players, onSave, onClose }) {
     );
   }
 
-  /* ---- Tablet/Desktop ---- */
+  /* ---- Tablet/Desktop: schmale Werkzeugzeile, Brett mit Zeitleiste, Seitenleiste mit Reitern ---- */
   const root = voll
     ? { position: "fixed", inset: 0, zIndex: 1000, background: "var(--bg)", display: "flex", flexDirection: "column", padding: "8px 10px 24px", gap: 8, overflow: "auto" }
     : { display: "flex", flexDirection: "column", gap: 8, minHeight: 560, paddingBottom: 16 };
+  const verh = g.vbW / g.vbH;
+  const brettHoehe = voll ? "(100vh - 330px)" : "72vh";
+  const tabKnopf = (k, l) => (
+    <button key={k} type="button" onClick={() => setSeitenTab(k)} aria-pressed={seitenTab === k}
+      style={{ ...styles.segBtn, ...(seitenTab === k ? styles.segBtnActive : {}) }}>{l}</button>
+  );
+  const seitenInhalt = seitenTab === "auswahl" && inhaltAusw ? inhaltAusw
+    : seitenTab === "aufstellung" ? (
+      <>
+        <div>
+          <KartenTitel block>Formation</KartenTitel>
+          {inhaltFormation}
+        </div>
+        {inhaltMannschaft && (
+          <div style={{ marginTop: 8 }}>
+            <KartenTitel block>Mannschaft</KartenTitel>
+            {inhaltMannschaft}
+          </div>
+        )}
+      </>
+    ) : inhaltMagnete;
   return (
     <div style={root}>
       {dialogEl}
       {kopfEl}
       {statusEl}
-      {cFeld}
-      {cZeichnen}
+      <div style={{ ...kachel, padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        {inhaltZeichnen}
+        {inhaltFeld}
+      </div>
       <div style={{ display: "flex", flexDirection: "row", gap: 10, flex: "none", minHeight: 0, alignItems: "flex-start" }}>
-        {voll
-          ? brettEl({ flex: 1, minWidth: 0, height: "calc(100vh - 220px)", minHeight: 360 })
-          : brettEl({ flex: 1, minWidth: 0, aspectRatio: `${g.vbW} / ${g.vbH}`, maxHeight: "min(70vh, 700px)" })}
-        <div style={{ width: 270, flex: "none", overflowY: "auto", maxHeight: voll ? "none" : "min(66vh, 640px)", display: "flex", flexDirection: "column", gap: 10 }}>
-          {cAusw}
-          {cMagnete}
-          {cFormation}
-          {cMannschaft}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {brettEl({ width: `min(100%, calc(${brettHoehe} * ${verh}))`, aspectRatio: `${g.vbW} / ${g.vbH}`, margin: "0 auto", flex: "none" })}
+          <div style={{ ...kachel, padding: 8 }}>{inhaltSchritte}</div>
+        </div>
+        <div style={{ ...kachel, width: 290, flex: "none", maxHeight: "min(80vh, 820px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ ...styles.segNav, marginBottom: 0 }}>
+            {inhaltAusw && tabKnopf("auswahl", "Auswahl")}
+            {tabKnopf("magnete", "Magnete")}
+            {tabKnopf("aufstellung", "Aufstellung")}
+          </div>
+          {seitenInhalt}
         </div>
       </div>
-      {cSchritte}
     </div>
   );
 }
