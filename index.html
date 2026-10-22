@@ -4396,16 +4396,21 @@ function TaktikEditor({ board, players, onSave, onClose }) {
       <div style={rootV}>
         {dialogEl}
         {effBreit ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignContent: "flex-start", width: 100, flex: "none", overflowY: "auto" }}>
-            {steuer}
-            {umbruch}
-            {werkzeugeLeiste}
-          </div>
+          <>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignContent: "flex-start", width: 100, flex: "none", overflowY: "auto" }}>
+              {steuer}
+              {umbruch}
+              {werkzeugeLeiste}
+            </div>
+            {brettEl({ flex: 1, minWidth: 0, minHeight: 0 })}
+          </>
         ) : (
-          <div style={leiste}>{steuer}</div>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
+            <div style={leiste}>{steuer}</div>
+            {brettEl({ width: "100%", aspectRatio: `${g.vbW} / ${g.vbH}`, maxHeight: eff.h - 150, flex: "none" })}
+            <div style={leiste}>{werkzeugeLeiste}</div>
+          </div>
         )}
-        {brettEl({ flex: 1, minWidth: 0, minHeight: 0 })}
-        {!effBreit && <div style={leiste}>{werkzeugeLeiste}</div>}
         {sheetOffen && (
           <div style={{
             position: "absolute", zIndex: 1100, background: "var(--bg)", overflowY: "auto", padding: 10, boxSizing: "border-box",
@@ -4444,7 +4449,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           {bVoll}
         </div>
         {statusEl}
-        {brettEl({ height: "min(58vh, 640px)", minHeight: 300, flex: "none" })}
+        {brettEl({ width: "100%", aspectRatio: `${g.vbW} / ${g.vbH}`, maxHeight: "72vh", flex: "none" })}
         {cZeichnen}
         {cAusw}
         {cSchritte}
@@ -4468,7 +4473,9 @@ function TaktikEditor({ board, players, onSave, onClose }) {
       {cFeld}
       {cZeichnen}
       <div style={{ display: "flex", flexDirection: "row", gap: 10, flex: "none", minHeight: 0, alignItems: "flex-start" }}>
-        {brettEl({ flex: 1, minWidth: 0, height: voll ? "calc(100vh - 220px)" : "min(66vh, 640px)", minHeight: voll ? 360 : 300 })}
+        {voll
+          ? brettEl({ flex: 1, minWidth: 0, height: "calc(100vh - 220px)", minHeight: 360 })
+          : brettEl({ flex: 1, minWidth: 0, aspectRatio: `${g.vbW} / ${g.vbH}`, maxHeight: "min(70vh, 700px)" })}
         <div style={{ width: 270, flex: "none", overflowY: "auto", maxHeight: voll ? "none" : "min(66vh, 640px)", display: "flex", flexDirection: "column", gap: 10 }}>
           {cAusw}
           {cMagnete}
