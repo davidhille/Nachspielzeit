@@ -2622,7 +2622,7 @@ function App() {
       const vorhandene = trainingBoards.filter((t) => t.terminId === terminId);
       const position = vorhandene.reduce((m, t) => Math.max(m, t.position), 0) + 1;
       await dbInsert("training_boards", { id: uid(), termin_id: terminId, board_id: boardId, position });
-    }, "Board zum Training hinzugefügt");
+    }, (() => { const t = termine.find((x) => x.id === terminId); return t ? `Board zum Training am ${formatTerminLabel(t.date)} hinzugefügt` : "Board zum Training hinzugefügt"; })());
   const removeTrainingBoard = (id) => wrapAction(() => dbDelete("training_boards", id), "Board aus dem Training entfernt");
   const moveTrainingBoard = (terminId, id, richtung) =>
     wrapAction(async () => {
@@ -2995,6 +2995,9 @@ create policy "access via code" on training_boards for all to public using (nsz_
 notify pgrst, 'reload schema';`;
 
 function TrainingBoardSqlHinweis() {
+  if (!ACCESS_INFO || ACCESS_INFO.team_id) {
+    return <div style={{ fontSize: 13, color: "var(--muted)" }}>Diese Funktion ist noch nicht aktiviert. Bitte beim Admin nachfragen.</div>;
+  }
   return (
     <div style={{ fontSize: 13, color: "var(--muted)" }}>
       <div style={{ marginBottom: 6 }}>Für die Zuordnung fehlt noch eine Tabelle. Bitte einmal in Supabase (SQL Editor) ausführen, danach die Seite neu laden:</div>
@@ -4269,7 +4272,7 @@ function TaktikEditor({ board, players, onSave, onClose, nurLesen = false }) {
   );
   const bUndo = <TkBtn key="undo" icon="undo" titel="Rückgängig" onClick={rueckgaengig} disabled={!past.current.length} />;
   const bRedo = <TkBtn key="redo" icon="redo" titel="Wiederholen" onClick={wiederholen} disabled={!future.current.length} />;
-  const bTraining = nurLesen ? null : <TkBtn key="training" icon="kalender" titel={anzTrainings > 0 ? `Zu Training hinzufügen (in ${anzTrainings} Training${anzTrainings > 1 ? "s" : ""})` : "Zu Training hinzufügen"} aktiv={anzTrainings > 0 ? true : undefined} onClick={() => setTrainingWahl(true)} />;
+  const bTraining = nurLesen ? null : <TkBtn key="training" icon="kalender" titel={anzTrainings > 0 ? `Zu Training hinzufügen (in ${anzTrainings} Training${anzTrainings > 1 ? "s" : ""})` : "Zu Training hinzufügen"} aktiv={anzTrainings > 0 ? true : undefined} label={anzTrainings > 0 ? `Training (${anzTrainings})` : "Training"} onClick={() => setTrainingWahl(true)} />;
   const bBild = <TkBtn key="bild" icon="bild" titel={exportiert ? "Bild gespeichert" : "Als Bild speichern"} aktiv={exportiert ? true : undefined} onClick={exportPng} />;
   const bVoll = <TkBtn key="voll" icon={voll ? "vollAus" : "voll"} titel={voll ? "Vollbild beenden" : "Vollbild"} aktiv={voll} onClick={toggleVoll} />;
   const bPlay = anim ? (
