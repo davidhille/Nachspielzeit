@@ -4453,7 +4453,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
           {bVoll}
         </div>
         {statusEl}
-        {brettEl({ width: "100%", aspectRatio: `${g.vbW} / ${g.vbH}`, maxHeight: "72vh", flex: "none" })}
+        {brettEl({ width: `min(100%, calc(55vh * ${g.vbW / g.vbH}))`, aspectRatio: `${g.vbW} / ${g.vbH}`, margin: "0 auto", flex: "none" })}
         {cZeichnen}
         {cAusw}
         {cSchritte}
