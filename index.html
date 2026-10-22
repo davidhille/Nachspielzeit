@@ -3472,6 +3472,9 @@ const TK_ICONS = {
   kopieren: <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   nummer: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
   name: <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />,
+  mehr: <path d="M4 6h16M4 12h16M4 18h16" />,
+  schliessen: <path d="M6 6l12 12M18 6L6 18" />,
+  handydrehen: <><rect x="8" y="2.5" width="8" height="14" rx="1.5" /><path d="M4 14a8 8 0 0 0 6.5 7.8M10.5 22l-2.8-.5M10.5 22l.3-2.8M20 10a8 8 0 0 0-3-3" /></>,
 };
 function TkIcon({ n, size = 22 }) {
   return (
@@ -3569,7 +3572,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const [voll, setVoll] = useState(false);
   const [status, setStatus] = useState("");
   const [dirty, setDirty] = useState(0);
-  const [breit, setBreit] = useState(() => window.innerWidth >= window.innerHeight);
+  const [fenster, setFenster] = useState(() => ({ b: window.innerWidth, h: window.innerHeight }));
   const [exportiert, setExportiert] = useState(false);
   const [bogenAn, setBogenAn] = useState(false);
   const [bogenSeite, setBogenSeite] = useState(1);
@@ -3603,7 +3606,7 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   );
 
   useEffect(() => {
-    const h = () => setBreit(window.innerWidth >= window.innerHeight);
+    const h = () => setFenster({ b: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", h);
     return () => window.removeEventListener("resize", h);
   }, []);
@@ -4073,7 +4076,31 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const setz = (patch) => aendern((nd) => Object.assign(nd, patch));
   const imFeld = (pid) => st.objekte.some((o) => o.spielerId === pid);
   const [dialog, setDialog] = useState(null);
+  const [gedreht, setGedreht] = useState(false);
+  const [sheetOffen, setSheetOffen] = useState(false);
   const frage = (titel, wert, onOk, extra) => setDialog({ titel, wert, onOk, ...extra });
+
+  // Ansicht: bei „gedreht“ (Notlösung ohne Sperre des Handys) sind Breite und Höhe vertauscht
+  const eff = gedreht ? { b: fenster.h, h: fenster.b } : fenster;
+  const effBreit = eff.b >= eff.h;
+  const mobil = eff.b < 900;
+
+  const querformat = async () => {
+    try {
+      if (window.screen && screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock(window.innerHeight > window.innerWidth ? "landscape" : "portrait");
+        setGedreht(false);
+        return;
+      }
+    } catch (e) {}
+    setGedreht((v) => !v);
+  };
+  useEffect(() => {
+    if (voll) return;
+    setGedreht(false);
+    setSheetOffen(false);
+    try { if (window.screen && screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+  }, [voll]);
 
   const werkzeuge = [["bewegen", "Bewegen"], ["pass", "Pass"], ["lauf", "Laufweg"], ["welle", "Dribbling"], ["linie", "Linie"], ["frei", "Frei zeichnen"], ["verbinden", "Verbinden"], ["radieren", "Radierer"]];
   const formGroesse = { w: Math.round(g.W * 0.36), h: Math.round(g.W * 0.22), rot: 0, op: 0.3, farbe: farbe };
@@ -4096,227 +4123,352 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   ];
   const linienWerkzeug = ["pass", "lauf", "welle", "linie"].includes(tool);
 
-  const root = voll
-    ? { position: "fixed", inset: 0, zIndex: 1000, background: "var(--bg)", display: "flex", flexDirection: "column", padding: "8px 10px", gap: 8, overflow: "auto" }
-    : { display: "flex", flexDirection: "column", gap: 8, minHeight: 560 };
+  /* ---- Einzelne Bedienelemente (in allen Layouts wiederverwendet) ---- */
+  const bZurueck = <TkBtn icon="zurueck" titel="Zurück zu den Boards" onClick={schliessen} />;
+  const bName = (
+    <input value={name} onChange={(e) => { setName(e.target.value); setDirty((n) => n + 1); }} aria-label="Name des Boards"
+      style={{ ...styles.input, flex: 1, minWidth: 0, height: 44, boxSizing: "border-box", fontSize: 15, fontWeight: 700, padding: "0 12px" }} />
+  );
+  const bUndo = <TkBtn key="undo" icon="undo" titel="Rückgängig" onClick={rueckgaengig} disabled={!past.current.length} />;
+  const bRedo = <TkBtn key="redo" icon="redo" titel="Wiederholen" onClick={wiederholen} disabled={!future.current.length} />;
+  const bBild = <TkBtn key="bild" icon="bild" titel={exportiert ? "Bild gespeichert" : "Als Bild speichern"} aktiv={exportiert ? true : undefined} onClick={exportPng} />;
+  const bVoll = <TkBtn key="voll" icon={voll ? "vollAus" : "voll"} titel={voll ? "Vollbild beenden" : "Vollbild"} aktiv={voll} onClick={toggleVoll} />;
+  const bPlay = anim ? (
+    <React.Fragment key="play">
+      <TkBtn icon="stop" titel="Stopp" aktiv onClick={stoppen} />
+      {anim.wait && <TkBtn icon="weiter" titel="Weiter" onClick={() => (weiterRef.current = true)} style={{ borderColor: TK_ROT }} />}
+    </React.Fragment>
+  ) : (
+    <TkBtn key="play" icon="play" titel="Abspielen" onClick={abspielen} disabled={data.schritte.length < 2} />
+  );
+  const bSchritte = [
+    ...data.schritte.map((_, i) => (
+      <TkBtn key={"s" + i} label={String(i + 1)} titel={`Schritt ${i + 1}`} aktiv={anzSchritt === i} onClick={() => { if (!anim) { setSchritt(i); setSel(null); } }} />
+    )),
+    <TkBtn key="s+" icon="plus" titel="Schritt hinzufügen" onClick={neuerSchritt} disabled={!!anim} />,
+  ];
+  const bWerkzeuge = werkzeuge.map(([k, l]) => (
+    <TkBtn key={k} icon={k} titel={l} aktiv={tool === k} onClick={() => { setTool(k); if (k !== "bewegen") setSel(null); }} />
+  ));
+  const bBogen = linienWerkzeug ? [
+    <TkBtn key="bg" icon="bogen" titel="Gebogen zeichnen" aktiv={bogenAn} onClick={() => setBogenAn(!bogenAn)} />,
+    bogenAn && <TkBtn key="bgs" icon="tauschen" titel="Bogen-Seite tauschen" onClick={() => setBogenSeite(-bogenSeite)} />,
+  ] : null;
+  const bFarben = TK_FARBEN.map(([f, l]) => (
+    <button key={f} type="button" aria-label={l} title={l} aria-pressed={farbe === f} onClick={() => waehleFarbe(f)}
+      style={{ width: 36, height: 36, borderRadius: 999, background: f, cursor: "pointer", flex: "none", border: farbe === f ? `3px solid ${TK_ROT}` : "2px solid var(--border-strong)", padding: 0 }} />
+  ));
 
-  return (
-    <div style={root}>
-      {dialog && <TkDialog dialog={dialog} onClose={() => setDialog(null)} />}
-
-      <div style={{ ...grp, flexWrap: "nowrap" }}>
-        <TkBtn icon="zurueck" titel="Zurück zu den Boards" onClick={schliessen} />
-        <input value={name} onChange={(e) => { setName(e.target.value); setDirty((n) => n + 1); }} aria-label="Name des Boards"
-          style={{ ...styles.input, flex: 1, minWidth: 0, height: 44, boxSizing: "border-box", fontSize: 15, fontWeight: 700, padding: "0 12px" }} />
-        <TkBtn icon="undo" titel="Rückgängig" onClick={rueckgaengig} disabled={!past.current.length} />
-        <TkBtn icon="redo" titel="Wiederholen" onClick={wiederholen} disabled={!future.current.length} />
-        <TkBtn icon="bild" titel={exportiert ? "Bild gespeichert" : "Als Bild speichern"} aktiv={exportiert ? true : undefined} onClick={exportPng} />
-        <TkBtn icon={voll ? "vollAus" : "voll"} titel={voll ? "Vollbild beenden" : "Vollbild"} aktiv={voll} onClick={toggleVoll} />
+  /* ---- Kacheln ---- */
+  const cFeld = (
+    <div style={kachel}>
+      <KartenTitel zuStart={mobil}>Feld und Anzeige</KartenTitel>
+      <div style={grp}>
+        {Object.entries(TK_FELDER).map(([k, f]) => (
+          <TkBtn key={k} icon={k} titel={f.label} aktiv={data.feld === k} onClick={() => setz({ feld: k })} />
+        ))}
+        {trenner}
+        <TkBtn icon="quer" titel="Quer" aktiv={data.ausr === "quer"} onClick={() => setz({ ausr: "quer" })} />
+        <TkBtn icon="hoch" titel="Hoch" aktiv={data.ausr === "hoch"} onClick={() => setz({ ausr: "hoch" })} />
+        {trenner}
+        <TkBtn icon="zonen" titel="Zonen" aktiv={!!data.zonen} onClick={() => setz({ zonen: !data.zonen })} />
+        <TkBtn icon="hell" titel="Helles Feld" aktiv={!!data.hell} onClick={() => setz({ hell: !data.hell })} />
+        {trenner}
+        <TkBtn icon="nummern" titel="Nummern anzeigen" aktiv={data.anzeige === "nummer"} onClick={() => setz({ anzeige: "nummer" })} />
+        <TkBtn icon="foto" titel="Fotos anzeigen" aktiv={data.anzeige === "foto"} onClick={() => setz({ anzeige: "foto" })} />
+        <TkBtn icon="text" titel="Namen anzeigen" aktiv={!!data.namen} onClick={() => setz({ namen: !data.namen })} />
+        {trenner}
+        {[[0.8, "groesseS", "Spieler klein"], [1, "groesseM", "Spieler mittel"], [1.3, "groesseL", "Spieler groß"]].map(([v, ic, t]) => (
+          <TkBtn key={ic} icon={ic} titel={t} aktiv={(data.groesse || 1) === v} onClick={() => setz({ groesse: v })} />
+        ))}
       </div>
-      {status && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: -2 }}>{status}</div>}
+    </div>
+  );
 
-      <div style={kachel}>
-        <KartenTitel>Feld und Anzeige</KartenTitel>
-        <div style={grp}>
-          {Object.entries(TK_FELDER).map(([k, f]) => (
-            <TkBtn key={k} icon={k} titel={f.label} aktiv={data.feld === k} onClick={() => setz({ feld: k })} />
-          ))}
-          {trenner}
-          <TkBtn icon="quer" titel="Quer" aktiv={data.ausr === "quer"} onClick={() => setz({ ausr: "quer" })} />
-          <TkBtn icon="hoch" titel="Hoch" aktiv={data.ausr === "hoch"} onClick={() => setz({ ausr: "hoch" })} />
-          {trenner}
-          <TkBtn icon="zonen" titel="Zonen" aktiv={!!data.zonen} onClick={() => setz({ zonen: !data.zonen })} />
-          <TkBtn icon="hell" titel="Helles Feld" aktiv={!!data.hell} onClick={() => setz({ hell: !data.hell })} />
-          {trenner}
-          <TkBtn icon="nummern" titel="Nummern anzeigen" aktiv={data.anzeige === "nummer"} onClick={() => setz({ anzeige: "nummer" })} />
-          <TkBtn icon="foto" titel="Fotos anzeigen" aktiv={data.anzeige === "foto"} onClick={() => setz({ anzeige: "foto" })} />
-          <TkBtn icon="text" titel="Namen anzeigen" aktiv={!!data.namen} onClick={() => setz({ namen: !data.namen })} />
-          {trenner}
-          {[[0.8, "groesseS", "Spieler klein"], [1, "groesseM", "Spieler mittel"], [1.3, "groesseL", "Spieler groß"]].map(([v, ic, t]) => (
-            <TkBtn key={ic} icon={ic} titel={t} aktiv={(data.groesse || 1) === v} onClick={() => setz({ groesse: v })} />
-          ))}
-        </div>
+  const cZeichnen = (
+    <div style={kachel}>
+      <KartenTitel>Zeichnen</KartenTitel>
+      <div style={grp}>
+        {bWerkzeuge}
+        {linienWerkzeug && trenner}
+        {bBogen}
+        {trenner}
+        {bFarben}
       </div>
+    </div>
+  );
 
-      <div style={kachel}>
-        <KartenTitel>Zeichnen</KartenTitel>
-        <div style={grp}>
-          {werkzeuge.map(([k, l]) => (
-            <TkBtn key={k} icon={k} titel={l} aktiv={tool === k} onClick={() => { setTool(k); if (k !== "bewegen") setSel(null); }} />
-          ))}
-          {linienWerkzeug && (
-            <>
-              {trenner}
-              <TkBtn icon="bogen" titel="Gebogen zeichnen" aktiv={bogenAn} onClick={() => setBogenAn(!bogenAn)} />
-              {bogenAn && <TkBtn icon="tauschen" titel="Bogen-Seite tauschen" onClick={() => setBogenSeite(-bogenSeite)} />}
-            </>
-          )}
-          {trenner}
-          {TK_FARBEN.map(([f, l]) => (
-            <button key={f} type="button" aria-label={l} title={l} aria-pressed={farbe === f} onClick={() => waehleFarbe(f)}
-              style={{ width: 36, height: 36, borderRadius: 999, background: f, cursor: "pointer", flex: "none", border: farbe === f ? `3px solid ${TK_ROT}` : "2px solid var(--border-strong)", padding: 0 }} />
-          ))}
-        </div>
+  const cAusw = selObj || selLinie ? (
+    <div style={kachel}>
+      <KartenTitel>Ausgewählt</KartenTitel>
+      <div style={grp}>
+        {selObj && ["spieler", "gegner", "torwart", "gegnertw"].includes(selObj.art) && !selObj.spielerId && (
+          <>
+            <TkBtn icon="nummer" titel="Nummer ändern" onClick={() => frage("Nummer", selObj.nr != null ? String(selObj.nr) : "", (v) => objAendern((o) => (o.nr = v.trim())), { zahl: true })} />
+            <TkBtn icon="name" titel="Name ändern" onClick={() => frage("Name (optional)", selObj.name || "", (v) => objAendern((o) => (o.name = v.trim())))} />
+          </>
+        )}
+        {selObj && ["spieler", "torwart"].includes(selObj.art) && (
+          <TkBtn icon="torwart" titel={selObj.art === "torwart" ? "Zum Feldspieler machen" : "Zum Torwart machen"} aktiv={selObj.art === "torwart"} onClick={() => objAendern((o) => (o.art = o.art === "torwart" ? "spieler" : "torwart"))} />
+        )}
+        {selObj && ["gegner", "gegnertw"].includes(selObj.art) && (
+          <TkBtn icon="torwart" titel={selObj.art === "gegnertw" ? "Zum Feldspieler machen" : "Zum Torwart machen"} aktiv={selObj.art === "gegnertw"} onClick={() => objAendern((o) => (o.art = o.art === "gegnertw" ? "gegner" : "gegnertw"))} />
+        )}
+        {selObj && TK_SPIELERART.includes(selObj.art) && (
+          <TkBtn icon="blick" titel="Blickrichtung" aktiv={selObj.blick != null} onClick={() => objAendern((o) => { if (o.blick != null) delete o.blick; else o.blick = 0; })} />
+        )}
+        {selObj && selObj.art === "tor" && <TkBtn icon="drehen" titel="Drehen" onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 90) % 180))} />}
+        {selObj && selObj.art === "stange" && <TkBtn icon="drehen" titel="Drehen" onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 45) % 180))} />}
+        {selObj && selObj.art === "form" && (
+          <>
+            <TkBtn icon="drehen" titel="Drehen" onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 15) % 180))} />
+            <TkBtn icon="deckkraft" titel={`Deckkraft ${Math.round((selObj.op != null ? selObj.op : 0.3) * 100)} % (tippen zum Ändern)`} label={`${Math.round((selObj.op != null ? selObj.op : 0.3) * 100)} %`}
+              onClick={() => objAendern((o) => { const w = [0, 0.15, 0.3, 0.5, 0.75]; const i = w.findIndex((x) => Math.abs(x - (o.op != null ? o.op : 0.3)) < 0.01); o.op = w[(i + 1) % w.length]; })} />
+          </>
+        )}
+        {selLinie && selLinie.art !== "verbindung" && selLinie.art !== "frei" && (
+          <TkBtn icon="bogen" titel="Gebogen" aktiv={!!selLinie.bogen} onClick={() => aendern((nd, step) => {
+            const l = step.linien.find((q) => q.id === selLinie.id);
+            if (!l) return;
+            if (l.bogen) delete l.bogen;
+            else l.bogen = tkStandardBogen(g.toS(l.punkte[0][0], l.punkte[0][1]), g.toS(l.punkte[l.punkte.length - 1][0], l.punkte[l.punkte.length - 1][1]), g);
+          })} />
+        )}
+        {selLinie && selLinie.bogen && (
+          <TkBtn icon="tauschen" titel="Bogen umdrehen" onClick={() => aendern((nd, step) => {
+            const l = step.linien.find((q) => q.id === selLinie.id);
+            if (!l) return;
+            const a = l.punkte[0], b = l.punkte[l.punkte.length - 1];
+            l.bogen = [a[0] + b[0] - l.bogen[0], a[1] + b[1] - l.bogen[1]];
+          })} />
+        )}
+        {selObj && selObj.art === "text" && <TkBtn icon="text" titel="Text ändern" onClick={() => frage("Text", selObj.text || "", (v) => { if (v && v.trim()) objAendern((o) => (o.text = v.trim())); })} />}
+        <TkBtn icon="loeschen" titel="Löschen" gefahr onClick={loeschen} />
       </div>
+      {selObj && selObj.art === "form" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Größe: gelben Punkt ziehen. Farbe: unter „Zeichnen“.</div>}
+      {selObj && selObj.art === "reifen" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
+      {selLinie && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
+    </div>
+  ) : null;
 
-      <div style={{ display: "flex", flexDirection: breit ? "row" : "column", gap: 10, flex: voll ? 1 : undefined, minHeight: 0 }}>
-        <div style={{ flex: 1, minWidth: 0, height: voll ? undefined : breit ? "min(66vh, 640px)" : "min(58vh, 640px)", minHeight: voll ? 260 : 300 }}>
-          <TkBrett data={data} g={g} players={players} objekte={objekte} linien={linien} linienOp={linienOp} selId={sel ? sel.id : null}
-            draft={draft} svgRef={svgRef}
-            handlers={{ onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onCancel }} />
-        </div>
-        <div style={{ width: breit ? 270 : "100%", flex: "none", overflowY: "auto", maxHeight: breit ? (voll ? "none" : "min(66vh, 640px)") : undefined, display: "flex", flexDirection: "column", gap: 10 }}>
-          {selObj || selLinie ? (
-            <div style={kachel}>
-              <KartenTitel>Ausgewählt</KartenTitel>
-              <div style={grp}>
-                {selObj && ["spieler", "gegner", "torwart", "gegnertw"].includes(selObj.art) && !selObj.spielerId && (
-                  <>
-                    <TkBtn icon="nummer" titel="Nummer ändern" onClick={() => frage("Nummer", selObj.nr != null ? String(selObj.nr) : "", (v) => objAendern((o) => (o.nr = v.trim())), { zahl: true })} />
-                    <TkBtn icon="name" titel="Name ändern" onClick={() => frage("Name (optional)", selObj.name || "", (v) => objAendern((o) => (o.name = v.trim())))} />
-                  </>
-                )}
-                {selObj && ["spieler", "torwart"].includes(selObj.art) && (
-                  <TkBtn icon="torwart" titel={selObj.art === "torwart" ? "Zum Feldspieler machen" : "Zum Torwart machen"} aktiv={selObj.art === "torwart"} onClick={() => objAendern((o) => (o.art = o.art === "torwart" ? "spieler" : "torwart"))} />
-                )}
-                {selObj && ["gegner", "gegnertw"].includes(selObj.art) && (
-                  <TkBtn icon="torwart" titel={selObj.art === "gegnertw" ? "Zum Feldspieler machen" : "Zum Torwart machen"} aktiv={selObj.art === "gegnertw"} onClick={() => objAendern((o) => (o.art = o.art === "gegnertw" ? "gegner" : "gegnertw"))} />
-                )}
-                {selObj && TK_SPIELERART.includes(selObj.art) && (
-                  <TkBtn icon="blick" titel="Blickrichtung" aktiv={selObj.blick != null} onClick={() => objAendern((o) => { if (o.blick != null) delete o.blick; else o.blick = 0; })} />
-                )}
-                {selObj && selObj.art === "tor" && <TkBtn icon="drehen" titel="Drehen" onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 90) % 180))} />}
-                {selObj && selObj.art === "stange" && <TkBtn icon="drehen" titel="Drehen" onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 45) % 180))} />}
-                {selObj && selObj.art === "form" && (
-                  <>
-                    <TkBtn icon="drehen" titel="Drehen" onClick={() => objAendern((o) => (o.rot = ((o.rot || 0) + 15) % 180))} />
-                    <TkBtn icon="deckkraft" titel={`Deckkraft ${Math.round((selObj.op != null ? selObj.op : 0.3) * 100)} % (tippen zum Ändern)`} label={`${Math.round((selObj.op != null ? selObj.op : 0.3) * 100)} %`}
-                      onClick={() => objAendern((o) => { const w = [0, 0.15, 0.3, 0.5, 0.75]; const i = w.findIndex((x) => Math.abs(x - (o.op != null ? o.op : 0.3)) < 0.01); o.op = w[(i + 1) % w.length]; })} />
-                  </>
-                )}
-                {selLinie && selLinie.art !== "verbindung" && selLinie.art !== "frei" && (
-                  <TkBtn icon="bogen" titel="Gebogen" aktiv={!!selLinie.bogen} onClick={() => aendern((nd, step) => {
-                    const l = step.linien.find((q) => q.id === selLinie.id);
-                    if (!l) return;
-                    if (l.bogen) delete l.bogen;
-                    else l.bogen = tkStandardBogen(g.toS(l.punkte[0][0], l.punkte[0][1]), g.toS(l.punkte[l.punkte.length - 1][0], l.punkte[l.punkte.length - 1][1]), g);
-                  })} />
-                )}
-                {selLinie && selLinie.bogen && (
-                  <TkBtn icon="tauschen" titel="Bogen umdrehen" onClick={() => aendern((nd, step) => {
-                    const l = step.linien.find((q) => q.id === selLinie.id);
-                    if (!l) return;
-                    const a = l.punkte[0], b = l.punkte[l.punkte.length - 1];
-                    l.bogen = [a[0] + b[0] - l.bogen[0], a[1] + b[1] - l.bogen[1]];
-                  })} />
-                )}
-                {selObj && selObj.art === "text" && <TkBtn icon="text" titel="Text ändern" onClick={() => frage("Text", selObj.text || "", (v) => { if (v && v.trim()) objAendern((o) => (o.text = v.trim())); })} />}
-                <TkBtn icon="loeschen" titel="Löschen" gefahr onClick={loeschen} />
-              </div>
-              {selObj && selObj.art === "form" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Größe: gelben Punkt ziehen. Farbe: unter „Zeichnen“.</div>}
-              {selObj && selObj.art === "reifen" && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
-              {selLinie && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Farbe: unter „Zeichnen“.</div>}
-            </div>
-          ) : null}
-          <div style={kachel}>
-            <KartenTitel>Magnete</KartenTitel>
-            <div style={grp}>
-              {magnete.map(([l, ic, fn]) => (
-                <TkMagnetKachel key={l} titel={l} onClick={fn}>
-                  {Array.isArray(ic) ? TK_MAGNET_ICON[ic[0]](ic[1]) : TK_MAGNET_ICON[ic]}
-                </TkMagnetKachel>
-              ))}
-            </div>
-          </div>
-          <div style={kachel}>
-            <KartenTitel>Formation</KartenTitel>
-            <div style={{ ...grp, marginBottom: 8 }}>
-              <TkBtn label="Wir" size={36} aktiv={fTeam === "wir"} onClick={() => setFTeam("wir")} />
-              <TkBtn label="Gegner" size={36} aktiv={fTeam === "gegner"} onClick={() => setFTeam("gegner")} />
-            </div>
-            <div style={grp}>
-              {(data.feld === "f5"
-                ? [["2-2", [2, 2]], ["1-2-1", [1, 2, 1]], ["1-3", [1, 3]], ["3-1", [3, 1]]]
-                : [["2-3-1", [2, 3, 1]], ["3-2-1", [3, 2, 1]], ["2-2-2", [2, 2, 2]], ["4-4-2", [4, 4, 2]], ["4-3-3", [4, 3, 3]], ["3-5-2", [3, 5, 2]]]
-              ).map(([l, rows]) => (
-                <TkBtn key={l} label={l} size={38} onClick={() => formationAnwenden(rows, fTeam)} />
-              ))}
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Stellt vorhandene Spieler auf, fehlende kommen aus dem Kader dazu.</div>
-          </div>
-          {aktivePlayers.length > 0 && (
-            <div style={kachel}>
-              <KartenTitel>Mannschaft</KartenTitel>
-              <div style={grp}>
-                {aktivePlayers.map((p) => {
-                  const da = imFeld(p.id);
-                  return (
-                    <TkBtn key={p.id} size={38} disabled={da} onClick={() => hinzu({ art: "spieler", spielerId: p.id })}
-                      label={`${p.trikotnummer != null ? p.trikotnummer + " " : ""}${tkVorname(p.name)}`} />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+  const cMagnete = (
+    <div style={kachel}>
+      <KartenTitel>Magnete</KartenTitel>
+      <div style={grp}>
+        {magnete.map(([l, ic, fn]) => (
+          <TkMagnetKachel key={l} titel={l} onClick={fn}>
+            {Array.isArray(ic) ? TK_MAGNET_ICON[ic[0]](ic[1]) : TK_MAGNET_ICON[ic]}
+          </TkMagnetKachel>
+        ))}
       </div>
+    </div>
+  );
 
-      <div style={kachel}>
-        <KartenTitel>Schritte und Animation</KartenTitel>
-        <div style={grp}>
-          {data.schritte.map((_, i) => (
-            <TkBtn key={i} label={String(i + 1)} titel={`Schritt ${i + 1}`} aktiv={anzSchritt === i} onClick={() => { if (!anim) { setSchritt(i); setSel(null); } }} />
-          ))}
-          <TkBtn icon="plus" titel="Schritt hinzufügen" onClick={neuerSchritt} disabled={!!anim} />
-          {data.schritte.length > 1 && <TkBtn icon="loeschen" titel="Schritt löschen" gefahr onClick={schrittLoeschen} disabled={!!anim} />}
-          {trenner}
-          {anim ? (
-            <>
-              <TkBtn icon="stop" titel="Stopp" aktiv onClick={stoppen} />
-              {anim.wait && <TkBtn icon="weiter" titel="Weiter" onClick={() => (weiterRef.current = true)} style={{ borderColor: TK_ROT }} />}
-            </>
-          ) : (
-            <TkBtn icon="play" titel="Abspielen" onClick={abspielen} disabled={data.schritte.length < 2} />
-          )}
-          {data.schritte.length > 1 && (
-            <>
-              <TkBtn icon="wiederholen" titel="Wiederholen" aktiv={schleife} onClick={() => setSchleife(!schleife)} />
-              {[0.5, 1, 2].map((v) => (
-                <TkBtn key={v} label={`${String(v).replace(".", ",")}×`} titel={`Tempo ${String(v).replace(".", ",")}×`} aktiv={tempo === v} onClick={() => setTempo(v)} />
-              ))}
-            </>
-          )}
-        </div>
-        {data.schritte.length < 2 && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Mit „+“ den nächsten Moment anlegen und die Magnete neu stellen, dann abspielen.</div>}
+  const cFormation = (
+    <div style={kachel}>
+      <KartenTitel zuStart={mobil}>Formation</KartenTitel>
+      <div style={{ ...grp, marginBottom: 8 }}>
+        <TkBtn label="Wir" size={36} aktiv={fTeam === "wir"} onClick={() => setFTeam("wir")} />
+        <TkBtn label="Gegner" size={36} aktiv={fTeam === "gegner"} onClick={() => setFTeam("gegner")} />
+      </div>
+      <div style={grp}>
+        {(data.feld === "f5"
+          ? [["2-2", [2, 2]], ["1-2-1", [1, 2, 1]], ["1-3", [1, 3]], ["3-1", [3, 1]]]
+          : [["2-3-1", [2, 3, 1]], ["3-2-1", [3, 2, 1]], ["2-2-2", [2, 2, 2]], ["4-4-2", [4, 4, 2]], ["4-3-3", [4, 3, 3]], ["3-5-2", [3, 5, 2]]]
+        ).map(([l, rows]) => (
+          <TkBtn key={l} label={l} size={38} onClick={() => formationAnwenden(rows, fTeam)} />
+        ))}
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Stellt vorhandene Spieler auf, fehlende kommen aus dem Kader dazu.</div>
+    </div>
+  );
+
+  const cMannschaft = aktivePlayers.length > 0 ? (
+    <div style={kachel}>
+      <KartenTitel zuStart={mobil}>Mannschaft</KartenTitel>
+      <div style={grp}>
+        {aktivePlayers.map((p) => {
+          const da = imFeld(p.id);
+          return (
+            <TkBtn key={p.id} size={38} disabled={da} onClick={() => hinzu({ art: "spieler", spielerId: p.id })}
+              label={`${p.trikotnummer != null ? p.trikotnummer + " " : ""}${tkVorname(p.name)}`} />
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
+  const cSchritte = (
+    <div style={kachel}>
+      <KartenTitel>Schritte und Animation</KartenTitel>
+      <div style={grp}>
+        {bSchritte}
+        {data.schritte.length > 1 && <TkBtn icon="loeschen" titel="Schritt löschen" gefahr onClick={schrittLoeschen} disabled={!!anim} />}
+        {trenner}
+        {bPlay}
         {data.schritte.length > 1 && (
-          <div style={{ ...grp, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--divider)" }}>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Schritt {sIdx + 1}:</span>
-            {(() => {
-              const fmt = (v) => v.toFixed(1).replace(".", ",") + " s";
-              const stufe = (feld, std, min, max, label) => {
-                const v = st[feld] != null ? st[feld] : std;
-                const set = (nv) => aendern((nd, step) => { step[feld] = Math.round(Math.max(min, Math.min(max, nv)) * 10) / 10; });
-                return (
-                  <span key={feld} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontSize: 13 }}>{label}</span>
-                    <TkBtn label="−" size={38} titel={label + " kürzer"} onClick={() => set(v - 0.5)} />
-                    <span style={{ fontSize: 13, fontWeight: 700, minWidth: 48, textAlign: "center" }}>{fmt(v)}</span>
-                    <TkBtn label="+" size={38} titel={label + " länger"} onClick={() => set(v + 0.5)} />
-                  </span>
-                );
-              };
-              const letzter = sIdx >= data.schritte.length - 1;
+          <>
+            <TkBtn icon="wiederholen" titel="Wiederholen" aktiv={schleife} onClick={() => setSchleife(!schleife)} />
+            {[0.5, 1, 2].map((v) => (
+              <TkBtn key={v} label={`${String(v).replace(".", ",")}×`} titel={`Tempo ${String(v).replace(".", ",")}×`} aktiv={tempo === v} onClick={() => setTempo(v)} />
+            ))}
+          </>
+        )}
+      </div>
+      {data.schritte.length < 2 && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>Mit „+“ den nächsten Moment anlegen und die Magnete neu stellen, dann abspielen.</div>}
+      {data.schritte.length > 1 && (
+        <div style={{ ...grp, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--divider)" }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Schritt {sIdx + 1}:</span>
+          {(() => {
+            const fmt = (v) => v.toFixed(1).replace(".", ",") + " s";
+            const stufe = (feld, std, min, max, label) => {
+              const v = st[feld] != null ? st[feld] : std;
+              const set = (nv) => aendern((nd, step) => { step[feld] = Math.round(Math.max(min, Math.min(max, nv)) * 10) / 10; });
               return (
-                <>
-                  {!st.warten && stufe("pause", 0.6, 0, 60, "Pause")}
-                  <TkBtn icon="warten" titel={letzter ? "Beim letzten Schritt nicht nötig" : "Warten auf Tipp"} aktiv={!!st.warten} disabled={letzter} onClick={() => aendern((nd, step) => { step.warten = !step.warten; })} />
-                  {!letzter && stufe("dauer", 1.7, 0.5, 20, "Bewegung")}
-                </>
+                <span key={feld} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 13 }}>{label}</span>
+                  <TkBtn label="−" size={38} titel={label + " kürzer"} onClick={() => set(v - 0.5)} />
+                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 48, textAlign: "center" }}>{fmt(v)}</span>
+                  <TkBtn label="+" size={38} titel={label + " länger"} onClick={() => set(v + 0.5)} />
+                </span>
               );
-            })()}
+            };
+            const letzter = sIdx >= data.schritte.length - 1;
+            return (
+              <>
+                {!st.warten && stufe("pause", 0.6, 0, 60, "Pause")}
+                <TkBtn icon="warten" titel={letzter ? "Beim letzten Schritt nicht nötig" : "Warten auf Tipp"} aktiv={!!st.warten} disabled={letzter} onClick={() => aendern((nd, step) => { step.warten = !step.warten; })} />
+                {!letzter && stufe("dauer", 1.7, 0.5, 20, "Bewegung")}
+              </>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+
+  const dialogEl = dialog ? <TkDialog dialog={dialog} onClose={() => setDialog(null)} /> : null;
+  const statusEl = status ? <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: -2 }}>{status}</div> : null;
+  const brettEl = (stil) => (
+    <div style={stil}>
+      <TkBrett data={data} g={g} players={players} objekte={objekte} linien={linien} linienOp={linienOp} selId={sel ? sel.id : null}
+        draft={draft} svgRef={svgRef}
+        handlers={{ onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onCancel }} />
+    </div>
+  );
+  const kopfEl = (
+    <div style={{ ...grp, flexWrap: "nowrap" }}>
+      {bZurueck}
+      {bName}
+      {bUndo}
+      {bRedo}
+      {bBild}
+      {bVoll}
+    </div>
+  );
+
+  /* ---- Vollbild am Handy: Brett füllt den Bildschirm, Werkzeuge in Leisten und einem Fenster von unten/rechts ---- */
+  if (voll && mobil) {
+    const rootV = {
+      position: "fixed", zIndex: 1000, background: "var(--bg)", display: "flex", gap: 6, boxSizing: "border-box",
+      flexDirection: effBreit ? "row" : "column",
+      padding: "max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left))",
+      overflow: "hidden",
+      ...(gedreht
+        ? { top: 0, left: 0, width: window.innerHeight, height: window.innerWidth, transformOrigin: "0 0", transform: `translateX(${window.innerWidth}px) rotate(90deg)` }
+        : { inset: 0 }),
+    };
+    const leiste = { display: "flex", gap: 6, alignItems: "center", flex: "none", overflowX: "auto", overflowY: "hidden", paddingBottom: 2 };
+    const umbruch = <span aria-hidden="true" style={{ flexBasis: "100%", height: 0 }} />;
+    const bMehr = <TkBtn key="mehr" icon="mehr" titel="Magnete und weitere Einstellungen" aktiv={sheetOffen} onClick={() => setSheetOffen((v) => !v)} />;
+    const bDrehen = <TkBtn key="dreh" icon="handydrehen" titel="Ansicht drehen" onClick={querformat} />;
+    const steuer = [bVoll, bDrehen, bUndo, bRedo, bPlay, ...bSchritte, bMehr];
+    const werkzeugeLeiste = [...bWerkzeuge, ...(bBogen || []), ...bFarben];
+    return (
+      <div style={rootV}>
+        {dialogEl}
+        {effBreit ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignContent: "flex-start", width: 100, flex: "none", overflowY: "auto" }}>
+            {steuer}
+            {umbruch}
+            {werkzeugeLeiste}
+          </div>
+        ) : (
+          <div style={leiste}>{steuer}</div>
+        )}
+        {brettEl({ flex: 1, minWidth: 0, minHeight: 0 })}
+        {!effBreit && <div style={leiste}>{werkzeugeLeiste}</div>}
+        {sheetOffen && (
+          <div style={{
+            position: "absolute", zIndex: 1100, background: "var(--bg)", overflowY: "auto", padding: 10, boxSizing: "border-box",
+            display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 -6px 24px rgba(0,0,0,0.25)",
+            ...(effBreit
+              ? { top: 0, bottom: 0, right: 0, width: "min(420px, 55%)" }
+              : { left: 0, right: 0, bottom: 0, maxHeight: "62%", borderTopLeftRadius: 16, borderTopRightRadius: 16 }),
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600 }}>Werkzeuge</span>
+              <TkBtn icon="schliessen" titel="Schließen" size={40} onClick={() => setSheetOffen(false)} />
+            </div>
+            {cAusw}
+            {cMagnete}
+            {cSchritte}
+            {cFeld}
+            {cFormation}
+            {cMannschaft}
           </div>
         )}
       </div>
+    );
+  }
+
+  /* ---- Handy (nicht Vollbild): Brett zuerst, danach die Kacheln untereinander ---- */
+  if (mobil) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 24 }}>
+        {dialogEl}
+        <div style={{ ...grp, flexWrap: "nowrap" }}>{bZurueck}{bName}</div>
+        <div style={{ ...grp, flexWrap: "nowrap" }}>
+          {bUndo}
+          {bRedo}
+          <span style={{ flex: 1 }} />
+          {bBild}
+          {bVoll}
+        </div>
+        {statusEl}
+        {brettEl({ height: "min(58vh, 640px)", minHeight: 300, flex: "none" })}
+        {cZeichnen}
+        {cAusw}
+        {cSchritte}
+        {cMagnete}
+        {cFeld}
+        {cFormation}
+        {cMannschaft}
+      </div>
+    );
+  }
+
+  /* ---- Tablet/Desktop ---- */
+  const root = voll
+    ? { position: "fixed", inset: 0, zIndex: 1000, background: "var(--bg)", display: "flex", flexDirection: "column", padding: "8px 10px 24px", gap: 8, overflow: "auto" }
+    : { display: "flex", flexDirection: "column", gap: 8, minHeight: 560, paddingBottom: 16 };
+  return (
+    <div style={root}>
+      {dialogEl}
+      {kopfEl}
+      {statusEl}
+      {cFeld}
+      {cZeichnen}
+      <div style={{ display: "flex", flexDirection: "row", gap: 10, flex: "none", minHeight: 0, alignItems: "flex-start" }}>
+        {brettEl({ flex: 1, minWidth: 0, height: voll ? "calc(100vh - 220px)" : "min(66vh, 640px)", minHeight: voll ? 360 : 300 })}
+        <div style={{ width: 270, flex: "none", overflowY: "auto", maxHeight: voll ? "none" : "min(66vh, 640px)", display: "flex", flexDirection: "column", gap: 10 }}>
+          {cAusw}
+          {cMagnete}
+          {cFormation}
+          {cMannschaft}
+        </div>
+      </div>
+      {cSchritte}
     </div>
   );
 }
@@ -8618,10 +8770,10 @@ function ChevronIcon({ size = 16, open }) {
 
 /* Kachel-Titel: Klick klappt die ganze Kachel (Eltern-Element) auf/zu. Zustand bleibt pro Titel bis zum Neuladen erhalten. */
 const NZ_ZU = {};
-function KartenTitel({ children, block = false, aktion = null, style }) {
+function KartenTitel({ children, block = false, aktion = null, zuStart = false, style }) {
   const ref = useRef(null);
   const key = [].concat(children).join("");
-  const [zu, setZu] = useState(!!NZ_ZU[key]);
+  const [zu, setZu] = useState(NZ_ZU[key] !== undefined ? !!NZ_ZU[key] : !!zuStart);
   const anwenden = (wert) => {
     const h = ref.current;
     if (!h) return;
