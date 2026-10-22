@@ -908,8 +908,8 @@ notify pgrst, 'reload schema';`;
       {fehler && (
         <div style={{ ...styles.editBanner, marginTop: 12 }}>
           <div>{fehler}</div>
-          <div style={{ fontSize: 12, marginTop: 6 }}>Falls die Spalten fehlen, einmal in Supabase (SQL Editor) ausführen:</div>
-          <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_SPIELER}</pre>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Falls die Spalten fehlen, einmal in Supabase (SQL Editor) ausführen:</div>
+          <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_SPIELER}</pre>
         </div>
       )}
       {ergebnis && (
@@ -925,11 +925,11 @@ notify pgrst, 'reload schema';`;
                 <input type="checkbox" checked={aktiv(v)} onChange={(e) => setAuswahl((a) => ({ ...a, [v.i]: e.target.checked }))} aria-label="Übernehmen" />
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{v.vorname} {v.nachname}</div>
-                  <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                  <div style={{ fontSize: 13, color: "var(--muted)" }}>
                     {v.geburtsdatum ? formatGeburtsdatum(v.geburtsdatum) : "kein Geburtsdatum"} · Pass {v.passnummer || "–"}
                   </div>
                 </div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: v.art === "neu" ? "var(--success-text)" : v.art === "unklar" ? "var(--danger-text)" : "var(--text)" }}>{label[v.art]}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: v.art === "neu" ? "var(--success-text)" : v.art === "unklar" ? "var(--danger-text)" : "var(--text)" }}>{label[v.art]}</div>
                 {v.art === "unklar" && (
                   <select style={styles.select} value={zuordnung[v.i] || ""} onChange={(e) => setZuordnung((z) => ({ ...z, [v.i]: e.target.value }))}>
                     <option value="">Spieler wählen …</option>
@@ -942,7 +942,7 @@ notify pgrst, 'reload schema';`;
             ))}
           </div>
           {fehlend.length > 0 && (
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 10 }}>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 10 }}>
               In der App, aber nicht in der Datei (bleiben unverändert): {fehlend.map((p) => p.name).join(", ")}
             </div>
           )}
@@ -986,8 +986,8 @@ function SqlHinweis({ fehler }) {
   return (
     <div style={{ ...styles.editBanner, marginBottom: 12 }}>
       <div style={{ marginBottom: 6 }}>{fehler}</div>
-      <div style={{ fontSize: 12 }}>Falls die Teams-Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
-      <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TEAMS}</pre>
+      <div style={{ fontSize: 13 }}>Falls die Teams-Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
+      <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TEAMS}</pre>
     </div>
   );
 }
@@ -1328,7 +1328,7 @@ function UebungenAdmin({ teams }) {
           </button>
           <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
         </div>
-        <div style={{ fontSize: 12, color: "var(--muted-2)" }}>
+        <div style={{ fontSize: 13, color: "var(--muted-2)" }}>
           Bilder lassen sich später in der Team-App je Übung ergänzen (Alle-Teams-Übungen im Admin: Bild per Import-Feld „bild_url“).
         </div>
       </div>
@@ -1349,7 +1349,7 @@ function UebungenAdmin({ teams }) {
                 <div style={{ fontWeight: 700, fontSize: 14 }}>
                   {offenId === u.id ? "▾" : "▸"} {u.titel}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>{Array.isArray(u.keywords) ? u.keywords.join(", ") : ""}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>{Array.isArray(u.keywords) ? u.keywords.join(", ") : ""}</div>
               </button>
               {offenId === u.id && (
                 <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1420,13 +1420,14 @@ function ZugaengeVerwaltung({ teams }) {
   };
   const loeschen = async (c) => {
     if (c.code === ACCESS_CODE) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gelöscht werden.");
-    if (!window.confirm(`Code${c.label ? ` „${c.label}“` : ""} endgültig löschen?`)) return;
-    try {
-      await dbDelete("access_codes", c.code, "code");
-      await laden();
-    } catch (e) {
-      setMeldung(friendlyError(e));
-    }
+    confirmAnd(`Code${c.label ? ` „${c.label}“` : ""} endgültig löschen?`, async () => {
+      try {
+        await dbDelete("access_codes", c.code, "code");
+        await laden();
+      } catch (e) {
+        setMeldung(friendlyError(e));
+      }
+    });
   };
   return (
     <section>
@@ -1439,8 +1440,8 @@ function ZugaengeVerwaltung({ teams }) {
       {fehler && (
         <div style={{ ...styles.editBanner, marginBottom: 12 }}>
           <div style={{ marginBottom: 6 }}>{fehler}</div>
-          <div style={{ fontSize: 12 }}>Falls die Zugangs-Tabelle noch fehlt: SQL unten einmalig in Supabase (SQL Editor) ausführen, vorher DEIN-AKTUELLER-CODE ersetzen.</div>
-          <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_ZUGAENGE}</pre>
+          <div style={{ fontSize: 13 }}>Falls die Zugangs-Tabelle noch fehlt: SQL unten einmalig in Supabase (SQL Editor) ausführen, vorher DEIN-AKTUELLER-CODE ersetzen.</div>
+          <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_ZUGAENGE}</pre>
         </div>
       )}
       {!fehler && codes !== null && (
@@ -1475,7 +1476,7 @@ function ZugaengeVerwaltung({ teams }) {
                     {c.active ? "" : " · gesperrt"}
                     {c.code === ACCESS_CODE ? " · dein aktueller Code" : ""}
                   </div>
-                  <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
+                  <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
                   <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, letterSpacing: "0.02em", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
                 </div>
                 <button style={styles.secondaryBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
@@ -1614,7 +1615,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Vereinsname
           <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={verein} placeholder={CLUB_STD.name} onChange={(e) => setVerein(e.target.value)} />
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Erscheint in der Kopfzeile, auf der Eltern-Seite, den Karten und den Teilen-Bildern. Leer = „{CLUB_STD.name}“.
           </div>
         </label>
@@ -1628,7 +1629,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             </label>
             {logoUrl && <button style={styles.linkBtn} onClick={() => setLogoUrl("")}>Zurücksetzen</button>}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Am besten PNG mit transparentem Hintergrund. Leer = Standard-Wappen.
           </div>
         </div>
@@ -1637,12 +1638,12 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
             {[["#C4271F", "Rot (Standard)"], ["#1F5FBF", "Blau"], ["#1E7A46", "Grün"], ["#D9731A", "Orange"], ["#6A3FA6", "Lila"], ["#26323F", "Anthrazit"]].map(([h, l]) => {
               const an = (farbe || CLUB_STD.farbe).toLowerCase() === h.toLowerCase();
-              return <button key={h} title={l} aria-label={l} onClick={() => setFarbe(h === CLUB_STD.farbe ? "" : h)} style={{ width: 34, height: 34, borderRadius: 999, background: h, cursor: "pointer", padding: 0, border: an ? "3px solid var(--text)" : "2px solid var(--border-strong)" }} />;
+              return <button key={h} title={l} aria-label={l} onClick={() => setFarbe(h === CLUB_STD.farbe ? "" : h)} style={{ width: 44, height: 44, borderRadius: 999, background: h, cursor: "pointer", padding: 0, border: an ? "3px solid var(--text)" : "2px solid var(--border-strong)" }} />;
             })}
-            <input type="color" value={farbe || CLUB_STD.farbe} onChange={(e) => setFarbe(e.target.value)} aria-label="Eigene Farbe" style={{ width: 44, height: 34, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
+            <input type="color" value={farbe || CLUB_STD.farbe} onChange={(e) => setFarbe(e.target.value)} aria-label="Eigene Farbe" style={{ width: 44, height: 44, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
             {farbe && <button style={styles.linkBtn} onClick={() => setFarbe("")}>Zurücksetzen</button>}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Färbt Kopfzeile, Schaltflächen und die Eltern-Seite. Zu helle Farben werden automatisch abgedunkelt. Die Sammelkarten behalten ihr Design.
           </div>
         </div>
@@ -1653,7 +1654,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Mannschaftsbild
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
-            {fotoUrl ? <img src={fotoUrl} alt="Mannschaftsbild" style={{ height: 64, borderRadius: 8, objectFit: "cover" }} /> : <span style={{ fontSize: 12.5, fontWeight: 400, color: "var(--muted)" }}>Noch kein Bild</span>}
+            {fotoUrl ? <img src={fotoUrl} alt="Mannschaftsbild" style={{ height: 64, borderRadius: 8, objectFit: "cover" }} /> : <span style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)" }}>Noch kein Bild</span>}
             <label style={{ ...styles.secondaryBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
               {fotoBusy ? "Lädt …" : fotoUrl ? "Bild ersetzen" : "Bild hochladen"}
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { fotoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
@@ -1672,7 +1673,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
               {MONATSNAMEN.map((n, i) => (i + 1 <= 8 && i + 1 >= 4 ? <option key={n} value={i + 1}>{n}</option> : null))}
             </select>
           </div>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Ab dem Saisonbeginn starten Bilanz, Quoten und Karten bei null. Die Monate dazwischen gelten als Sommerpause ohne Wertung. Standard: September bis Juli.
           </div>
         </div>
@@ -1681,7 +1682,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
             {[1, 2, 3, 4, 5, 6, 0].map((d) => {
               const an = trTage.includes(d);
-              return <button key={d} onClick={() => setTrTage(an ? trTage.filter((x) => x !== d) : [...trTage, d])} style={{ ...styles.chip, ...(an ? styles.chipActive : {}), minHeight: 38, padding: "6px 12px" }}>{WOCHENTAGE[d]}</button>;
+              return <button key={d} onClick={() => setTrTage(an ? trTage.filter((x) => x !== d) : [...trTage, d])} style={{ ...styles.chip, ...(an ? styles.chipActive : {}), minHeight: 44, padding: "6px 12px" }}>{WOCHENTAGE[d]}</button>;
             })}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap", fontWeight: 400 }}>
@@ -1689,7 +1690,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             bis <input type="time" style={{ ...styles.input, width: "auto" }} value={trBis} onChange={(e) => setTrBis(e.target.value)} />
             für <input type="number" min="1" max="52" style={{ ...styles.input, width: 70 }} value={trWochen} onChange={(e) => setTrWochen(e.target.value)} /> Wochen
           </div>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Vorbelegung beim Anlegen von Trainingsterminen im Trainingsplan.</div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Vorbelegung beim Anlegen von Trainingsterminen im Trainingsplan.</div>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Standard für neue Spieltage
@@ -1701,7 +1702,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Backup-Erinnerung nach … Tagen
           <input type="number" min="0" max="365" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={backupTage} onChange={(e) => setBackupTage(e.target.value)} />
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Auf der Übersicht erscheint ein Hinweis, wenn das letzte Backup (im Admin unter „Backup“) so lange her ist. 0 = keine Erinnerung. Standard: 7.
             {cfg.letztes_backup ? ` Letztes Backup: ${new Date(cfg.letztes_backup).toLocaleString("de-DE")}.` : " Bisher wurde noch kein Backup vermerkt."}
           </div>
@@ -1709,7 +1710,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Papierkorb: Hinweis nach … Tagen
           <input type="number" min="0" max="3650" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={papierTage} onChange={(e) => setPapierTage(e.target.value)} />
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Im Papierkorb wird markiert, was länger als diese Frist liegt, mit einem Knopf zum endgültigen Löschen. Es wird nie automatisch gelöscht. 0 = kein Hinweis.
           </div>
         </label>
@@ -1724,7 +1725,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Anlegen, sperren und löschen im Bereich „Zugänge“ (Admin, Ansicht „Alle Teams“).</div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Anlegen, sperren und löschen im Bereich „Zugänge“ (Admin, Ansicht „Alle Teams“).</div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Startansicht der App
@@ -1743,19 +1744,19 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             <option value="teilnehmer">Sobald Ergebnisse oder Teilnehmer eingetragen sind</option>
             <option value="datum">Sobald das Datum erreicht ist</option>
           </select>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Gilt für Spieltagsquote, Spieltage-Anzahl und die Karten. Zukünftige Spieltage zählen nie.</div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Gilt für Spieltagsquote, Spieltage-Anzahl und die Karten. Zukünftige Spieltage zählen nie.</div>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Bewertung im Training (Punkte)
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 10, marginTop: 6 }}>
             {[["anwesend", "Anwesend"], ["abzugAnmeldung", "Abzug: nicht angemeldet"], ["abzugVerspaetet", "Abzug: verspätet"], ["unentschuldigt", "Unentschuldigt gefehlt"], ["entschuldigt", "Abgemeldet"], ["gelb", "Abzug: Gelbe Karte"], ["blau", "Abzug: Blaue Karte"], ["rot", "Abzug: Rote Karte"]].map(([k, l]) => (
-              <label key={k} style={{ fontSize: 12.5, fontWeight: 600 }}>
+              <label key={k} style={{ fontSize: 13, fontWeight: 600 }}>
                 {l}
                 <input inputMode="decimal" style={{ ...styles.input, marginTop: 3, width: "100%", boxSizing: "border-box" }} value={bewertung[k]} onChange={(e) => setBewertung({ ...bewertung, [k]: e.target.value })} />
               </label>
             ))}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             Abzüge als positive Zahl eingeben. Achtung: Eine Änderung wirkt auch rückwirkend auf alle bisherigen Trainings. Standard: Anwesend 0,5, Abzüge 0,25 · Karten 0,5 / 1 / 2.
             <button style={{ ...styles.linkBtn, marginLeft: 8 }} onClick={() => setBewertung({ gelb: "0,5", blau: "1", rot: "2", anwesend: "0,5", abzugAnmeldung: "0,25", abzugVerspaetet: "0,25", unentschuldigt: "-0,25", entschuldigt: "0" })}>Standard setzen</button>
           </div>
@@ -1770,7 +1771,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             value={vorlauf}
             onChange={(e) => setVorlauf(e.target.value)}
           />
-          <div style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
             So viele Tage vorher erscheint der Hinweis auf der Übersicht (0 = nur am Geburtstag selbst). Ein-/ausschalten unter „Funktionen“.
           </div>
         </label>
@@ -1833,7 +1834,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
             <button style={styles.primaryBtn} onClick={anlegen}>Team anlegen</button>
             <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted-2)" }}>
+          <div style={{ fontSize: 13, color: "var(--muted-2)" }}>
             Die Adresse kürzel.nachspielzeit.app muss zusätzlich in Cloudflare als Custom Domain beim Projekt eingetragen werden.
           </div>
         </div>
@@ -1847,7 +1848,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
                 {t.id === aktuellesTeam ? " · ausgewählt" : ""}
                 {t.archived ? " · archiviert" : ""}
               </div>
-              <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{t.id}.nachspielzeit.app</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{t.id}.nachspielzeit.app</div>
             </div>
             {t.id !== aktuellesTeam && (
               <button style={styles.secondaryBtnOutline} onClick={() => onSelect(t.id)}>Öffnen</button>
@@ -2102,9 +2103,9 @@ notify pgrst, 'reload schema';`;
             {featureFehler && (
               <div style={{ ...styles.editBanner, marginBottom: 12 }}>
                 <div style={{ marginBottom: 6 }}>{featureFehler}</div>
-                <div style={{ fontSize: 12 }}>Falls die Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
-                <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_FEATURES}</pre>
-                <div style={{ fontSize: 12, marginTop: 8 }}>Für die Team-Zuordnung zusätzlich das SQL aus dem Tab „Teams“ ausführen.</div>
+                <div style={{ fontSize: 13 }}>Falls die Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
+                <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_FEATURES}</pre>
+                <div style={{ fontSize: 13, marginTop: 8 }}>Für die Team-Zuordnung zusätzlich das SQL aus dem Tab „Teams“ ausführen.</div>
               </div>
             )}
             {features === null ? (
@@ -2119,7 +2120,7 @@ notify pgrst, 'reload schema';`;
                     <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: imBlock ? "10px 0" : 0, paddingLeft: imBlock && f.unter ? (f.ebene === 2 ? 44 : 22) : 0, borderTop: imBlock && f.unter ? "1px solid var(--divider)" : "none", opacity: aktiv ? 1 : 0.5 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: imBlock && f.ebene === 2 ? 600 : 700, fontSize: 14 }}>{f.label}</div>
-                        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{f.beschreibung}</div>
+                        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{f.beschreibung}</div>
                       </div>
                       <button
                         role="switch"
@@ -2127,7 +2128,7 @@ notify pgrst, 'reload schema';`;
                         aria-label={f.label}
                         disabled={speichert === f.key}
                         onClick={() => schalte(f.key, !an)}
-                        style={{ width: 52, height: 30, borderRadius: 999, border: "none", background: an ? "var(--success-text)" : "var(--border-strong)", position: "relative", flexShrink: 0, cursor: "pointer" }}
+                        style={{ width: 66, height: 44, boxSizing: "border-box", borderRadius: 999, border: "7px solid transparent", backgroundClip: "padding-box", background: an ? "var(--success-text)" : "var(--border-strong)", position: "relative", flexShrink: 0, cursor: "pointer" }}
                       >
                         <span style={{ position: "absolute", top: 3, left: an ? 25 : 3, width: 24, height: 24, borderRadius: 999, background: "#fff", transition: "left 120ms ease" }} />
                       </button>
@@ -2438,9 +2439,11 @@ function App() {
       await fn();
       await refreshAll();
       if (successMsg) showToast(successMsg, undo);
+      return true;
     } catch (e) {
       console.error(e);
       showToast(friendlyError(e), null, "error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -2511,8 +2514,13 @@ function App() {
         await songsSpeichern(liste);
       }
     }, "Song hochgeladen");
-  const songAendern = (i, aktion, wert) =>
-    wrapAction(async () => {
+  const songAendern = (i, aktion, wert) => {
+    if (aktion === "loeschen" && wert !== "ok") {
+      const titel = (teamInfo?.config?.songs || [])[i]?.titel || "Song";
+      confirmAnd(`„${titel}“ löschen?`, () => songAendern(i, "loeschen", "ok"));
+      return;
+    }
+    return wrapAction(async () => {
       const liste = [...(teamInfo?.config?.songs || [])];
       if (aktion === "hoch" && i > 0) [liste[i - 1], liste[i]] = [liste[i], liste[i - 1]];
       else if (aktion === "runter" && i < liste.length - 1) [liste[i + 1], liste[i]] = [liste[i], liste[i + 1]];
@@ -2523,7 +2531,6 @@ function App() {
         if (!t || !t.trim()) return;
         liste[i] = { ...liste[i], titel: t.trim() };
       } else if (aktion === "loeschen") {
-        if (!window.confirm(`„${liste[i].titel}“ löschen?`)) return;
         const [weg] = liste.splice(i, 1);
         await songsSpeichern(liste);
         await loescheSongDatei(weg.pfad);
@@ -2531,6 +2538,7 @@ function App() {
       }
       await songsSpeichern(liste);
     }, "Songs angepasst");
+  };
   const kartenVollUmschalten = () =>
     wrapAction(async () => {
       const voll = !teamInfo?.config?.share_voll;
@@ -4090,10 +4098,11 @@ function TaktikEditor({ board, players, onSave, onClose, nurLesen = false }) {
     }) || setSchritt(sIdx + 1);
   const schrittLoeschen = () => {
     if (data.schritte.length < 2) return;
-    if (!window.confirm(`Schritt ${sIdx + 1} löschen?`)) return;
-    aendern((nd, step, idx) => nd.schritte.splice(idx, 1));
-    setSchritt(Math.max(0, sIdx - 1));
-    setSel(null);
+    confirmAnd(`Schritt ${sIdx + 1} löschen?`, () => {
+      aendern((nd, step, idx) => nd.schritte.splice(idx, 1));
+      setSchritt(Math.max(0, sIdx - 1));
+      setSel(null);
+    });
   };
 
   const stoppen = () => { cancelAnimationFrame(rafRef.current); setAnim(null); };
@@ -4767,7 +4776,7 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
                   </div>
                 </button>
                 <TkBtn icon="kopieren" titel="Duplizieren" size={38} onClick={() => onDuplicate(b)} />
-                <TkBtn icon="loeschen" titel="Löschen" size={38} gefahr onClick={() => { if (window.confirm(`Board „${b.name}“ löschen?`)) onDelete(b.id); }} />
+                <TkBtn icon="loeschen" titel="Löschen" size={38} gefahr onClick={() => confirmAnd(`Board „${b.name}“ löschen?`, () => onDelete(b.id))} />
               </div>
             </div>
           );
@@ -5579,7 +5588,7 @@ function SongPlayer({ songs, cover, team }) {
           aria-label="Fortschritt"
           style={{ width: "100%", accentColor: ROT, cursor: "pointer" }}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
           <span>{fmtZeit(zeit)}</span>
           <span>{fmtZeit(dauer)}</span>
         </div>
@@ -5621,7 +5630,7 @@ function SongPlayer({ songs, cover, team }) {
           aria-label="Fortschritt"
           style={{ width: "100%", accentColor: ROT, cursor: "pointer" }}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
           <span>{fmtZeit(zeit)}</span>
           <span>{fmtZeit(dauer)}</span>
         </div>
@@ -5658,7 +5667,7 @@ function SongPlayer({ songs, cover, team }) {
                 {i === aktiv ? <Equalizer aktiv={laeuft} farbe={ROT} hoehe={14} /> : <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>}
               </span>
               <span style={{ flex: 1 }}>{x.titel}</span>
-              <span style={{ fontSize: 12.5, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{dauern[x.url] ? fmtZeit(dauern[x.url]) : ""}</span>
+              <span style={{ fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{dauern[x.url] ? fmtZeit(dauern[x.url]) : ""}</span>
             </button>
           ))}
         </div>
@@ -5723,7 +5732,7 @@ function KartenSeitePlus({ token }) {
   const b = plus && plus.saisonBilanz;
   const be = (plus && plus.bereiche) || { bilanz: true, spieltage: true, karten: true, songs: true };
   const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
-  const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
+  const th = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3Plain, marginTop: 28 }}>{t}</h3>;
   const tabs = [];
@@ -5759,7 +5768,7 @@ function KartenSeitePlus({ token }) {
                 <button key={t.k} onClick={() => waehle(t.k)} aria-current={an ? "page" : undefined}
                   style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14.5, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? CLUB.farbe : "var(--border)"}`, background: an ? CLUB.farbe : "var(--surface)", color: an ? "#fff" : "inherit" }}>
                   {t.label}
-                  {t.n != null ? <span style={{ fontSize: 12.5, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
+                  {t.n != null ? <span style={{ fontSize: 13, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
                 </button>
               );
             })}
@@ -5902,7 +5911,7 @@ function KartenSeiteVorschau({ token }) {
   const b = plus && plus.saisonBilanz;
   const be = (plus && plus.bereiche) || { bilanz: true, spieltage: true, karten: true, songs: true };
   const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
-  const th = { textAlign: "right", padding: "6px 8px", fontSize: 12, color: "var(--muted)", fontWeight: 600 };
+  const th = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3Plain, marginTop: 28 }}>{t}</h3>;
   const tabs = [];
@@ -5939,7 +5948,7 @@ function KartenSeiteVorschau({ token }) {
                 <button key={t.k} onClick={() => waehle(t.k)} aria-current={an ? "page" : undefined}
                   style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14.5, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? CLUB.farbe : "var(--border)"}`, background: an ? CLUB.farbe : "var(--surface)", color: an ? "#fff" : "inherit" }}>
                   {t.label}
-                  {t.n != null ? <span style={{ fontSize: 12.5, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
+                  {t.n != null ? <span style={{ fontSize: 13, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
                 </button>
               );
             })}
@@ -6119,17 +6128,17 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
   const zeile = (k, stil) => (k >= 0 && k < zeilen.length ? <div style={stil}>{zeilen[k]}</div> : <div style={stil}>&nbsp;</div>);
   return (
     <div style={{ margin: "8px 0", padding: 12, border: "1px solid var(--border)", borderRadius: 10 }}>
-      <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>
         Tap-Sync „{titel}“: Song starten und bei jeder Zeile genau dann auf den großen Button tippen (oder Leertaste), wenn sie anfängt. Kopfhörer empfohlen. Zeile {Math.min(idx + 1, zeilen.length)} von {zeilen.length}.
       </div>
       <audio ref={audioRef} src={url} preload="auto" onPlay={() => setLaeuft(true)} onPause={() => setLaeuft(false)} onEnded={() => setLaeuft(false)} />
       <div style={{ textAlign: "center", minHeight: 110 }}>
         {idx > 0 ? (
-          <div style={{ fontSize: 15, fontWeight: 700, color: CLUB.farbe }}>♪ {zeilen[idx - 1]} <span style={{ fontWeight: 500, fontSize: 12, color: "var(--muted)" }}>(getippt)</span></div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: CLUB.farbe }}>♪ {zeilen[idx - 1]} <span style={{ fontWeight: 500, fontSize: 13, color: "var(--muted)" }}>(getippt)</span></div>
         ) : (
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>&nbsp;</div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>&nbsp;</div>
         )}
-        <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Als Nächstes tippen, sobald diese Zeile anfängt</div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Als Nächstes tippen, sobald diese Zeile anfängt</div>
         {zeile(idx, { fontSize: 20, fontWeight: 700, margin: "2px 0 6px" })}
         {zeile(idx + 1, { fontSize: 14, color: "var(--muted)" })}
         {zeile(idx + 2, { fontSize: 13, color: "var(--muted)", opacity: 0.6 })}
@@ -6141,9 +6150,9 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
         <button style={styles.linkBtn} onClick={(e) => { e.currentTarget.blur(); startStop(); }}>{laeuft ? "Pause" : "Start / Weiter"}</button>
         <button style={styles.linkBtn} onClick={zurueck} disabled={idx === 0}>↶ Eine Zeile zurück</button>
         <button style={{ ...styles.linkBtn, fontWeight: 700 }} onClick={speichern} disabled={idx === 0}>Fertig &amp; speichern ({idx}/{zeilen.length})</button>
-        <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+        <span style={{ fontSize: 13, color: "var(--muted)" }}>
           Tempo{" "}
-          <select value={tempo} onChange={(e) => setTempo(parseFloat(e.target.value))} style={{ fontSize: 12.5 }}>
+          <select value={tempo} onChange={(e) => setTempo(parseFloat(e.target.value))} style={{ fontSize: 13 }}>
             <option value={1}>normal</option>
             <option value={0.85}>85 %</option>
             <option value={0.7}>70 %</option>
@@ -6178,11 +6187,10 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
   const codeSauber = linkCode.toLowerCase().replace(/[^a-z0-9]/g, "");
   const namenSetzen = () => {
     if (codeSauber && codeSauber.length < 5) { window.alert("Der Code braucht mindestens 5 Zeichen (Buchstaben und Ziffern) oder bleibt leer für einen Zufallscode."); return; }
-    if (codeSauber && /^[0-9]+$/.test(codeSauber) && !window.confirm("Ein Code nur aus Ziffern ist leichter zu erraten. Trotzdem verwenden?")) return;
-    if (token && !window.confirm("Neuer Link: Der bisherige Link bleibt vorerst weiter aktiv und kann unten abgeschaltet werden. Fortfahren?")) return;
-    onCreate(linkName, codeSauber);
-    setLinkName("");
-    setLinkCode("");
+    const los = () => { onCreate(linkName, codeSauber); setLinkName(""); setLinkCode(""); };
+    const mitAlt = () => (token ? confirmAnd("Neuer Link: Der bisherige Link bleibt vorerst weiter aktiv und kann unten abgeschaltet werden. Fortfahren?", los) : los());
+    if (codeSauber && /^[0-9]+$/.test(codeSauber)) confirmAnd("Ein Code nur aus Ziffern ist leichter zu erraten. Trotzdem verwenden?", mitAlt);
+    else mitAlt();
   };
   const namensFelder = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -6205,7 +6213,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
       </label>
       {token ? (
         <>
-          <input readOnly value={url} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
+          <input readOnly value={url} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 13 }} />
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
             <button style={styles.linkBtn} onClick={() => kopierText(url, setKopiert)}>{kopiert ? "Kopiert ✓" : "Link kopieren"}</button>
             <button style={styles.linkBtn} onClick={onRefresh} disabled={busy}>Jetzt aktualisieren</button>
@@ -6213,14 +6221,14 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
             <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={onRevoke} disabled={busy}>Alle Links sperren</button>
           </div>
           <div style={{ marginTop: 12 }}>{namensFelder}</div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Der Link besteht aus Name und Code (mind. 5 Zeichen, Buchstaben/Ziffern), damit er nicht zu erraten ist.</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Der Link besteht aus Name und Code (mind. 5 Zeichen, Buchstaben/Ziffern), damit er nicht zu erraten ist.</div>
           {altTokens.length > 0 && (
-            <div style={{ marginTop: 10, fontSize: 12.5 }}>
+            <div style={{ marginTop: 10, fontSize: 13 }}>
               <div style={{ color: "var(--muted)", marginBottom: 4 }}>Frühere Links (funktionieren weiter, zeigen dieselbe Seite):</div>
               {altTokens.map((t) => (
                 <div key={t} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "2px 0" }}>
                   <span style={{ wordBreak: "break-all" }}>{kartenLinkUrl(t)}</span>
-                  <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => { if (window.confirm("Diesen alten Link abschalten? Eltern, die ihn gespeichert haben, sehen dann nichts mehr.")) onAltOff(t); }} disabled={busy}>Abschalten</button>
+                  <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => confirmAnd("Diesen alten Link abschalten? Eltern, die ihn gespeichert haben, sehen dann nichts mehr.", () => onAltOff(t))} disabled={busy}>Abschalten</button>
                 </div>
               ))}
             </div>
@@ -6238,7 +6246,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
             <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 10 }}>
               Hier siehst du Änderungen an der Eltern-Seite, bevor sie freigegeben werden. Gleiche Daten wie der Eltern-Link, nur eine andere Darstellung. Eltern sehen sie nicht.
             </div>
-            <input readOnly value={urlVorschau} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 12.5 }} />
+            <input readOnly value={urlVorschau} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 13 }} />
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
               <button style={styles.linkBtn} onClick={() => kopierText(urlVorschau, setKopiertV)}>{kopiertV ? "Kopiert ✓" : "Link kopieren"}</button>
               <button style={styles.linkBtn} onClick={() => window.open(urlVorschau, "_blank")}>Öffnen</button>
@@ -6262,14 +6270,14 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
               </div>
             ))}
             {sync && (
-              <div style={{ fontSize: 12.5, margin: "6px 0", color: sync.fehler ? "var(--danger-text)" : "var(--muted)" }}>
+              <div style={{ fontSize: 13, margin: "6px 0", color: sync.fehler ? "var(--danger-text)" : "var(--muted)" }}>
                 {songs[sync.i] ? `„${songs[sync.i].titel}“: ` : ""}{sync.msg}
                 {(!sync.fertig && !sync.fehler) ? null : (
                   <button style={{ ...styles.linkBtn, marginLeft: 8 }} onClick={() => setSync(null)}>OK</button>
                 )}
               </div>
             )}
-            <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "4px 0" }}>
+            <div style={{ fontSize: 13, color: "var(--muted)", margin: "4px 0" }}>
               Liedtext zuerst über „Text“ eintragen, am besten am Laptop. Tap-Sync dauert so lange wie der Song.
             </div>
             {tapI != null && songs[tapI] && (
@@ -6279,7 +6287,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
             )}
             {textEdit && songs[textEdit.i] && (
               <div style={{ margin: "6px 0 8px" }}>
-                <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 4 }}>Text zu „{songs[textEdit.i].titel}“ – normal oder mit Zeitstempeln [mm:ss.xx] pro Zeile (dann läuft der Text im Player mit)</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Text zu „{songs[textEdit.i].titel}“ – normal oder mit Zeitstempeln [mm:ss.xx] pro Zeile (dann läuft der Text im Player mit)</div>
                 <textarea value={textEdit.val} onChange={(e) => setTextEdit({ ...textEdit, val: e.target.value })} rows={6} style={{ ...styles.textarea, marginTop: 0, width: "100%" }} />
                 <div style={{ display: "flex", gap: 14, marginTop: 4 }}>
                   <button style={styles.linkBtn} disabled={busy} onClick={() => { onSongChange(textEdit.i, "text", textEdit.val); setTextEdit(null); }}>Speichern</button>
@@ -6956,7 +6964,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
     <>
     <div className={titleAbove ? "team-hero" : undefined} style={titleAbove ? { marginBottom } : undefined}>
     {titleAbove && (
-      <div className="hero-kopf" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
+      <div className="hero-kopf" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
         Mannschaft
       </div>
     )}
@@ -7013,7 +7021,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
           {teamName}
         </div>
         {(seasonLabel || subtitle) && (
-          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)", marginTop: 2, textShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 2, textShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>
             {subtitle ? subtitle : `Saison ${seasonLabel}`}
           </div>
         )}
@@ -7052,7 +7060,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
               border: "none",
               background: "rgba(0,0,0,0.4)",
               color: "#fff",
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -7092,8 +7100,8 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
             position: "fixed",
             top: 16,
             right: 16,
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             borderRadius: 999,
             border: "none",
             background: "rgba(255,255,255,0.15)",
@@ -7108,6 +7116,59 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
       </div>
     )}
     </>
+  );
+}
+
+/* Alltags-Einstieg: offene Bewertung und nächster Termin mit Direkt-Button */
+function HeuteKarte({ termine, spieltage, trainings, onOpen }) {
+  const heute = todayISO();
+  const offen = useMemo(() => {
+    const bewertet = new Set((trainings || []).map((t) => t.date));
+    const grenze = new Date(); grenze.setDate(grenze.getDate() - 14);
+    const g = grenze.toISOString().slice(0, 10);
+    return (termine || [])
+      .filter((t) => t.status !== "abgesagt" && t.date <= heute && t.date >= g && !bewertet.has(t.date))
+      .sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+  }, [termine, trainings, heute]);
+  const naechster = useMemo(() => {
+    const liste = [
+      ...(termine || []).filter((t) => t.status !== "abgesagt" && t.date >= heute).map((t) => ({ kind: "training", date: t.date, zeit: t.start_zeit, typ: "training" })),
+      ...(spieltage || []).filter((s) => s.date >= heute).map((s) => ({ kind: "spieltag", date: s.date, zeit: s.zeit, spieltagId: s.id, typ: s.typ || "spieltag" })),
+    ].sort((a, b) => a.date.localeCompare(b.date));
+    // ein heutiges, schon bewertetes Training ist kein „nächster“ Termin mehr
+    const bewertet = new Set((trainings || []).map((t) => t.date));
+    return liste.find((e) => !(e.kind === "training" && e.date === heute && bewertet.has(e.date))) || null;
+  }, [termine, spieltage, trainings, heute]);
+  if (!offen && !naechster) return null;
+  const btn = { ...styles.primaryBtn, width: "auto", flexShrink: 0, padding: "0 16px", height: 44, whiteSpace: "nowrap" };
+  const zeile = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "6px 0" };
+  return (
+    <div style={{ ...styles.card, marginBottom: 14 }}>
+      <KartenTitel>Als Nächstes</KartenTitel>
+      {offen && (
+        <div style={zeile}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14.5 }}>Training noch nicht bewertet</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{formatTerminLabel(offen.date)}</div>
+          </div>
+          <button type="button" style={btn} onClick={() => onOpen({ typ: "training", date: offen.date })}>Bewerten</button>
+        </div>
+      )}
+      {naechster && (
+        <div style={zeile}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14.5 }}>
+              {naechster.date === heute ? "Heute" : formatTerminLabel(naechster.date)} · {naechster.kind === "spieltag" ? (naechster.typ === "turnier" ? "Turnier" : naechster.typ === "hallenturnier" ? "Hallenturnier" : "Spieltag") : naechster.typ === "hallentraining" ? "Hallentraining" : "Training"}
+            </div>
+            {naechster.zeit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>{String(naechster.zeit).slice(0, 5)} Uhr</div> : null}
+          </div>
+          <button type="button" style={{ ...btn, background: "var(--surface)", color: "var(--accent-text)", border: "1.5px solid var(--border-strong)", boxShadow: "none" }}
+            onClick={() => onOpen(naechster.kind === "spieltag" ? { typ: naechster.typ, spieltagId: naechster.spieltagId, date: naechster.date } : { typ: "training", date: naechster.date })}>
+            Öffnen
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -7235,11 +7296,11 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
                   textAlign: "center",
                 }}
               >
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted)" }}>{kurzDatum(eintrag.date)}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)" }}>{kurzDatum(eintrag.date)}</div>
                 <div style={{ margin: "9px auto", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", color: info.color }}>
                   {info.icon}
                 </div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>{info.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{info.label}</div>
                 {eintrag.startZeit && eintrag.endZeit && (
                   <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
                     {eintrag.startZeit}–{eintrag.endZeit}
@@ -7431,6 +7492,7 @@ function Dashboard({
       </div>
       </div>
       <div className="dash-side">
+        <HeuteKarte termine={termine} spieltage={spieltage} trainings={trainings} onOpen={onOpenTermin} />
         <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
         {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
         <SaisonwechselHinweis seasons={seasons} />
@@ -7802,7 +7864,7 @@ function SpielerSlider({ rows, players, onSelect }) {
   if (liste.length === 0) return null;
   return (
     <div className="spieler-wrap" style={{ marginBottom: 12, marginTop: 8 }}>
-      <div className="spieler-label" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+      <div className="spieler-label" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
         Spieler
       </div>
       <div className="spieler-slider">
@@ -7885,7 +7947,7 @@ function PlayerCard({ player, stats }) {
           <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
             SV HEIMSTETTEN U8
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 6, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 6, lineHeight: 1.5 }}>
             <div>{player.geburtsdatum ? `Geboren am ${formatGeburtsdatum(player.geburtsdatum)}` : "\u00A0"}</div>
             <div>
               {player.geburtsdatum && alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10)) != null
@@ -8493,6 +8555,8 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
     zielDatum && geplanteTermine.some((t) => t.date === zielDatum) ? zielDatum : ermittleDefaultDate(geplanteTermine, bewerteteDaten)
   );
   const [rows, setRows] = useState({});
+  const [geprueft, setGeprueft] = useState(() => new Set());
+  useEffect(() => { setGeprueft(new Set()); }, [date]);
 
   useEffect(() => {
     if (!date && geplanteTermine[0]) setDate(ermittleDefaultDate(geplanteTermine, bewerteteDaten));
@@ -8510,18 +8574,24 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
   }, [date, players, trainings]);
 
   const getRow = (id) => rows[id] || { vorkommnis: 0, karte: "keine", teilnahme: "anwesend", kommentar: "" };
-  const setRow = (id, patch) => setRows((r) => ({ ...r, [id]: { ...getRow(id), ...patch } }));
+  const setRow = (id, patch) => {
+    setRows((r) => ({ ...r, [id]: { ...getRow(id), ...patch } }));
+    setGeprueft((g) => (g.has(id) ? g : new Set(g).add(id)));
+  };
 
-  const save = () => {
+  const save = async () => {
     if (players.length === 0 || !date) return;
     const entries = players.map((p) => ({ id: uid(), date, playerId: p.id, ...getRow(p.id) }));
-    onSave(entries, date);
+    const ok = await onSave(entries, date);
+    if (ok === false) return; // bei Fehler bleiben die Eingaben erhalten
     const bewertetNachSpeichern = new Set(bewerteteDaten);
     bewertetNachSpeichern.add(date);
     setDate(ermittleDefaultDate(geplanteTermine, bewertetNachSpeichern));
   };
 
   const aktuellBewertet = bewerteteDaten.has(date);
+  const istGeprueft = (id) => aktuellBewertet || geprueft.has(id);
+  const anzGeprueft = players.filter((p) => istGeprueft(p.id)).length;
 
   const deleteBewertung = () => {
     if (!date || !onDelete) return;
@@ -8551,6 +8621,21 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
           </select>
         ) : (
           <span style={styles.hint}>Keine Termine angelegt</span>
+        )}
+        {geplanteTermine.length > 0 && players.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontWeight: 600 }}>
+              <span>{anzGeprueft} von {players.length} geprüft</span>
+              {anzGeprueft < players.length && (
+                <button type="button" style={{ ...styles.linkBtn, minHeight: 44 }} onClick={() => setGeprueft(new Set(players.map((p) => p.id)))}>
+                  Rest als „anwesend“ bestätigen
+                </button>
+              )}
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: "var(--border)", overflow: "hidden", marginTop: 4 }} aria-hidden="true">
+              <div style={{ height: "100%", width: `${(anzGeprueft / players.length) * 100}%`, background: "var(--accent)", transition: "width 150ms ease-out" }} />
+            </div>
+          </div>
         )}
       </div>
 
@@ -8596,6 +8681,7 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
                 <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 10 }}>
                   <Avatar name={p.name} size={36} photoUrl={p.photo_url} />
                   {p.name}
+                  {istGeprueft(p.id) && <span title="Geprüft" aria-label="Geprüft" style={{ color: "var(--pos-text)", fontWeight: 800 }}>✓</span>}
                 </span>
                 <div
                   style={{
@@ -9503,7 +9589,7 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
         <button type="button" onMouseDown={keepFocus} style={btn(aktiv.ul)} onClick={() => cmd("insertUnorderedList")} title="Aufzählung" aria-label="Aufzählung"><BulletListIcon size={15} /></button>
         <button type="button" onMouseDown={keepFocus} style={btn(aktiv.ol)} onClick={() => cmd("insertOrderedList")} title="Nummerierte Liste" aria-label="Nummerierte Liste"><NumberedListIcon size={15} /></button>
         <button type="button" onMouseDown={keepFocus} style={btn(false)} onClick={() => fileRef.current && fileRef.current.click()} title="Bild einfügen" aria-label="Bild einfügen" disabled={ladeBild}><ImageIcon size={15} /></button>
-        {ladeBild && <span style={{ fontSize: 12, color: "var(--muted)" }}>Bild wird hochgeladen …</span>}
+        {ladeBild && <span style={{ fontSize: 13, color: "var(--muted)" }}>Bild wird hochgeladen …</span>}
         <input
           ref={fileRef}
           type="file"
@@ -9531,8 +9617,8 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
         onBlur={sync}
         onPaste={onPaste}
       />
-      {bildFehler && <div style={{ fontSize: 12, color: "var(--danger-text)", marginTop: 4 }}>{bildFehler}</div>}
-      {hint && <div style={{ fontSize: 11.5, color: "var(--muted-2)", marginTop: 4 }}>Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
+      {bildFehler && <div style={{ fontSize: 13, color: "var(--danger-text)", marginTop: 4 }}>{bildFehler}</div>}
+      {hint && <div style={{ fontSize: 12.5, color: "var(--muted-2)", marginTop: 4 }}>Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
     </div>
   );
 }
@@ -9745,10 +9831,10 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
             </button>
           </div>
           {teilenFehler && (
-            <span style={{ fontSize: 11.5, color: "var(--danger-text)", textAlign: "right", maxWidth: 220 }}>{teilenFehler}</span>
+            <span style={{ fontSize: 12.5, color: "var(--danger-text)", textAlign: "right", maxWidth: 220 }}>{teilenFehler}</span>
           )}
           {spieltag.spiele.length > 0 && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#2E7D32" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#2E7D32" }}>
               <span
                 style={{
                   width: 15,
@@ -9835,7 +9921,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       >
                         <EditIcon size={14} />
                       </button>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, paddingRight: 20 }}>{gegnerName(sp.opponentId)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, paddingRight: 20 }}>{gegnerName(sp.opponentId)}</div>
                       <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700, color: ergebnisColor, margin: "4px 0" }}>
                         {sp.ourGoals}:{sp.theirGoals}
                       </div>
@@ -9873,8 +9959,8 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       cursor: "pointer",
                     }}
                   >
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>{g.name}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted-2)", fontSize: 11, fontWeight: 600 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g.name}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted-2)", fontSize: 12.5, fontWeight: 600 }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <path d="M12 5v14M5 12h14" />
                       </svg>
@@ -9895,7 +9981,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                     alignItems: "center",
                     justifyContent: "center",
                     color: "var(--muted-2)",
-                    fontSize: 11.5,
+                    fontSize: 12.5,
                     fontWeight: 600,
                     textAlign: "center",
                     cursor: "pointer",
@@ -11105,7 +11191,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
   );
 }
 
-const tagStyle = { background: "var(--surface-2, #F2EAE9)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 11, fontWeight: 600 };
+const tagStyle = { background: "var(--surface-2, #F2EAE9)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 12.5, fontWeight: 600 };
 
 function UebungenBereich({ uebungen, onSave, onRemove }) {
   const [suche, setSuche] = useState("");
@@ -11143,7 +11229,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
       ) : (
         <>
           <UebungFilterLeiste karte aktion={<button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>} uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
-          <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600, marginBottom: 10 }}>
             {gefiltert.length} {gefiltert.length === 1 ? "Übung" : "Übungen"}
             {filter.length > 0 ? ` · Filter: ${filter.join(", ")}` : ""}
           </div>
@@ -11274,7 +11360,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
             <button style={styles.secondaryBtn} onClick={() => fileRef.current && fileRef.current.click()}>
               {vorschau ? "Bild ändern" : "Bild hochladen"}
             </button>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
               Foto, Skizze oder Screenshot – oder einfach einen Screenshot mit Strg/Cmd+V einfügen. Wird automatisch verkleinert.
             </div>
           </div>
@@ -11310,7 +11396,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
         </div>
         {vorschlaege.length > 0 && (
           <>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Vorhandene Keywords:</div>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>Vorhandene Keywords:</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {vorschlaege.map((k) => (
                 <button key={k} onClick={() => addKeyword(k)} style={styles.chip}>{k}</button>
@@ -11376,7 +11462,7 @@ function TerminBoards({ termin }) {
           </button>
           <button type="button" onClick={() => setAnsicht(l.board)} style={{ flex: 1, minWidth: 0, border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "inherit" }}>
             <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.board.name}</div>
-            <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{info(l.board)} · ansehen</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{info(l.board)} · ansehen</div>
           </button>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <button style={styles.linkBtn} disabled={i === 0} onClick={() => tb.move(termin.id, l.id, -1)} aria-label="Nach oben">↑</button>
@@ -11403,7 +11489,7 @@ function TerminBoards({ termin }) {
                   {vorschau(b, 56)}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</div>
-                    <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{info(b)}</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)" }}>{info(b)}</div>
                   </div>
                   <button style={{ ...styles.primaryBtn, padding: "0 16px", height: 40, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }} onClick={() => tb.add(termin.id, b.id)}>Hinzufügen</button>
                 </div>
@@ -11460,7 +11546,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
               <UebungBild url={e.uebung.bildUrl} size={72} titel={e.uebung.titel} zoom />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-2)" }}>{i + 1}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted-2)" }}>{i + 1}</div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{e.uebung.titel}</div>
                 {e.uebung.keywords.length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
@@ -11869,7 +11955,7 @@ const styles = {
   },
   loginLogo: { width: 56, height: "auto", objectFit: "contain", marginBottom: 4 },
   loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em" },
-  loginSubtitle: { fontSize: 12, color: "var(--muted)", marginTop: -8, marginBottom: 6 },
+  loginSubtitle: { fontSize: 13, color: "var(--muted)", marginTop: -8, marginBottom: 6 },
   loginInput: {
     border: "1px solid var(--border-strong)",
     background: "var(--surface)",
@@ -11879,7 +11965,7 @@ const styles = {
     textAlign: "center",
     width: "100%",
   },
-  loginError: { color: "var(--danger-text)", fontSize: 12, textAlign: "center" },
+  loginError: { color: "var(--danger-text)", fontSize: 13, textAlign: "center" },
   loginBtn: {
     background: "var(--accent)",
     color: "#fff",
@@ -11903,7 +11989,7 @@ const styles = {
     border: "1px solid rgba(255,255,255,0.22)",
     borderRadius: 999,
     color: "#F8E9E8",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
     padding: "6px 11px",
     cursor: "pointer",
@@ -11984,8 +12070,8 @@ const styles = {
   h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 12px 0", paddingBottom: 8, borderBottom: "1px solid var(--divider)", letterSpacing: "-0.005em" },
   h3Block: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, margin: 0, padding: "12px 0", borderTop: "1px solid var(--divider)", letterSpacing: "-0.005em" },
   h3Plain: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
-  tabLabel: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--muted)", margin: "4px 0 10px 0" },
-  subheading: { fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "16px 0 8px 0" },
+  tabLabel: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--muted)", margin: "4px 0 10px 0" },
+  subheading: { fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "16px 0 8px 0" },
   rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 6 },
   select: {
     border: "1px solid var(--border-strong)",
@@ -11997,7 +12083,7 @@ const styles = {
     fontFamily: "'Inter', system-ui, sans-serif",
   },
   selectGroup: { display: "flex", flexDirection: "column", gap: 2 },
-  selectGroupLabel: { fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.03em" },
+  selectGroupLabel: { fontSize: 13, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.03em" },
   input: {
     border: "1px solid var(--border-strong)",
     background: "var(--surface)",
@@ -12022,7 +12108,7 @@ const styles = {
   addRow: { display: "flex", gap: 8, marginBottom: 16 },
   tableWrap: { overflowX: "auto", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
-  th: { textAlign: "left", padding: "10px 12px", color: "var(--muted)", fontWeight: 600, fontSize: 12, borderBottom: "1px solid var(--border)" },
+  th: { textAlign: "left", padding: "10px 12px", color: "var(--muted)", fontWeight: 600, fontSize: 13, borderBottom: "1px solid var(--border)" },
   td: { padding: "10px 12px", borderBottom: "1px solid var(--divider)" },
   tdName: { padding: "10px 12px", borderBottom: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 8, fontWeight: 500 },
   rank: {
@@ -12031,7 +12117,7 @@ const styles = {
     borderRadius: 6,
     background: "var(--divider)",
     color: "var(--muted)",
-    fontSize: 12,
+    fontSize: 13,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -12053,9 +12139,9 @@ const styles = {
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardActions: { display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", WebkitOverflowScrolling: "touch", maxWidth: "100%" },
   iconBtn: {
-    width: 32,
-    height: 32,
-    minWidth: 32,
+    width: 44,
+    height: 44,
+    minWidth: 44,
     borderRadius: 999,
     border: "none",
     background: "var(--tan-bg)",
@@ -12114,14 +12200,14 @@ const styles = {
     height: 22,
     padding: "0 6px",
     borderRadius: 999,
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: 700,
   },
   summaryPillWin: { background: "var(--win-bg)", color: "var(--success-text)" },
   summaryPillDraw: { background: "var(--draw-bg)", color: "var(--muted)" },
   summaryPillLoss: { background: "var(--loss-bg)", color: "var(--loss-text)" },
-  summaryGoals: { fontSize: 12.5, color: "var(--muted)", fontWeight: 600 },
-  pill: { padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 },
+  summaryGoals: { fontSize: 13, color: "var(--muted)", fontWeight: 600 },
+  pill: { padding: "3px 10px", borderRadius: 999, fontSize: 13, fontWeight: 700 },
   fieldRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
   goalStepper: {
     display: "flex",
@@ -12156,14 +12242,14 @@ const styles = {
     fontWeight: 700,
     color: "var(--text)",
   },
-  label: { fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 130 },
+  label: { fontSize: 12.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 130 },
   range: { flex: 1, accentColor: "var(--accent)", minWidth: 100 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
   chip: { border: "1px solid var(--border-strong)", outline: "none", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
-  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 11, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
+  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 12.5, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
     background: "var(--header-grad-btn)",
     color: "#fff",
@@ -12206,8 +12292,8 @@ const styles = {
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
-    padding: "6px 4px",
-    minHeight: 32,
+    padding: "6px 8px",
+    minHeight: 44,
   },
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
@@ -12266,7 +12352,7 @@ const styles = {
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
   statBox: { flex: "1 1 90px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   statValue: { fontSize: 18, fontWeight: 700, color: "var(--accent-text)", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
-  statLabel: { fontSize: 12, color: "var(--muted)", marginTop: 2 },
+  statLabel: { fontSize: 13, color: "var(--muted)", marginTop: 2 },
   sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
   sparkCard: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
