@@ -4096,11 +4096,13 @@ function TaktikEditor({ board, players, onSave, onClose }) {
   const mobil = eff.b < 900;
 
   const querformat = async () => {
+    const vorher = window.innerHeight > window.innerWidth;
     try {
       if (window.screen && screen.orientation && screen.orientation.lock) {
-        await screen.orientation.lock(window.innerHeight > window.innerWidth ? "landscape" : "portrait");
-        setGedreht(false);
-        return;
+        await Promise.race([screen.orientation.lock(vorher ? "landscape" : "portrait"), new Promise((_, nein) => setTimeout(nein, 600))]);
+        // Hat sich die Ansicht wirklich gedreht? Sonst (z. B. Emulator, iPhone) per Software drehen
+        await new Promise((r) => setTimeout(r, 450));
+        if ((window.innerHeight > window.innerWidth) !== vorher) { setGedreht(false); return; }
       }
     } catch (e) {}
     setGedreht((v) => !v);
