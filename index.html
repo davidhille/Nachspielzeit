@@ -9746,8 +9746,20 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setTally({});
   };
 
+  const zugeordnet = Object.values(tally).reduce((a, b) => a + b, 0);
+  const luecke = (Number(ourGoals) || 0) - zugeordnet; // >0: Tore ohne Torschütze
   const saveSpiel = () => {
     if (!opponentId) return;
+    if (luecke !== 0) {
+      const msg = luecke > 0
+        ? `${luecke === 1 ? "1 Tor hat" : `${luecke} Tore haben`} noch keinen Torschützen. Trotzdem speichern?`
+        : `Es sind ${zugeordnet} Torschützen-Tore erfasst, aber nur ${Number(ourGoals) || 0} im Ergebnis. Trotzdem speichern?`;
+      confirmAnd(msg, speichernJetzt);
+      return;
+    }
+    speichernJetzt();
+  };
+  const speichernJetzt = () => {
     const spiel = {
       id: editingId || uid(),
       opponentId,
@@ -10033,6 +10045,15 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
 
                   <div style={{ marginTop: 4 }}>
                     <label style={styles.label}>Torschützen — antippen zum Erfassen</label>
+                    {(Number(ourGoals) || 0) > 0 || zugeordnet > 0 ? (
+                      <div role="status" style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: luecke === 0 ? "var(--pos-text)" : "var(--danger-text)" }}>
+                        {luecke === 0
+                          ? `✓ Alle ${zugeordnet} Tore haben einen Torschützen`
+                          : luecke > 0
+                          ? `${zugeordnet} von ${Number(ourGoals) || 0} Toren zugeordnet – ${luecke} ohne Torschütze`
+                          : `Mehr Torschützen-Tore (${zugeordnet}) als im Ergebnis (${Number(ourGoals) || 0})`}
+                      </div>
+                    ) : null}
                     <div style={styles.scorerGrid}>
                       {torschuetzenOptionen.map((p) => {
                         const count = tally[p.id] || 0;
