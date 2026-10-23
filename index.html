@@ -48,7 +48,7 @@
   :root {
     color-scheme: light dark;
     --bg: #F7F4F3; --surface: #fff; --surface-2: #FBF5F5; --divider: #F3E9E9; --border: #EADADA; --border-strong: #E4D2D2;
-    --text: #1C2B22; --text-2: #5B4747; --muted: #76595A; --muted-2: #B08A8A;
+    --text: #1C2B22; --text-2: #5B4747; --muted: #76595A; --muted-2: #8A6565;
     --accent: #AE1E1D; --accent-text: #AE1E1D; --accent-soft: #FBEAEA; --danger-text: #9B2226; --success-text: #2E7D32; --loss-text: #C62828;
     --pos-bg: #DCEFE3; --pos-text: #1B4332; --neg-bg: #FBE0E0;
     --win-bg: #E8F5E9; --loss-bg: #FBDDDD; --draw-bg: #EFEFEF;
@@ -627,6 +627,12 @@ let _confirmHandler = null;
 function registerConfirmHandler(fn) {
   _confirmHandler = fn;
 }
+let _toastHandler = null;
+function registerToastHandler(fn) { _toastHandler = fn; }
+const meldung = (msg, type = "info") => { if (_toastHandler) _toastHandler(msg, type); else window.alert(msg); };
+let _promptHandler = null;
+function registerPromptHandler(fn) { _promptHandler = fn; }
+const frageAnd = (titel, wert, onOk) => { if (_promptHandler) _promptHandler({ titel, wert, onOk }); else { const v = window.prompt(titel, wert); if (v !== null) onOk(v); } };
 const confirmAnd = (message, fn) => {
   if (_confirmHandler) {
     _confirmHandler(message, fn);
@@ -1695,7 +1701,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
             {[1, 2, 3, 4, 5, 6, 0].map((d) => {
               const an = trTage.includes(d);
-              return <button key={d} onClick={() => setTrTage(an ? trTage.filter((x) => x !== d) : [...trTage, d])} style={{ ...styles.chip, ...(an ? styles.chipActive : {}), minHeight: 44, padding: "6px 12px" }}>{WOCHENTAGE[d]}</button>;
+              return <button key={d} onClick={() => setTrTage(an ? trTage.filter((x) => x !== d) : [...trTage, d])} aria-pressed={!!(an)} style={{ ...styles.chip, ...(an ? styles.chipActive : {}), minHeight: 44, padding: "6px 12px" }}>{WOCHENTAGE[d]}</button>;
             })}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap", fontWeight: 400 }}>
@@ -2270,11 +2276,13 @@ function App() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
+  const [promptState, setPromptState] = useState(null);
   const toastTimerRef = useRef(null);
 
   useEffect(() => {
     registerConfirmHandler((message, onConfirm) => setConfirmState({ message, onConfirm }));
-    return () => registerConfirmHandler(null);
+    registerPromptHandler((d) => setPromptState(d));
+    return () => { registerConfirmHandler(null); registerPromptHandler(null); };
   }, []);
 
   const confirmCardRef = useRef(null);
@@ -2313,7 +2321,44 @@ function App() {
     setToast({ message: msg, undo: undo || null, type });
     const duration = undo ? 6000 : type === "error" ? 5000 : 2200;
     toastTimerRef.current = setTimeout(() => setToast(null), duration);
-  };
+  };  useEffect(() => {
+    registerToastHandler((m, t) => showToast(m, null, t));
+    return () => registerToastHandler(null);
+  });
+
+  /* Barrierefreiheit: Beschriftungen mit Feldern verknüpfen (Labels ohne for/Verschachtelung) */
+  useEffect(() => {
+    let n = 0, raf = 0;
+    const CTRL = 'input:not([type=hidden]):not([type=file]):not([type=color]),select,textarea,[contenteditable="true"]';
+    const run = () => {
+      document.querySelectorAll("label").forEach((l) => {
+        if (l.control || l.dataset.nzl) return;
+        const t = l.nextElementSibling;
+        if (!t) return;
+        const c = t.matches(CTRL) ? t : t.children.length <= 4 ? t.querySelector(CTRL) : null;
+        if (c) {
+          if (c.matches("[contenteditable]")) {
+            if (!l.id) l.id = "nzl-" + ++n;
+            c.setAttribute("aria-labelledby", l.id);
+          } else {
+            if (!c.id) c.id = "nzf-" + ++n;
+            l.htmlFor = c.id;
+          }
+          l.dataset.nzl = "1";
+        } else if (t.querySelector("button")) {
+          if (!l.id) l.id = "nzl-" + ++n;
+          t.setAttribute("role", "group");
+          t.setAttribute("aria-labelledby", l.id);
+          l.dataset.nzl = "1";
+        }
+      });
+    };
+    const mo = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(run); });
+    mo.observe(document.body, { childList: true, subtree: true });
+    run();
+    return () => { mo.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
+
 
   const refreshAll = useCallback(async () => {
     try {
@@ -2533,6 +2578,11 @@ function App() {
       confirmAnd(`„${titel}“ löschen?`, () => songAendern(i, "loeschen", "ok"));
       return;
     }
+    if (aktion === "umbenennen" && !(wert && wert.titel)) {
+      const aktuell = (teamInfo?.config?.songs || [])[i]?.titel || "";
+      frageAnd("Titel", aktuell, (v) => songAendern(i, "umbenennen", { titel: v }));
+      return;
+    }
     return wrapAction(async () => {
       const liste = [...(teamInfo?.config?.songs || [])];
       if (aktion === "hoch" && i > 0) [liste[i - 1], liste[i]] = [liste[i], liste[i - 1]];
@@ -2540,7 +2590,7 @@ function App() {
       else if (aktion === "text") {
         liste[i] = { ...liste[i], text: (wert || "").trim() };
       } else if (aktion === "umbenennen") {
-        const t = window.prompt("Titel", liste[i].titel);
+        const t = wert.titel;
         if (!t || !t.trim()) return;
         liste[i] = { ...liste[i], titel: t.trim() };
       } else if (aktion === "loeschen") {
@@ -2946,7 +2996,7 @@ function App() {
       </main>
       {busy && <div style={styles.progressBar} />}
       {toast && (
-        <div style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
+        <div role={toast.type === "error" ? "alert" : "status"} style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
           <span>
             {toast.type === "error" ? "⚠ " : ""}
             {toast.message}
@@ -2964,6 +3014,7 @@ function App() {
           )}
         </div>
       )}
+      {promptState && <TkDialog dialog={promptState} onClose={() => setPromptState(null)} />}
       {confirmState && (
         <div style={styles.modalOverlay} onClick={() => setConfirmState(null)}>
           <div
@@ -4222,7 +4273,7 @@ function TaktikEditor({ board, players, onSave, onClose, nurLesen = false }) {
       setExportiert(true);
       setTimeout(() => setExportiert(false), 2000);
     } catch (e) {
-      if (!(e && e.name === "AbortError")) window.alert("Das Bild konnte nicht erstellt werden.");
+      if (!(e && e.name === "AbortError")) meldung("Das Bild konnte nicht erstellt werden.", "error");
     }
   };
 
@@ -4710,7 +4761,7 @@ function TaktikEditor({ board, players, onSave, onClose, nurLesen = false }) {
   const brettHoehe = voll ? "(100vh - 330px)" : "72vh";
   const tabKnopf = (k, l) => (
     <button key={k} type="button" onClick={() => setSeitenTab(k)} aria-pressed={seitenTab === k}
-      style={{ ...styles.segBtn, ...(seitenTab === k ? styles.segBtnActive : {}) }}>{l}</button>
+      aria-pressed={!!(seitenTab === k)} style={{ ...styles.segBtn, ...(seitenTab === k ? styles.segBtnActive : {}) }}>{l}</button>
   );
   const seitenInhalt = seitenTab === "auswahl" && inhaltAusw ? inhaltAusw
     : seitenTab === "aufstellung" ? (
@@ -6202,12 +6253,12 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
       setFlag(true);
       setTimeout(() => setFlag(false), 2000);
     } catch (e) {
-      window.prompt("Link kopieren:", text);
+      frageAnd("Link kopieren", text, () => {});
     }
   };
   const codeSauber = linkCode.toLowerCase().replace(/[^a-z0-9]/g, "");
   const namenSetzen = () => {
-    if (codeSauber && codeSauber.length < 5) { window.alert("Der Code braucht mindestens 5 Zeichen (Buchstaben und Ziffern) oder bleibt leer für einen Zufallscode."); return; }
+    if (codeSauber && codeSauber.length < 5) { meldung("Der Code braucht mindestens 5 Zeichen (Buchstaben und Ziffern) oder bleibt leer für einen Zufallscode.", "error"); return; }
     const los = () => { onCreate(linkName, codeSauber); setLinkName(""); setLinkCode(""); };
     const mitAlt = () => (token ? confirmAnd("Neuer Link: Der bisherige Link bleibt vorerst weiter aktiv und kann unten abgeschaltet werden. Fortfahren?", los) : los());
     if (codeSauber && /^[0-9]+$/.test(codeSauber)) confirmAnd("Ein Code nur aus Ziffern ist leichter zu erraten. Trotzdem verwenden?", mitAlt);
@@ -7571,13 +7622,13 @@ function Dashboard({
         <div style={{ ...styles.segNav, marginBottom: 12 }}>
           <button
             onClick={() => setUebersichtTab("training")}
-            style={{ ...styles.segBtn, ...(uebersichtTab === "training" ? styles.segBtnActive : {}) }}
+            aria-pressed={!!(uebersichtTab === "training")} style={{ ...styles.segBtn, ...(uebersichtTab === "training" ? styles.segBtnActive : {}) }}
           >
             Training
           </button>
           <button
             onClick={() => setUebersichtTab("saison")}
-            style={{ ...styles.segBtn, ...(uebersichtTab === "saison" ? styles.segBtnActive : {}) }}
+            aria-pressed={!!(uebersichtTab === "saison")} style={{ ...styles.segBtn, ...(uebersichtTab === "saison" ? styles.segBtnActive : {}) }}
           >
             Saison
           </button>
@@ -8280,19 +8331,19 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
       <div style={{ ...styles.segNav, marginTop: 16 }}>
         <button
           onClick={() => setHistorieTab("training")}
-          style={{ ...styles.segBtn, ...(historieTab === "training" ? styles.segBtnActive : {}) }}
+          aria-pressed={!!(historieTab === "training")} style={{ ...styles.segBtn, ...(historieTab === "training" ? styles.segBtnActive : {}) }}
         >
           Training {saison ? saison.replace("-", "/") : ""}
         </button>
         <button
           onClick={() => setHistorieTab("spieltage")}
-          style={{ ...styles.segBtn, ...(historieTab === "spieltage" ? styles.segBtnActive : {}) }}
+          aria-pressed={!!(historieTab === "spieltage")} style={{ ...styles.segBtn, ...(historieTab === "spieltage" ? styles.segBtnActive : {}) }}
         >
           Spieltag-Teilnahmen
         </button>
         <button
           onClick={() => setHistorieTab("notizen")}
-          style={{ ...styles.segBtn, ...(historieTab === "notizen" ? styles.segBtnActive : {}) }}
+          aria-pressed={!!(historieTab === "notizen")} style={{ ...styles.segBtn, ...(historieTab === "notizen" ? styles.segBtnActive : {}) }}
         >
           Notizen{notizenAlle.length > 0 ? ` (${notizenAlle.length})` : ""}
         </button>
@@ -8812,7 +8863,7 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
                     <button
                       key={k}
                       onClick={(e) => { setRow(p.id, { karte: k }); e.currentTarget.blur(); }}
-                      style={{ ...styles.chip, ...(row.karte === k ? styles.chipActive : {}) }}
+                      aria-pressed={!!(row.karte === k)} style={{ ...styles.chip, ...(row.karte === k ? styles.chipActive : {}) }}
                     >
                       {k === "keine" ? "Keine" : k[0].toUpperCase() + k.slice(1)}
                     </button>
@@ -8958,13 +9009,13 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
       <div style={styles.segNav}>
         <button
           onClick={() => setSubTab("liste")}
-          style={{ ...styles.segBtn, ...(subTab === "liste" ? styles.segBtnActive : {}) }}
+          aria-pressed={!!(subTab === "liste")} style={{ ...styles.segBtn, ...(subTab === "liste" ? styles.segBtnActive : {}) }}
         >
           Spieltage
         </button>
         <button
           onClick={() => setSubTab("uebersicht")}
-          style={{ ...styles.segBtn, ...(subTab === "uebersicht" ? styles.segBtnActive : {}) }}
+          aria-pressed={!!(subTab === "uebersicht")} style={{ ...styles.segBtn, ...(subTab === "uebersicht" ? styles.segBtnActive : {}) }}
         >
           Übersicht
         </button>
@@ -9009,19 +9060,19 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <button
               onClick={() => setUebersichtSort("spiele")}
-              style={{ ...styles.chip, ...(uebersichtSort === "spiele" ? styles.chipActive : {}) }}
+              aria-pressed={!!(uebersichtSort === "spiele")} style={{ ...styles.chip, ...(uebersichtSort === "spiele" ? styles.chipActive : {}) }}
             >
               Spiele
             </button>
             <button
               onClick={() => setUebersichtSort("tore")}
-              style={{ ...styles.chip, ...(uebersichtSort === "tore" ? styles.chipActive : {}) }}
+              aria-pressed={!!(uebersichtSort === "tore")} style={{ ...styles.chip, ...(uebersichtSort === "tore" ? styles.chipActive : {}) }}
             >
               Tore
             </button>
             <button
               onClick={() => setUebersichtSort("quote")}
-              style={{ ...styles.chip, ...(uebersichtSort === "quote" ? styles.chipActive : {}) }}
+              aria-pressed={!!(uebersichtSort === "quote")} style={{ ...styles.chip, ...(uebersichtSort === "quote" ? styles.chipActive : {}) }}
             >
               Tore/Spiel
             </button>
@@ -10099,7 +10150,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           <button
                             key={g.id}
                             onClick={(e) => { setOpponentId(g.id); e.currentTarget.blur(); }}
-                            style={{ ...styles.chip, ...(opponentId === g.id ? styles.chipActive : {}) }}
+                            aria-pressed={!!(opponentId === g.id)} style={{ ...styles.chip, ...(opponentId === g.id ? styles.chipActive : {}) }}
                           >
                             {g.name}
                           </button>
@@ -10284,7 +10335,7 @@ function Verwaltung({
           <button
             key={key}
             onClick={() => setSubTab(key)}
-            style={{ ...styles.segBtn, ...(subTab === key ? styles.segBtnActive : {}) }}
+            aria-pressed={!!(subTab === key)} style={{ ...styles.segBtn, ...(subTab === key ? styles.segBtnActive : {}) }}
           >
             {label}
           </button>
@@ -10542,7 +10593,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
           <button
             key={g.id}
             onClick={() => setGruppeId(g.id)}
-            style={{ ...styles.segBtn, ...(gruppeId === g.id ? styles.segBtnActive : {}) }}
+            aria-pressed={!!(gruppeId === g.id)} style={{ ...styles.segBtn, ...(gruppeId === g.id ? styles.segBtnActive : {}) }}
           >
             {g.label}
           </button>
@@ -10980,13 +11031,13 @@ function TrainingsplanBereich({
           <div style={styles.chipGroup}>
             <button
               onClick={(e) => { waehleTyp("training"); e.currentTarget.blur(); }}
-              style={{ ...styles.chip, ...(terminTyp === "training" ? styles.chipActive : {}) }}
+              aria-pressed={!!(terminTyp === "training")} style={{ ...styles.chip, ...(terminTyp === "training" ? styles.chipActive : {}) }}
             >
               Training
             </button>
             <button
               onClick={(e) => { waehleTyp("hallentraining"); e.currentTarget.blur(); }}
-              style={{ ...styles.chip, ...(terminTyp === "hallentraining" ? styles.chipActive : {}) }}
+              aria-pressed={!!(terminTyp === "hallentraining")} style={{ ...styles.chip, ...(terminTyp === "hallentraining" ? styles.chipActive : {}) }}
             >
               Hallentraining
             </button>
@@ -11007,7 +11058,7 @@ function TrainingsplanBereich({
               <button
                 key={idx}
                 onClick={(e) => { toggleWochentag(idx); e.currentTarget.blur(); }}
-                style={{ ...styles.chip, ...(wochentage.includes(idx) ? styles.chipActive : {}) }}
+                aria-pressed={!!(wochentage.includes(idx))} style={{ ...styles.chip, ...(wochentage.includes(idx) ? styles.chipActive : {}) }}
               >
                 {WOCHENTAGE[idx]}
               </button>
@@ -11019,13 +11070,13 @@ function TrainingsplanBereich({
           <div style={styles.chipGroup}>
             <button
               onClick={(e) => { setRhythmus("woechentlich"); e.currentTarget.blur(); }}
-              style={{ ...styles.chip, ...(rhythmus === "woechentlich" ? styles.chipActive : {}) }}
+              aria-pressed={!!(rhythmus === "woechentlich")} style={{ ...styles.chip, ...(rhythmus === "woechentlich" ? styles.chipActive : {}) }}
             >
               Wöchentlich
             </button>
             <button
               onClick={(e) => { setRhythmus("zweiwoechentlich"); e.currentTarget.blur(); }}
-              style={{ ...styles.chip, ...(rhythmus === "zweiwoechentlich" ? styles.chipActive : {}) }}
+              aria-pressed={!!(rhythmus === "zweiwoechentlich")} style={{ ...styles.chip, ...(rhythmus === "zweiwoechentlich" ? styles.chipActive : {}) }}
             >
               Zweiwöchentlich
             </button>
@@ -11058,13 +11109,13 @@ function TrainingsplanBereich({
           <div style={{ ...styles.segNav, marginTop: 16 }}>
             <button
               onClick={() => setTerminTab("kommende")}
-              style={{ ...styles.segBtn, ...(terminTab === "kommende" ? styles.segBtnActive : {}) }}
+              aria-pressed={!!(terminTab === "kommende")} style={{ ...styles.segBtn, ...(terminTab === "kommende" ? styles.segBtnActive : {}) }}
             >
               Kommende Termine{kommende.length > 0 ? ` (${kommende.length})` : ""}
             </button>
             <button
               onClick={() => setTerminTab("vergangene")}
-              style={{ ...styles.segBtn, ...(terminTab === "vergangene" ? styles.segBtnActive : {}) }}
+              aria-pressed={!!(terminTab === "vergangene")} style={{ ...styles.segBtn, ...(terminTab === "vergangene" ? styles.segBtnActive : {}) }}
             >
               Vergangene Termine{vergangene.length > 0 ? ` (${vergangene.length})` : ""}
             </button>
@@ -11277,7 +11328,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
           <button
             onClick={() => setFilter([])}
-            style={{ ...styles.chip, ...(filter.length === 0 ? styles.chipActive : {}) }}
+            aria-pressed={!!(filter.length === 0)} style={{ ...styles.chip, ...(filter.length === 0 ? styles.chipActive : {}) }}
           >
             Alle
           </button>
@@ -11285,7 +11336,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
             <button
               key={k}
               onClick={(e) => { toggle(k); e.currentTarget.blur(); }}
-              style={{ ...styles.chip, ...(filter.includes(k) ? styles.chipActive : {}) }}
+              aria-pressed={!!(filter.includes(k))} style={{ ...styles.chip, ...(filter.includes(k) ? styles.chipActive : {}) }}
             >
               {k}
             </button>
@@ -11821,19 +11872,19 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
         <div style={styles.chipGroup}>
           <button
             onClick={(e) => { setNeuerTyp("spieltag"); e.currentTarget.blur(); }}
-            style={{ ...styles.chip, ...(neuerTyp === "spieltag" ? styles.chipActive : {}) }}
+            aria-pressed={!!(neuerTyp === "spieltag")} style={{ ...styles.chip, ...(neuerTyp === "spieltag" ? styles.chipActive : {}) }}
           >
             Spieltag
           </button>
           <button
             onClick={(e) => { setNeuerTyp("turnier"); e.currentTarget.blur(); }}
-            style={{ ...styles.chip, ...(neuerTyp === "turnier" ? styles.chipActive : {}) }}
+            aria-pressed={!!(neuerTyp === "turnier")} style={{ ...styles.chip, ...(neuerTyp === "turnier" ? styles.chipActive : {}) }}
           >
             Turnier
           </button>
           <button
             onClick={(e) => { setNeuerTyp("hallenturnier"); e.currentTarget.blur(); }}
-            style={{ ...styles.chip, ...(neuerTyp === "hallenturnier" ? styles.chipActive : {}) }}
+            aria-pressed={!!(neuerTyp === "hallenturnier")} style={{ ...styles.chip, ...(neuerTyp === "hallenturnier" ? styles.chipActive : {}) }}
           >
             Hallenturnier
           </button>
