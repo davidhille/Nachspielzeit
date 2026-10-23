@@ -9649,6 +9649,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
   const [tally, setTally] = useState({});
+  const [eigen, setEigen] = useState(0); // Eigentore des Gegners (zählen für uns, ohne Torschützen)
   const [editingId, setEditingId] = useState(null);
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
@@ -9712,6 +9713,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setOurGoals(0);
     setTheirGoals(0);
     setTally({});
+    setEigen(0);
   };
 
   const startEditSpiel = (sp) => {
@@ -9724,6 +9726,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     const t = {};
     sp.scorers.forEach((sc) => (t[sc.playerId] = sc.tore));
     setTally(t);
+    setEigen(Math.max(0, (Number(sp.ourGoals) || 0) - sp.scorers.reduce((a, sc) => a + (Number(sc.tore) || 0), 0)));
   };
 
   const startNewForOpponent = (gegnerId) => {
@@ -9734,6 +9737,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setOurGoals(0);
     setTheirGoals(0);
     setTally({});
+    setEigen(0);
   };
 
   const startNewFree = () => {
@@ -9744,10 +9748,11 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setOurGoals(0);
     setTheirGoals(0);
     setTally({});
+    setEigen(0);
   };
 
   const zugeordnet = Object.values(tally).reduce((a, b) => a + b, 0);
-  const luecke = (Number(ourGoals) || 0) - zugeordnet; // >0: Tore ohne Torschütze
+  const luecke = (Number(ourGoals) || 0) - zugeordnet - eigen; // >0: Tore ohne Torschütze
   const saveSpiel = () => {
     if (!opponentId) return;
     if (luecke !== 0) {
@@ -10048,9 +10053,9 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                     {(Number(ourGoals) || 0) > 0 || zugeordnet > 0 ? (
                       <div role="status" style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: luecke === 0 ? "var(--pos-text)" : "var(--danger-text)" }}>
                         {luecke === 0
-                          ? `✓ Alle ${zugeordnet} Tore haben einen Torschützen`
+                          ? `✓ Alle Tore zugeordnet${eigen > 0 ? ` (davon ${eigen} Eigentor${eigen > 1 ? "e" : ""} des Gegners)` : ""}`
                           : luecke > 0
-                          ? `${zugeordnet} von ${Number(ourGoals) || 0} Toren zugeordnet – ${luecke} ohne Torschütze`
+                          ? `${zugeordnet + eigen} von ${Number(ourGoals) || 0} Toren zugeordnet – ${luecke} ohne Torschütze`
                           : `Mehr Torschützen-Tore (${zugeordnet}) als im Ergebnis (${Number(ourGoals) || 0})`}
                       </div>
                     ) : null}
@@ -10074,6 +10079,16 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           </div>
                         );
                       })}
+                      <div style={{ ...styles.scorerTile, ...(eigen > 0 ? styles.scorerTileActive : {}) }}>
+                        <button style={styles.scorerName} onClick={() => { setEigen((e) => e + 1); setOurGoals((g) => Number(g) + 1); }}>
+                          Eigentor Gegner
+                        </button>
+                        <div style={styles.scorerStepper}>
+                          <button style={styles.stepBtn} onClick={() => { setEigen((e) => Math.max(0, e - 1)); setOurGoals((g) => Math.max(0, Number(g) - 1)); }} disabled={eigen === 0} aria-label="Eigentor des Gegners abziehen">−</button>
+                          <span style={styles.stepCount} aria-live="polite">{eigen}</span>
+                          <button style={styles.stepBtn} onClick={() => { setEigen((e) => e + 1); setOurGoals((g) => Number(g) + 1); }} aria-label="Eigentor des Gegners hinzufügen">+</button>
+                        </div>
+                      </div>
                       {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
                     </div>
                   </div>
