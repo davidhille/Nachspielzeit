@@ -74,6 +74,7 @@
     }
   }
   * { box-sizing: border-box; }
+  table, .nz-zahl { font-variant-numeric: tabular-nums; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
   input, select, textarea { color: var(--text); }
   button { appearance: none; -webkit-appearance: none; }
@@ -910,7 +911,7 @@ notify pgrst, 'reload schema';`;
         <div style={{ ...styles.editBanner, marginTop: 12 }}>
           <div>{fehler}</div>
           <div style={{ fontSize: 13, marginTop: 6 }}>Falls die Spalten fehlen, einmal in Supabase (SQL Editor) ausführen:</div>
-          <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_SPIELER}</pre>
+          <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_SPIELER}</pre>
         </div>
       )}
       {ergebnis && (
@@ -988,7 +989,7 @@ function SqlHinweis({ fehler }) {
     <div style={{ ...styles.editBanner, marginBottom: 12 }}>
       <div style={{ marginBottom: 6 }}>{fehler}</div>
       <div style={{ fontSize: 13 }}>Falls die Teams-Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
-      <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TEAMS}</pre>
+      <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TEAMS}</pre>
     </div>
   );
 }
@@ -1354,7 +1355,7 @@ function UebungenAdmin({ teams }) {
               </button>
               {offenId === u.id && (
                 <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-                  {u.bild_url && <img src={u.bild_url} alt={u.titel} style={{ maxWidth: "100%", borderRadius: 10 }} />}
+                  {u.bild_url && <img src={u.bild_url} alt={u.titel} style={{ maxWidth: "100%", borderRadius: 12 }} />}
                   {u.beschreibung ? <FormatierterText text={u.beschreibung} /> : <div style={{ fontSize: 13, color: "var(--muted)" }}>Kein Ablauf hinterlegt.</div>}
                   <div>
                     <button style={styles.secondaryBtn} onClick={() => setBearbeite(u)}>
@@ -1442,7 +1443,7 @@ function ZugaengeVerwaltung({ teams }) {
         <div style={{ ...styles.editBanner, marginBottom: 12 }}>
           <div style={{ marginBottom: 6 }}>{fehler}</div>
           <div style={{ fontSize: 13 }}>Falls die Zugangs-Tabelle noch fehlt: SQL unten einmalig in Supabase (SQL Editor) ausführen, vorher DEIN-AKTUELLER-CODE ersetzen.</div>
-          <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_ZUGAENGE}</pre>
+          <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_ZUGAENGE}</pre>
         </div>
       )}
       {!fehler && codes !== null && (
@@ -2065,7 +2066,7 @@ notify pgrst, 'reload schema';`;
               <div style={styles.cardDesc}>
                 Lädt alle Daten der App (Spieler, Trainings, Spieltage, Übungen, Notizen, Einstellungen …) als eine JSON-Datei herunter. Bilder liegen im Supabase-Storage und sind nur als Link enthalten.
               </div>
-              <div style={{ fontSize: 13.5, color: "var(--muted)", margin: "-4px 0 12px" }}>
+              <div style={{ fontSize: 14, color: "var(--muted)", margin: "-4px 0 12px" }}>
                 Letztes Backup von diesem Gerät: {letztesBackup || "noch keines"}
               </div>
               <button style={styles.primaryBtn} onClick={backupErstellen} disabled={backupLaeuft}>
@@ -2083,7 +2084,7 @@ notify pgrst, 'reload schema';`;
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 10 }}>Wiederherstellen aus einem Backup folgt in einem späteren Schritt.</div>
+            <div style={{ fontSize: 14, color: "var(--muted)", marginTop: 10 }}>Wiederherstellen aus einem Backup folgt in einem späteren Schritt.</div>
           </section>
         )}
 
@@ -2105,7 +2106,7 @@ notify pgrst, 'reload schema';`;
               <div style={{ ...styles.editBanner, marginBottom: 12 }}>
                 <div style={{ marginBottom: 6 }}>{featureFehler}</div>
                 <div style={{ fontSize: 13 }}>Falls die Tabelle noch fehlt, einmal in Supabase (SQL Editor) ausführen:</div>
-                <pre style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_FEATURES}</pre>
+                <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_FEATURES}</pre>
                 <div style={{ fontSize: 13, marginTop: 8 }}>Für die Team-Zuordnung zusätzlich das SQL aus dem Tab „Teams“ ausführen.</div>
               </div>
             )}
@@ -5671,7 +5672,7 @@ function SongPlayer({ songs, cover, team }) {
       {songs.length > 1 && offen && (
         <div style={{ maxHeight: 340, overflowY: "auto", paddingRight: 2 }}>
           {songs.map((x, i) => (
-            <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 12, alignItems: "center", textAlign: "left", border: "none", borderRadius: 12, padding: "10px 12px", marginBottom: 4, fontSize: 15, fontFamily: "inherit", cursor: "pointer", background: i === aktiv ? "rgba(196,39,31,0.10)" : "transparent", color: i === aktiv ? ROT : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
+            <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 12, alignItems: "center", textAlign: "left", border: "none", borderRadius: 12, padding: "10px 12px", marginBottom: 4, fontSize: 16, fontFamily: "inherit", cursor: "pointer", background: i === aktiv ? "rgba(196,39,31,0.10)" : "transparent", color: i === aktiv ? ROT : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
               <span style={{ width: 22, display: "inline-flex", justifyContent: "center" }}>
                 {i === aktiv ? <Equalizer aktiv={laeuft} farbe={ROT} hoehe={14} /> : <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>}
               </span>
@@ -5683,7 +5684,7 @@ function SongPlayer({ songs, cover, team }) {
       )}
 
       {song.text && textOffen && !lrc && (
-        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: 12, fontSize: 14.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{song.text}</div>
+        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: 12, fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{song.text}</div>
       )}
       {song.text && textOffen && lrc && (
         <div ref={lrcBox} style={{ position: "relative", padding: "40px 14px", height: 340, overflowY: "auto", background: "var(--surface-2)", borderRadius: 12, textAlign: "center", scrollbarWidth: "none" }}>
@@ -5775,7 +5776,7 @@ function KartenSeitePlus({ token }) {
               const an = t.k === aktTab;
               return (
                 <button key={t.k} onClick={() => waehle(t.k)} aria-current={an ? "page" : undefined}
-                  style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14.5, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? CLUB.farbe : "var(--border)"}`, background: an ? CLUB.farbe : "var(--surface)", color: an ? "#fff" : "inherit" }}>
+                  style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? CLUB.farbe : "var(--border)"}`, background: an ? CLUB.farbe : "var(--surface)", color: an ? "#fff" : "inherit" }}>
                   {t.label}
                   {t.n != null ? <span style={{ fontSize: 13, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
                 </button>
@@ -5955,7 +5956,7 @@ function KartenSeiteVorschau({ token }) {
               const an = t.k === aktTab;
               return (
                 <button key={t.k} onClick={() => waehle(t.k)} aria-current={an ? "page" : undefined}
-                  style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14.5, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? CLUB.farbe : "var(--border)"}`, background: an ? CLUB.farbe : "var(--surface)", color: an ? "#fff" : "inherit" }}>
+                  style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${an ? CLUB.farbe : "var(--border)"}`, background: an ? CLUB.farbe : "var(--surface)", color: an ? "#fff" : "inherit" }}>
                   {t.label}
                   {t.n != null ? <span style={{ fontSize: 13, fontWeight: 600, opacity: an ? 0.9 : 0.6 }}>{t.n}</span> : null}
                 </button>
@@ -6136,23 +6137,23 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
   }, [zeilen]);
   const zeile = (k, stil) => (k >= 0 && k < zeilen.length ? <div style={stil}>{zeilen[k]}</div> : <div style={stil}>&nbsp;</div>);
   return (
-    <div style={{ margin: "8px 0", padding: 12, border: "1px solid var(--border)", borderRadius: 10 }}>
+    <div style={{ margin: "8px 0", padding: 12, border: "1px solid var(--border)", borderRadius: 12 }}>
       <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>
         Tap-Sync „{titel}“: Song starten und bei jeder Zeile genau dann auf den großen Button tippen (oder Leertaste), wenn sie anfängt. Kopfhörer empfohlen. Zeile {Math.min(idx + 1, zeilen.length)} von {zeilen.length}.
       </div>
       <audio ref={audioRef} src={url} preload="auto" onPlay={() => setLaeuft(true)} onPause={() => setLaeuft(false)} onEnded={() => setLaeuft(false)} />
       <div style={{ textAlign: "center", minHeight: 110 }}>
         {idx > 0 ? (
-          <div style={{ fontSize: 15, fontWeight: 700, color: CLUB.farbe }}>♪ {zeilen[idx - 1]} <span style={{ fontWeight: 500, fontSize: 13, color: "var(--muted)" }}>(getippt)</span></div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: CLUB.farbe }}>♪ {zeilen[idx - 1]} <span style={{ fontWeight: 500, fontSize: 13, color: "var(--muted)" }}>(getippt)</span></div>
         ) : (
           <div style={{ fontSize: 13, color: "var(--muted)" }}>&nbsp;</div>
         )}
-        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Als Nächstes tippen, sobald diese Zeile anfängt</div>
+        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Als Nächstes tippen, sobald diese Zeile anfängt</div>
         {zeile(idx, { fontSize: 20, fontWeight: 700, margin: "2px 0 6px" })}
         {zeile(idx + 1, { fontSize: 14, color: "var(--muted)" })}
         {zeile(idx + 2, { fontSize: 13, color: "var(--muted)", opacity: 0.6 })}
       </div>
-      <button onPointerDown={(e) => { e.preventDefault(); tap(); }} style={{ width: "100%", padding: "22px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: "none", background: "var(--accent, #B71C1C)", color: "#fff", cursor: "pointer", touchAction: "manipulation", userSelect: "none" }}>
+      <button onPointerDown={(e) => { e.preventDefault(); tap(); }} style={{ width: "100%", padding: "22px 0", fontSize: 20, fontWeight: 700, borderRadius: 12, border: "none", background: "var(--accent, #B71C1C)", color: "#fff", cursor: "pointer", touchAction: "manipulation", userSelect: "none" }}>
         {laeuft ? "TAP – Zeile beginnt jetzt" : idx > 0 ? "Pausiert – unten „Start / Weiter“" : "Erst Song starten ▶ (Button unten)"}
       </button>
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
@@ -6213,7 +6214,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
     <section>
     <div style={{ ...styles.card, marginBottom: 12 }}>
       <KartenTitel>Link für Eltern</KartenTitel>
-      <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
+      <div style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
         Eine Seite mit Saisonbilanz, Spieltagskarten, Sammelkarten und Mannschaftssongs. Wer den Link hat, sieht sie ohne Anmeldung; die Werte aktualisieren sich automatisch, sobald in der App etwas geändert wurde.
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 10 }}>
@@ -6252,7 +6253,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
     <div style={{ ...styles.card, marginBottom: 12 }}>
           <div>
             <KartenTitel>Vorschau-Link (zum Testen)</KartenTitel>
-            <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 10 }}>
+            <div style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)", marginBottom: 10 }}>
               Hier siehst du Änderungen an der Eltern-Seite, bevor sie freigegeben werden. Gleiche Daten wie der Eltern-Link, nur eine andere Darstellung. Eltern sehen sie nicht.
             </div>
             <input readOnly value={urlVorschau} onFocus={(e) => e.target.select()} style={{ ...styles.textarea, marginTop: 0, fontSize: 13 }} />
@@ -6266,7 +6267,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
           <div>
             <KartenTitel>Mannschaftssongs (Player auf der Eltern-Seite)</KartenTitel>
             {songs.map((x, i) => (
-              <div key={x.pfad} style={{ fontSize: 13.5, padding: "8px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
+              <div key={x.pfad} style={{ fontSize: 14, padding: "8px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
                 <div style={{ marginBottom: 4 }}>{i + 1}. {x.titel}</div>
                 <div style={{ display: "flex", gap: "4px 10px", alignItems: "center", flexWrap: "wrap" }}>
                 <button style={{ ...styles.linkBtn, padding: "4px 2px" }} disabled={busy || i === 0} onClick={() => onSongChange(i, "hoch")}>↑</button>
@@ -6973,7 +6974,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
     <>
     <div className={titleAbove ? "team-hero" : undefined} style={titleAbove ? { marginBottom } : undefined}>
     {titleAbove && (
-      <div className="hero-kopf" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
+      <div className="hero-kopf" style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: "16px", marginBottom: 8 }}>
         Mannschaft
       </div>
     )}
@@ -7100,7 +7101,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         <img
           src={photoUrl}
           alt={teamName}
-          style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 10 }}
+          style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 12 }}
         />
         <button
           onClick={() => setLightboxOpen(false)}
@@ -7157,7 +7158,7 @@ function HeuteKarte({ termine, spieltage, trainings, onOpen }) {
       {offen && (
         <div style={zeile}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14.5 }}>Training noch nicht bewertet</div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Training noch nicht bewertet</div>
             <div style={{ fontSize: 13, color: "var(--muted)" }}>{formatTerminLabel(offen.date)}</div>
           </div>
           <button type="button" style={btn} onClick={() => onOpen({ typ: "training", date: offen.date })}>Bewerten</button>
@@ -7166,7 +7167,7 @@ function HeuteKarte({ termine, spieltage, trainings, onOpen }) {
       {naechster && (
         <div style={zeile}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14.5 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>
               {naechster.date === heute ? "Heute" : formatTerminLabel(naechster.date)} · {naechster.kind === "spieltag" ? (naechster.typ === "turnier" ? "Turnier" : naechster.typ === "hallenturnier" ? "Hallenturnier" : "Spieltag") : naechster.typ === "hallentraining" ? "Hallentraining" : "Training"}
             </div>
             {naechster.zeit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>{String(naechster.zeit).slice(0, 5)} Uhr</div> : null}
@@ -7311,12 +7312,12 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{info.label}</div>
                 {eintrag.startZeit && eintrag.endZeit && (
-                  <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
                     {eintrag.startZeit}–{eintrag.endZeit}
                   </div>
                 )}
                 {eintrag.zeit && (
-                  <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>{eintrag.zeit} Uhr</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{eintrag.zeit} Uhr</div>
                 )}
               </div>
             );
@@ -7351,7 +7352,7 @@ function GeburtstagsKarte({ players, vorlauf }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{eintraege.some((e) => e.tage === 0) ? "Heute ist Geburtstag!" : "Bald Geburtstag"}</div>
         {eintraege.map((e) => (
-          <div key={e.id} style={{ fontSize: 13.5, padding: "1px 0", fontWeight: e.tage === 0 ? 700 : 400 }}>
+          <div key={e.id} style={{ fontSize: 14, padding: "1px 0", fontWeight: e.tage === 0 ? 700 : 400 }}>
             {e.name} wird {e.alter} · {wann(e)}
           </div>
         ))}
@@ -7873,7 +7874,7 @@ function SpielerSlider({ rows, players, onSelect }) {
   if (liste.length === 0) return null;
   return (
     <div className="spieler-wrap" style={{ marginBottom: 12, marginTop: 8 }}>
-      <div className="spieler-label" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+      <div className="spieler-label" style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
         Spieler
       </div>
       <div className="spieler-slider">
@@ -7926,7 +7927,7 @@ function PlayerCard({ player, stats }) {
             <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 38, fontWeight: 700, color: "var(--gold)" }}>
               {player.trikotnummer ?? "–"}
             </div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", letterSpacing: "0.08em", marginTop: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", letterSpacing: "0.08em", marginTop: 4 }}>
               TRIKOT
             </div>
           </div>
@@ -7953,7 +7954,7 @@ function PlayerCard({ player, stats }) {
           {player.spitzname && (
             <div style={{ fontSize: 13, fontStyle: "italic", fontWeight: 600, color: "var(--gold)", marginTop: 4 }}>„{player.spitzname}“</div>
           )}
-          <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
             SV HEIMSTETTEN U8
           </div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 6, lineHeight: 1.5 }}>
@@ -7999,10 +8000,10 @@ function PlayerCard({ player, stats }) {
               </div>
             ) : (
               <div key={i} style={{ display: "flex", justifyContent: "flex-start", alignItems: "baseline", gap: 5 }}>
-                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 700, color: "var(--gold)" }}>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, color: "var(--gold)" }}>
                   {s.value}
                 </span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                   {s.label}
                 </span>
               </div>
@@ -8633,7 +8634,7 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
         )}
         {geplanteTermine.length > 0 && players.length > 0 && (
           <div style={{ marginTop: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontWeight: 600 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 14, fontWeight: 600 }}>
               <span>{anzGeprueft} von {players.length} geprüft</span>
               {anzGeprueft < players.length && (
                 <button type="button" style={{ ...styles.linkBtn, minHeight: 44 }} onClick={() => setGeprueft(new Set(players.map((p) => p.id)))}>
@@ -8706,11 +8707,11 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
                     color: punkte >= 0 ? "var(--pos-text)" : "var(--danger-text)",
                   }}
                 >
-                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 800 }}>
+                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800 }}>
                     {punkte >= 0 ? "+" : ""}
                     {punkte.toFixed(2)}
                   </span>
-                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.8 }}>Punkte</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.8 }}>Punkte</span>
                 </div>
               </div>
 
@@ -8810,7 +8811,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
     <section>
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <KartenTitel>Monat wählen</KartenTitel>
-        <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
+        <div style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
           Extrapunkte (-1 bis +1) fließen ab dem Folgemonat in die Basis-Qualität ein.
         </div>
         <input
@@ -8943,7 +8944,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
         <div style={{ marginTop: 4 }}>
           <div style={{ ...styles.card, marginBottom: 16 }}>
           <KartenTitel>Sortieren nach</KartenTitel>
-          <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
+          <div style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)", marginBottom: 12 }}>
             Anzahl der Spiele, an denen ein Spieler laut Kader-Eintrag an den jeweiligen Spieltagen teilgenommen hat.
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -9592,9 +9593,9 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
     <div className="wys">
       {label && <label style={styles.label}>{label}</label>}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: label ? 4 : 0 }}>
-        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.bold), fontWeight: 800, fontSize: 15 }} onClick={() => cmd("bold")} title="Fett" aria-label="Fett">B</button>
-        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.underline), fontSize: 15, textDecoration: "underline" }} onClick={() => cmd("underline")} title="Unterstrichen" aria-label="Unterstrichen">U</button>
-        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.italic), fontSize: 15, fontStyle: "italic", fontFamily: "Georgia, serif" }} onClick={() => cmd("italic")} title="Kursiv" aria-label="Kursiv">I</button>
+        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.bold), fontWeight: 800, fontSize: 16 }} onClick={() => cmd("bold")} title="Fett" aria-label="Fett">B</button>
+        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.underline), fontSize: 16, textDecoration: "underline" }} onClick={() => cmd("underline")} title="Unterstrichen" aria-label="Unterstrichen">U</button>
+        <button type="button" onMouseDown={keepFocus} style={{ ...btn(aktiv.italic), fontSize: 16, fontStyle: "italic", fontFamily: "Georgia, serif" }} onClick={() => cmd("italic")} title="Kursiv" aria-label="Kursiv">I</button>
         <button type="button" onMouseDown={keepFocus} style={btn(aktiv.ul)} onClick={() => cmd("insertUnorderedList")} title="Aufzählung" aria-label="Aufzählung"><BulletListIcon size={15} /></button>
         <button type="button" onMouseDown={keepFocus} style={btn(aktiv.ol)} onClick={() => cmd("insertOrderedList")} title="Nummerierte Liste" aria-label="Nummerierte Liste"><NumberedListIcon size={15} /></button>
         <button type="button" onMouseDown={keepFocus} style={btn(false)} onClick={() => fileRef.current && fileRef.current.click()} title="Bild einfügen" aria-label="Bild einfügen" disabled={ladeBild}><ImageIcon size={15} /></button>
@@ -9627,7 +9628,7 @@ function FormatTextarea({ value, onChange, rows = 5, placeholder, label, hint = 
         onPaste={onPaste}
       />
       {bildFehler && <div style={{ fontSize: 13, color: "var(--danger-text)", marginTop: 4 }}>{bildFehler}</div>}
-      {hint && <div style={{ fontSize: 12.5, color: "var(--muted-2)", marginTop: 4 }}>Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
+      {hint && <div style={{ fontSize: 13, color: "var(--muted-2)", marginTop: 4 }}>Screenshot: einfach hier einfügen (Strg/Cmd+V).</div>}
     </div>
   );
 }
@@ -9857,16 +9858,16 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
             </button>
           </div>
           {teilenFehler && (
-            <span style={{ fontSize: 12.5, color: "var(--danger-text)", textAlign: "right", maxWidth: 220 }}>{teilenFehler}</span>
+            <span style={{ fontSize: 13, color: "var(--danger-text)", textAlign: "right", maxWidth: 220 }}>{teilenFehler}</span>
           )}
           {spieltag.spiele.length > 0 && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#2E7D32" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--success-text)" }}>
               <span
                 style={{
                   width: 15,
                   height: 15,
                   borderRadius: 999,
-                  background: "#2E7D32",
+                  background: "var(--success-text)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -9935,7 +9936,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                         background: "var(--surface)",
                         border: "1px solid var(--border)",
                         borderBottom: `4px solid ${ergebnisColor}`,
-                        borderRadius: 14,
+                        borderRadius: 16,
                         padding: 12,
                       }}
                     >
@@ -9948,11 +9949,11 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                         <EditIcon size={14} />
                       </button>
                       <div style={{ fontSize: 13, fontWeight: 700, paddingRight: 20 }}>{gegnerName(sp.opponentId)}</div>
-                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700, color: ergebnisColor, margin: "4px 0" }}>
+                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: ergebnisColor, margin: "4px 0" }}>
                         {sp.ourGoals}:{sp.theirGoals}
                       </div>
                       {sp.scorers.length > 0 && (
-                        <div style={{ fontSize: 10.5, color: "var(--muted)", lineHeight: 1.4 }}>
+                        <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.4 }}>
                           ⚽{" "}
                           {sp.scorers.map((sc, i) => (
                             <React.Fragment key={sc.id}>
@@ -9973,7 +9974,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                     style={{
                       background: "transparent",
                       border: "1.5px dashed var(--muted-2)",
-                      borderRadius: 14,
+                      borderRadius: 16,
                       padding: 12,
                       minHeight: 92,
                       display: "flex",
@@ -9986,7 +9987,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                     }}
                   >
                     <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g.name}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted-2)", fontSize: 12.5, fontWeight: 600 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted-2)", fontSize: 13, fontWeight: 600 }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <path d="M12 5v14M5 12h14" />
                       </svg>
@@ -10000,14 +10001,14 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                   style={{
                     background: "transparent",
                     border: "1.5px dashed var(--border)",
-                    borderRadius: 14,
+                    borderRadius: 16,
                     padding: 12,
                     minHeight: 92,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "var(--muted-2)",
-                    fontSize: 12.5,
+                    fontSize: 13,
                     fontWeight: 600,
                     textAlign: "center",
                     cursor: "pointer",
@@ -11141,7 +11142,7 @@ function BildLightbox({ url, alt, onClose }) {
       role="dialog"
       aria-label="Bild vergrößert"
     >
-      <img src={url} alt={alt || ""} style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 10 }} />
+      <img src={url} alt={alt || ""} style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 12 }} />
       <button
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         aria-label="Schließen"
@@ -11155,7 +11156,7 @@ function BildLightbox({ url, alt, onClose }) {
 
 function UebungBild({ url, size = 64, titel = "", zoom = false }) {
   const [offen, setOffen] = useState(false);
-  const box = { width: size, height: size, borderRadius: 10, flexShrink: 0, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" };
+  const box = { width: size, height: size, borderRadius: 12, flexShrink: 0, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" };
   if (!url) {
     return (
       <div style={box} aria-hidden="true">
@@ -11236,7 +11237,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
   );
 }
 
-const tagStyle = { background: "var(--surface-2, #F2EAE9)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 12.5, fontWeight: 600 };
+const tagStyle = { background: "var(--surface-2, #F2EAE9)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600 };
 
 function UebungenBereich({ uebungen, onSave, onRemove }) {
   const [suche, setSuche] = useState("");
@@ -11595,7 +11596,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 8 }}>
               <UebungBild url={e.uebung.bildUrl} size={72} titel={e.uebung.titel} zoom />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--muted-2)" }}>{i + 1}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted-2)" }}>{i + 1}</div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{e.uebung.titel}</div>
                 {e.uebung.keywords.length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
@@ -12031,7 +12032,7 @@ const styles = {
     background: "var(--accent)",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "12px 18px",
     fontSize: 14,
     fontWeight: 600,
@@ -12055,7 +12056,7 @@ const styles = {
     padding: "6px 11px",
     cursor: "pointer",
   },
-  crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 6, padding: 3 },
+  crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 8, padding: 3 },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1, letterSpacing: "-0.01em" },
   subtitle: { fontSize: 13, color: "#F3D2D1", marginTop: 2 },
   nav: {
@@ -12090,7 +12091,7 @@ const styles = {
     background: "transparent",
     color: "var(--muted)",
     padding: "0 0 10px 0",
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
     whiteSpace: "nowrap",
@@ -12098,12 +12099,12 @@ const styles = {
     marginBottom: -1,
   },
   segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--surface) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--surface) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--surface)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
-  segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", minHeight: 44, padding: "8px 14px", borderRadius: 9, fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
+  segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", minHeight: 44, padding: "8px 14px", borderRadius: 8, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
   segBtnActive: { background: "rgba(196,39,31,0.10)", color: "var(--accent-text)" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
-    background: "#EFE7E7",
+    background: "var(--surface-2)",
     borderRadius: 12,
     padding: 4,
     marginTop: 20,
@@ -12112,7 +12113,7 @@ const styles = {
     flex: 1,
     textAlign: "center",
     padding: "9px 0",
-    borderRadius: 9,
+    borderRadius: 8,
     border: "none",
     background: "transparent",
     fontSize: 13,
@@ -12128,8 +12129,8 @@ const styles = {
   },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
   h2: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "4px 0 14px 0", letterSpacing: "-0.01em" },
-  h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 12px 0", paddingBottom: 8, borderBottom: "1px solid var(--divider)", letterSpacing: "-0.005em" },
-  h3Block: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, margin: 0, padding: "12px 0", borderTop: "1px solid var(--divider)", letterSpacing: "-0.005em" },
+  h3: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 600, margin: "0 0 12px 0", paddingBottom: 8, borderBottom: "1px solid var(--divider)", letterSpacing: "-0.005em" },
+  h3Block: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 600, margin: 0, padding: "12px 0", borderTop: "1px solid var(--divider)", letterSpacing: "-0.005em" },
   h3Plain: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, margin: "0 0 10px 0", letterSpacing: "-0.005em" },
   tabLabel: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--muted)", margin: "4px 0 10px 0" },
   subheading: { fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "16px 0 8px 0" },
@@ -12175,7 +12176,7 @@ const styles = {
   rank: {
     width: 20,
     height: 20,
-    borderRadius: 6,
+    borderRadius: 8,
     background: "var(--divider)",
     color: "var(--muted)",
     fontSize: 13,
@@ -12220,13 +12221,13 @@ const styles = {
     alignItems: "center",
     gap: 9,
     padding: "8px 11px 8px 8px",
-    borderRadius: 14,
+    borderRadius: 16,
     border: "1.5px solid var(--border)",
     outline: "none",
     background: "var(--surface)",
     cursor: "pointer",
     fontFamily: "inherit",
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: 600,
     color: "var(--text)",
   },
@@ -12250,7 +12251,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
   },
-  cardName: { fontWeight: 600, fontSize: 15 },
+  cardName: { fontWeight: 600, fontSize: 16 },
   mutedTag: { color: "var(--muted-2)", fontWeight: 400, fontSize: 13 },
   spieltagSummary: { display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" },
   summaryPill: {
@@ -12261,7 +12262,7 @@ const styles = {
     height: 22,
     padding: "0 6px",
     borderRadius: 999,
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: 700,
   },
   summaryPillWin: { background: "var(--win-bg)", color: "var(--success-text)" },
@@ -12276,13 +12277,13 @@ const styles = {
     gap: 2,
     background: "var(--surface-2)",
     border: "1px solid var(--border)",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 2,
   },
   goalStepperBtn: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 12,
     border: "none",
     outline: "none",
     background: "var(--surface)",
@@ -12299,18 +12300,18 @@ const styles = {
     minWidth: 30,
     textAlign: "center",
     fontFamily: "'Space Grotesk', sans-serif",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 700,
     color: "var(--text)",
   },
-  label: { fontSize: 12.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 130 },
+  label: { fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 130 },
   range: { flex: 1, accentColor: "var(--accent)", minWidth: 100 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
   chip: { border: "1px solid var(--border-strong)", outline: "none", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
-  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 12.5, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
+  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
     background: "var(--header-grad-btn)",
     color: "#fff",
@@ -12359,7 +12360,7 @@ const styles = {
   basisGrid: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--divider)", display: "flex", flexDirection: "column", gap: 8 },
   basisItem: { display: "flex", alignItems: "center", gap: 10 },
   empty: { background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 14 },
-  cardDesc: { fontSize: 13.5, lineHeight: 1.45, color: "var(--text)", margin: "0 0 12px" },
+  cardDesc: { fontSize: 14, lineHeight: 1.45, color: "var(--text)", margin: "0 0 12px" },
   hint: { fontSize: 13, color: "var(--muted)", marginTop: -4, marginBottom: 6 },
   toast: {
     position: "fixed",
@@ -12411,11 +12412,11 @@ const styles = {
     zIndex: 70,
   },
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
-  statBox: { flex: "1 1 90px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
-  statValue: { fontSize: 18, fontWeight: 700, color: "var(--accent-text)", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
+  statBox: { flex: "1 1 90px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  statValue: { fontSize: 20, fontWeight: 700, color: "var(--accent-text)", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
   statLabel: { fontSize: 13, color: "var(--muted)", marginTop: 2 },
   sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
-  sparkCard: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  sparkCard: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   sparkValue: { fontSize: 14, fontWeight: 700, color: "var(--accent-text)", fontVariantNumeric: "tabular-nums" },
   spielRow: {
@@ -12431,7 +12432,7 @@ const styles = {
     boxShadow: "0 1px 3px rgba(32,22,22,0.04)",
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
-  scorerTile: { border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  scorerTile: { border: "1px solid var(--border)", borderRadius: 12, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
   scorerTileActive: { border: "1px solid var(--accent)", background: "var(--accent-soft)" },
   scorerName: { background: "transparent", border: "none", padding: 0, minHeight: 44, textAlign: "left", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" },
   scorerStepper: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 },
@@ -12462,7 +12463,7 @@ const styles = {
   },
   modalCard: {
     background: "var(--surface)",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 20,
     maxWidth: 380,
     width: "100%",
