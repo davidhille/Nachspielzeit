@@ -58,6 +58,9 @@
     --tan-bg: #F3ECE3; --tan-text: #8A5A16;
     --lav-bg: #EFEAF3; --lav-text: #5B4FA8;
     --header-grad: linear-gradient(135deg, #C4271F 0%, #8E1416 100%);
+    --sh-1: 0 1px 2px rgba(28,20,20,0.05);
+    --sh-2: 0 4px 12px rgba(28,20,20,0.08), 0 1px 3px rgba(28,20,20,0.05);
+    --sh-3: 0 18px 40px rgba(0,0,0,0.28);
     --header-grad-btn: linear-gradient(135deg, #D2271F, #96161A);
   }
   @media (prefers-color-scheme: dark) {
@@ -71,6 +74,9 @@
       --focus: #FF8F87;
       --tan-bg: #3A2F1D; --tan-text: #F2C879;
       --lav-bg: #2A2640; --lav-text: #B7ACE8;
+      --sh-1: 0 1px 2px rgba(0,0,0,0.35);
+      --sh-2: 0 4px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.3);
+      --sh-3: 0 18px 40px rgba(0,0,0,0.55);
     }
   }
   * { box-sizing: border-box; }
@@ -78,7 +84,8 @@
   html, body { margin: 0; padding: 0; background: var(--bg); }
   input, select, textarea { color: var(--text); }
   button, input, select, textarea, option { font-family: inherit; }
-  button { appearance: none; -webkit-appearance: none; }
+  button { appearance: none; -webkit-appearance: none; transition: transform 100ms ease, background-color 120ms ease; }
+  button:not(:disabled):active { transform: scale(0.98); }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .app-header :focus-visible { outline-color: #FFFFFF; }
   .app-header { position: relative; overflow: hidden; }
@@ -3034,7 +3041,7 @@ function TkTrainingWahl({ board, onClose }) {
   return (
     <div role="dialog" aria-modal="true" aria-label="Zu Training hinzufügen" onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(20,12,12,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 420, maxHeight: "80vh", padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 18px 40px rgba(0,0,0,0.3)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 420, maxHeight: "80vh", padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "var(--sh-3)" }}>
         <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600 }}>Zu Training hinzufügen</div>
         {tb && tb.fehlt ? (
           <TrainingBoardSqlHinweis />
@@ -3677,7 +3684,7 @@ function TkDialog({ dialog, onClose }) {
   return (
     <div role="dialog" aria-modal="true" aria-label={dialog.titel} onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(20,12,12,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 360, padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 18px 40px rgba(0,0,0,0.3)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 360, padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "var(--sh-3)" }}>
         <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600 }}>{dialog.titel}</div>
         <input autoFocus value={wert} placeholder={dialog.platzhalter || ""} inputMode={dialog.zahl ? "numeric" : undefined}
           onChange={(e) => setWert(e.target.value)}
@@ -6229,7 +6236,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
             <button style={styles.linkBtn} onClick={() => kopierText(url, setKopiert)}>{kopiert ? "Kopiert ✓" : "Link kopieren"}</button>
             <button style={styles.linkBtn} onClick={onRefresh} disabled={busy}>Jetzt aktualisieren</button>
             <button style={styles.linkBtn} onClick={() => window.open(url, "_blank")}>Öffnen</button>
-            <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={onRevoke} disabled={busy}>Alle Links sperren</button>
+            <button style={{ ...styles.linkBtn, ...styles.dangerBtn }} onClick={onRevoke} disabled={busy}>Alle Links sperren</button>
           </div>
           <div style={{ marginTop: 12 }}>{namensFelder}</div>
           <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Der Link besteht aus Name und Code (mind. 5 Zeichen, Buchstaben/Ziffern), damit er nicht zu erraten ist.</div>
@@ -6239,7 +6246,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
               {altTokens.map((t) => (
                 <div key={t} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "2px 0" }}>
                   <span style={{ wordBreak: "break-all" }}>{kartenLinkUrl(t)}</span>
-                  <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => confirmAnd("Diesen alten Link abschalten? Eltern, die ihn gespeichert haben, sehen dann nichts mehr.", () => onAltOff(t))} disabled={busy}>Abschalten</button>
+                  <button style={{ ...styles.linkBtn, ...styles.dangerBtn }} onClick={() => confirmAnd("Diesen alten Link abschalten? Eltern, die ihn gespeichert haben, sehen dann nichts mehr.", () => onAltOff(t))} disabled={busy}>Abschalten</button>
                 </div>
               ))}
             </div>
@@ -6276,7 +6283,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
                 <button style={styles.linkBtn} disabled={busy} onClick={() => onSongChange(i, "umbenennen")}>Umbenennen</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => { setTextEdit(textEdit && textEdit.i === i ? null : { i, val: x.text || "" }); }}>{x.text ? "Text ✓" : "Text"}</button>
                 <button style={styles.linkBtn} disabled={busy} onClick={() => { if (!(x.text || "").trim()) { setSync({ i, msg: "Bitte zuerst über „Text“ den Liedtext eintragen und speichern.", fehler: true }); return; } setTextEdit(null); setTapI(i); }}>Tap-Sync</button>
-                <button style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center" }} disabled={busy} aria-label="Löschen" title="Löschen" onClick={() => onSongChange(i, "loeschen")}><TrashIcon size={15} /></button>
+                <button style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center" }} disabled={busy} aria-label="Löschen" title="Löschen" onClick={() => onSongChange(i, "loeschen")}><TrashIcon size={15} /></button>
                 </div>
               </div>
             ))}
@@ -8659,7 +8666,7 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
       {aktuellBewertet && (
         <div style={{ ...styles.editBanner, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <span>Dieser Termin wurde bereits bewertet — Änderungen überschreiben die bestehende Bewertung.</span>
-          <button style={{ ...styles.linkBtn, color: "var(--danger-text)", whiteSpace: "nowrap" }} onClick={deleteBewertung}>
+          <button style={{ ...styles.linkBtn, ...styles.dangerBtn, whiteSpace: "nowrap" }} onClick={deleteBewertung}>
             Bewertung löschen
           </button>
         </div>
@@ -9852,7 +9859,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
               </button>
             )}
             <button
-              style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+              style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => confirmAnd("Diesen Spieltag in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.", onRemoveSpieltag)}
             >
               <TrashIcon size={14} /> Entfernen
@@ -10110,7 +10117,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                     </button>
                     {editingId && (
                       <button
-                        style={{ ...styles.linkBtn, color: "var(--danger-text)", flexShrink: 0 }}
+                        style={{ ...styles.linkBtn, ...styles.dangerBtn, flexShrink: 0 }}
                         onClick={() => confirmAnd("Dieses Spiel wirklich entfernen?", () => { onRemoveSpiel(editingId); resetForm(); })}
                       >
                         Löschen
@@ -10314,7 +10321,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
         return (
           <div style={{ ...styles.seasonHint, marginBottom: 12 }}>
             <span>{alt.length} {alt.length === 1 ? "Eintrag liegt" : "Einträge liegen"} länger als {EINST.papierkorbTage} Tage im Papierkorb.</span>
-            <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => confirmAnd(`${alt.length} Einträge endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () => alt.forEach(([t, id, l]) => onHardDelete(t, id, l)))}>Jetzt endgültig löschen</button>
+            <button style={{ ...styles.linkBtn, ...styles.dangerBtn }} onClick={() => confirmAnd(`${alt.length} Einträge endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () => alt.forEach(([t, id, l]) => onHardDelete(t, id, l)))}>Jetzt endgültig löschen</button>
           </div>
         );
       })()}
@@ -10335,7 +10342,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       <RestoreIcon size={14} /> Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+                      style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                       onClick={() =>
                         confirmAnd(`Spieler "${p.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("players", p.id, "Spieler")
@@ -10368,7 +10375,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       <RestoreIcon size={14} /> Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+                      style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                       onClick={() =>
                         confirmAnd(`Gegner "${g.name}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`, () =>
                           onHardDelete("gegner", g.id, "Gegner")
@@ -10401,7 +10408,7 @@ function PapierkorbBereich({ trashPlayers, trashGegner, trashSpieltage, onRestor
                       <RestoreIcon size={14} /> Wiederherstellen
                     </button>
                     <button
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+                      style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
                       onClick={() =>
                         confirmAnd(
                           `Spieltag vom ${formatTerminLabel(s.date)} endgültig löschen? Das kann nicht rückgängig gemacht werden.`,
@@ -10818,7 +10825,7 @@ function SpielerBereich({
                     </button>
                     {p.photo_url && (
                       <button
-                        style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
                         onClick={() => confirmAnd("Profilbild entfernen?", () => onRemovePhoto(p.id))}
                       >
                         <TrashIcon size={14} /> Entfernen
@@ -11108,7 +11115,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
             {abgesagt ? <RestoreIcon size={14} /> : <PowerIcon size={14} />} {abgesagt ? "Wieder aktivieren" : "Absagen"}
           </button>
           <button
-            style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }}
+            style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
             onClick={() => confirmAnd("Diesen Trainingstermin wirklich entfernen?", () => onRemoveTermin(termin.id))}
           >
             <TrashIcon size={14} /> Entfernen
@@ -11459,7 +11466,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
           <button style={{ ...styles.primaryBtn, opacity: titel.trim() && !gesperrt ? 1 : 0.5 }} disabled={!titel.trim() || gesperrt} onClick={speichern}>Speichern</button>
           <button style={styles.secondaryBtn} onClick={onCancel}>Abbrechen</button>
           {onRemove && (
-            <button style={{ ...styles.linkBtn, color: "var(--danger-text)", display: "inline-flex", alignItems: "center", gap: 4 }} onClick={onRemove}>
+            <button style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4 }} onClick={onRemove}>
               <TrashIcon size={14} /> Löschen
             </button>
           )}
@@ -11516,7 +11523,7 @@ function TerminBoards({ termin }) {
             <button style={styles.linkBtn} disabled={i === 0} onClick={() => tb.move(termin.id, l.id, -1)} aria-label="Nach oben">↑</button>
             <button style={styles.linkBtn} disabled={i === liste.length - 1} onClick={() => tb.move(termin.id, l.id, 1)} aria-label="Nach unten">↓</button>
           </div>
-          <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => tb.remove(l.id)} aria-label="Board entfernen">
+          <button style={{ ...styles.linkBtn, ...styles.dangerBtn }} onClick={() => tb.remove(l.id)} aria-label="Board entfernen">
             <TrashIcon size={14} />
           </button>
         </div>
@@ -11620,7 +11627,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
                 <button style={styles.linkBtn} disabled={i === 0} onClick={() => onMove(termin.id, e.id, -1)} aria-label="Nach oben">↑</button>
                 <button style={styles.linkBtn} disabled={i === liste.length - 1} onClick={() => onMove(termin.id, e.id, 1)} aria-label="Nach unten">↓</button>
               </div>
-              <button style={{ ...styles.linkBtn, color: "var(--danger-text)" }} onClick={() => onRemove(e.id)} aria-label="Übung entfernen">
+              <button style={{ ...styles.linkBtn, ...styles.dangerBtn }} onClick={() => onRemove(e.id)} aria-label="Übung entfernen">
                 <TrashIcon size={14} />
               </button>
             </div>
@@ -11837,7 +11844,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                         e.stopPropagation();
                         confirmAnd(`Spieltag ${formatTerminLabel(s.date)} in den Papierkorb verschieben?`, () => onRemoveSpieltag(s.id));
                       }}
-                      style={{ ...styles.linkBtn, color: "var(--danger-text)", padding: 0 }}
+                      style={{ ...styles.linkBtn, ...styles.dangerBtn, padding: 0 }}
                     >
                       <TrashIcon size={14} />
                     </button>
@@ -11923,11 +11930,41 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 
 const NavCtx = React.createContext(null);
 const NAV_ZIELE = { verwaltung: "Zur Verwaltung", spieltage: "Zu den Spieltagen" };
+const EMPTY_ICONS = {
+  spiel: <><path d="M8 4h8v4a4 4 0 0 1-8 0V4z" /><path d="M8 5H5a3 3 0 0 0 3 4M16 5h3a3 3 0 0 1-3 4M12 12v4M9 20h6M10 16h4l1 4H9z" /></>,
+  spieler: <><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><circle cx="17" cy="9" r="2.4" /><path d="M16.5 14.6c2.6.2 4.5 2 4.5 4.9" /></>,
+  termin: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M8 3v4M16 3v4M3.5 10h17" /></>,
+  board: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M12 5v14M3 12h18" /><circle cx="12" cy="12" r="2.5" /></>,
+  notiz: <><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h7M9 17h5" /></>,
+  gegner: <><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></>,
+  papierkorb: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" /></>,
+  uebung: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7l4 3-1.5 4.5h-5L8 10z" /></>,
+  leer: <><path d="M3 13l3-8h12l3 8v6H3z" /><path d="M3 13h5l1 2h6l1-2h5" /></>,
+};
+const emptyIconFuer = (t) => {
+  const x = String(t).toLowerCase();
+  if (x.includes("papierkorb")) return "papierkorb";
+  if (x.includes("board")) return "board";
+  if (x.includes("notiz")) return "notiz";
+  if (x.includes("gegner")) return "gegner";
+  if (x.includes("spieltag") || x.includes("spiel")) return "spiel";
+  if (x.includes("spieler")) return "spieler";
+  if (x.includes("termin") || x.includes("training")) return "termin";
+  if (x.includes("übung") || x.includes("material")) return "uebung";
+  return "leer";
+};
 function EmptyState({ text, nach }) {
   const gehe = React.useContext(NavCtx);
+  const m = String(text).match(/^(.+?[.!?])\s+(.+)$/);
+  const kopf = m ? m[1] : text;
+  const rest = m ? m[2] : null;
   return (
     <div style={styles.empty}>
-      <div>{text}</div>
+      <div aria-hidden="true" style={{ width: 48, height: 48, borderRadius: 999, background: "var(--accent-soft)", color: "var(--accent-text)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{EMPTY_ICONS[emptyIconFuer(text)]}</svg>
+      </div>
+      <div style={{ fontWeight: 600, color: "var(--text)" }}>{kopf}</div>
+      {rest && <div style={{ marginTop: 4, fontSize: 13 }}>{rest}</div>}
       {nach && gehe && NAV_ZIELE[nach] && (
         <button type="button" style={{ ...styles.secondaryBtn, width: "auto", height: 44, padding: "0 18px", marginTop: 12 }} onClick={() => gehe(nach)}>
           {NAV_ZIELE[nach]}
@@ -12014,7 +12051,7 @@ const styles = {
     borderRadius: 16,
     padding: "32px 28px",
     width: 260,
-    boxShadow: "0 8px 24px rgba(174,30,29,0.10), 0 2px 6px rgba(28,20,20,0.04)",
+    boxShadow: "var(--sh-2)",
   },
   loginLogo: { width: 56, height: "auto", objectFit: "contain", marginBottom: 4 },
   loginTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em" },
@@ -12124,7 +12161,7 @@ const styles = {
   },
   segmentedBtnActive: {
     background: "var(--surface)",
-    boxShadow: "0 1px 3px rgba(28,20,20,0.1)",
+    boxShadow: "var(--sh-1)",
     color: "var(--accent-text)",
     fontWeight: 700,
   },
@@ -12169,7 +12206,7 @@ const styles = {
     resize: "vertical",
   },
   addRow: { display: "flex", gap: 8, marginBottom: 16 },
-  tableWrap: { overflowX: "auto", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  tableWrap: { overflowX: "auto", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--sh-1)" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", padding: "10px 12px", color: "var(--muted)", fontWeight: 600, fontSize: 13, borderBottom: "1px solid var(--border)" },
   td: { padding: "10px 12px", borderBottom: "1px solid var(--divider)" },
@@ -12198,7 +12235,7 @@ const styles = {
     textDecorationColor: "var(--border-strong)",
     cursor: "pointer",
   },
-  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 14, boxShadow: "0 1px 3px rgba(28,20,20,0.04)" },
+  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 14, boxShadow: "var(--sh-1)" },
   cardHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 },
   cardActions: { display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", WebkitOverflowScrolling: "touch", maxWidth: "100%" },
   iconBtn: {
@@ -12314,7 +12351,7 @@ const styles = {
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
-    background: "var(--header-grad-btn)",
+    background: "var(--accent)",
     color: "#fff",
     border: "none",
     borderRadius: 12,
@@ -12323,9 +12360,8 @@ const styles = {
     fontWeight: 600,
     cursor: "pointer",
     width: "100%",
-    boxShadow: "0 8px 18px -6px rgba(168,28,27,0.6)",
+    boxShadow: "var(--sh-1)",
     transition: "box-shadow 150ms ease, transform 100ms ease",
-    transform: "translateZ(0)",
   },
   stickyBar: {
     position: "sticky",
@@ -12336,7 +12372,7 @@ const styles = {
     marginTop: 16,
   },
   secondaryBtn: {
-    background: "var(--header-grad-btn)",
+    background: "var(--accent)",
     color: "#fff",
     border: "none",
     borderRadius: 12,
@@ -12345,9 +12381,9 @@ const styles = {
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
-    boxShadow: "0 6px 14px -6px rgba(168,28,27,0.55)",
-    transform: "translateZ(0)",
+    boxShadow: "var(--sh-1)",
   },
+  dangerBtn: { color: "var(--danger-text)", background: "var(--neg-bg)", fontWeight: 700, borderRadius: 12, padding: "6px 12px" },
   linkBtn: {
     background: "transparent",
     border: "none",
@@ -12374,7 +12410,7 @@ const styles = {
     borderRadius: 999,
     fontSize: 13,
     fontWeight: 500,
-    boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+    boxShadow: "var(--sh-2)",
     display: "flex",
     alignItems: "center",
     gap: 14,
@@ -12413,11 +12449,11 @@ const styles = {
     zIndex: 70,
   },
   statsRow: { display: "flex", gap: 8, flexWrap: "wrap" },
-  statBox: { flex: "1 1 90px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 8px", textAlign: "center", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  statBox: { flex: "1 1 90px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 8px", textAlign: "center", boxShadow: "var(--sh-1)" },
   statValue: { fontSize: 20, fontWeight: 700, color: "var(--accent-text)", fontFamily: "'Space Grotesk', sans-serif", fontVariantNumeric: "tabular-nums" },
   statLabel: { fontSize: 13, color: "var(--muted)", marginTop: 2 },
   sparkGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 },
-  sparkCard: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  sparkCard: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", boxShadow: "var(--sh-1)" },
   sparkHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   sparkValue: { fontSize: 14, fontWeight: 700, color: "var(--accent-text)", fontVariantNumeric: "tabular-nums" },
   spielRow: {
@@ -12430,10 +12466,10 @@ const styles = {
     borderRadius: 12,
     padding: "10px 12px",
     fontSize: 13,
-    boxShadow: "0 1px 3px rgba(32,22,22,0.04)",
+    boxShadow: "var(--sh-1)",
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
-  scorerTile: { border: "1px solid var(--border)", borderRadius: 12, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(28,20,20,0.04)" },
+  scorerTile: { border: "1px solid var(--border)", borderRadius: 12, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "var(--sh-1)" },
   scorerTileActive: { border: "1px solid var(--accent)", background: "var(--accent-soft)" },
   scorerName: { background: "transparent", border: "none", padding: 0, minHeight: 44, textAlign: "left", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" },
   scorerStepper: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 },
@@ -12468,7 +12504,7 @@ const styles = {
     padding: 20,
     maxWidth: 380,
     width: "100%",
-    boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
+    boxShadow: "var(--sh-3)",
   },
   modalText: { fontSize: 14, color: "var(--text)", margin: "0 0 18px 0", lineHeight: 1.5 },
   modalActions: { display: "flex", justifyContent: "flex-end", gap: 10 },
