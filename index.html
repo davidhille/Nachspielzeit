@@ -7194,14 +7194,8 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
 /* Alltags-Einstieg: offene Bewertung und nächster Termin mit Direkt-Button */
 /* Kennzahlen-Kopf der Übersicht: vier große Zahlen auf einen Blick */
 const ANWESEND_ARTEN = ["anwesend", "anwesend_nicht_angemeldet", "verspaetet", "verspaetet_nicht_angemeldet"];
-function KennzahlenKopf({ tab, season, month, trainings, termine, spieltage }) {
+function KennzahlenKopf({ month, trainings, termine }) {
   const heute = todayISO();
-  const spiele = (spieltage || []).filter((s) => seasonKeyOf(s.date.slice(0, 7)) === season).flatMap((s) => s.spiele || []);
-  const b = spiele.reduce((a, sp) => {
-    a.f += Number(sp.ourGoals) || 0; a.g += Number(sp.theirGoals) || 0;
-    if (sp.ourGoals > sp.theirGoals) a.s++; else if (sp.ourGoals === sp.theirGoals) a.u++; else a.n++;
-    return a;
-  }, { s: 0, u: 0, n: 0, f: 0, g: 0 });
   const eintraege = (trainings || []).filter((t) => t.date.startsWith(month || "x"));
   const dabei = eintraege.filter((t) => ANWESEND_ARTEN.includes(t.teilnahme)).length;
   const quote = eintraege.length > 0 ? Math.round((dabei / eintraege.length) * 100) : null;
@@ -7209,31 +7203,22 @@ function KennzahlenKopf({ tab, season, month, trainings, termine, spieltage }) {
   const faellig = (termine || []).filter((t) => t.status !== "abgesagt" && t.date.startsWith(month || "x") && t.date <= heute);
   const bewertet = faellig.filter((t) => bewertetDaten.has(t.date)).length;
   const offen = faellig.length - bewertet;
-  const diff = b.f - b.g;
-  const karten = {
-    bilanz: { label: "Bilanz", icon: "spiel", wert: spiele.length ? `${b.s} · ${b.u} · ${b.n}` : "–", sub: "Siege · Unent. · Niederl." },
-    tore: { label: "Tore", icon: "ball", wert: spiele.length ? `${b.f} : ${b.g}` : "–", sub: spiele.length ? `${diff > 0 ? "+" : ""}${diff} Differenz` : "Noch keine Spiele", ton: diff > 0 ? "var(--success-text)" : diff < 0 ? "var(--danger-text)" : null },
-    anwesenheit: { label: "Anwesenheit", icon: "spieler", wert: quote === null ? "–" : `${quote} %`, sub: month ? `Schnitt ${monthLabel(month)}` : "" },
-    bewertet: { label: "Trainings bewertet", icon: "termin", wert: faellig.length ? `${bewertet} / ${faellig.length}` : "–", sub: faellig.length ? (offen > 0 ? `${offen} noch offen` : "Alle bewertet") : "Noch keine Trainings", ton: offen > 0 ? "var(--danger-text)" : null },
-  };
-  const reihe = tab === "saison" ? ["bilanz", "tore", "anwesenheit", "bewertet"] : ["anwesenheit", "bewertet", "bilanz", "tore"];
+  const karten = [
+    { k: "a", label: "Anwesenheit", icon: "spieler", wert: quote === null ? "–" : `${quote} %`, sub: month ? `Schnitt ${monthLabel(month)}` : "" },
+    { k: "b", label: "Trainings bewertet", icon: "termin", wert: faellig.length ? `${bewertet} / ${faellig.length}` : "–", sub: faellig.length ? (offen > 0 ? `${offen} noch offen` : "Alle bewertet") : "Noch keine Trainings", ton: offen > 0 ? "var(--danger-text)" : null },
+  ];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, margin: "12px 0 4px" }}>
-      {reihe.map((k) => {
-        const c = karten[k];
-        return (
-          <div key={k} style={{ background: "var(--surface-2)", borderRadius: 12, padding: 12, minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                {c.icon === "ball" ? EMPTY_ICONS.uebung : EMPTY_ICONS[c.icon]}
-              </svg>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
-            </div>
-            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginTop: 4, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{c.wert}</div>
-            <div style={{ fontSize: 12, color: c.ton || "var(--muted)", fontWeight: c.ton ? 600 : 400 }}>{c.sub}</div>
+      {karten.map((c) => (
+        <div key={c.k} style={{ background: "var(--surface-2)", borderRadius: 12, padding: 12, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{EMPTY_ICONS[c.icon]}</svg>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
           </div>
-        );
-      })}
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginTop: 4, color: "var(--text)" }}>{c.wert}</div>
+          <div style={{ fontSize: 12, color: c.ton || "var(--muted)", fontWeight: c.ton ? 600 : 400 }}>{c.sub}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -7662,7 +7647,7 @@ function Dashboard({
         </div>
         )}
 
-      <KennzahlenKopf tab={uebersichtTab} season={season} month={month} trainings={trainings} termine={termine} spieltage={spieltage} />
+      {uebersichtTab === "training" && <KennzahlenKopf month={month} trainings={trainings} termine={termine} />}
 
       {uebersichtTab === "training" && (
         <>
