@@ -3,6 +3,40 @@
 <head>
 <meta charset="UTF-8" />
 <base href="/" />
+<script>
+  // Sicherheitsnetz gegen die "weiße Seite": Lädt eine Skriptdatei nicht (Netz, Cache, Deploy-Wechsel) oder startet die App nicht,
+  // lädt die Seite einmal selbst neu. Klappt es dann wieder nicht, erscheint eine Meldung mit den betroffenen Dateien statt Weiß.
+  (function () {
+    var fehlende = [];
+    window.addEventListener("error", function (e) {
+      var t = e.target;
+      if (t && t.tagName === "SCRIPT" && t.src) fehlende.push(t.src.replace(location.origin, ""));
+    }, true);
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        var root = document.getElementById("root");
+        if (!root) return;
+        var schon = false;
+        try { schon = sessionStorage.getItem("nsz_neuladen") === "1"; } catch (e) {}
+        if (root.dataset.rendered) {
+          try { sessionStorage.removeItem("nsz_neuladen"); } catch (e) {}
+          return;
+        }
+        if (!schon) {
+          try { sessionStorage.setItem("nsz_neuladen", "1"); } catch (e) {}
+          location.reload();
+          return;
+        }
+        root.innerHTML =
+          '<div style="padding:24px 20px;max-width:480px;margin:0 auto;font-family:system-ui,sans-serif;line-height:1.5">' +
+          '<h1 style="font-size:20px;margin:0 0 8px">Die Seite konnte nicht geladen werden</h1>' +
+          '<p style="font-size:14px;margin:0 0 16px">Bitte prüfe die Verbindung und versuche es nochmal.</p>' +
+          '<button onclick="location.reload()" style="font:inherit;font-size:14px;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid #888;background:#fff;color:#000;cursor:pointer">Neu laden</button>' +
+          '<p style="font-size:12px;opacity:.7;margin:16px 0 0;word-break:break-all">Technische Angabe: ' + (fehlende.join(", ") || "keine Ladefehler gemeldet") + "</p></div>";
+      }, 1500);
+    });
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Nachspielzeit — SV Heimstetten U8</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
