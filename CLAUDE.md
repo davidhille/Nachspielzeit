@@ -37,3 +37,21 @@
 ## Nicht anfassen / Vorsicht
 - Taktik-Editor (Code ca. Zeilen 3000–4950): Schriftgrößen bewusst frei, nicht auf 12 px vereinheitlichen (Entscheidung von David). Geometrie über `tkGeo`, Rotation über `getScreenCTM`. Änderungen dort immer separat melden.
 - Berechnungen für Punkte und Anwesenheit nicht ohne Rückfrage ändern.
+
+## Technische Details (Muster im Code)
+- Prüfung: `cd /opt/node-tools && node -e "…"` parst den Inhalt von `app-source` mit acorn + acorn-jsx und gibt `ACORN_OK` aus.
+- Aktionen mit `wrapAction(fn, successMsg, undo)` (liefert true/false) und `showToast`. Globale Helfer: `confirmAnd`, `meldung`, `frageAnd` (nutzen `TkDialog`).
+- Kontexte: `FeatureCtx`, `TrainingBoardCtx`, `NavCtx` (setTab).
+- `styles`-Objekt: `card`, `primaryBtn`/`secondaryBtn`, `linkBtn`, `dangerBtn`, `iconBtn`, `segNav`/`segBtn`, `chip`, `playerNameBtn`, `fieldRow`, `range`, `empty`. Neue Stile dort ergänzen, nicht inline duplizieren.
+- Hilfsklassen: `.nz-tabelle` (fixierte erste Spalte), `.nz-sr` (nur für Screenreader, z. B. verstecktes h1), `.nz-nur-maus` (bei Touch ausgeblendet).
+- Zahlen in Tabellen mit `tabular-nums`.
+
+## Browser-Prüfungen
+- Der eingebaute Browser braucht `request_access` für die Seite. Audits sind nur lesend.
+- Anmeldung und Zugangscode tippt David selbst.
+
+## Bekannte offene Punkte
+- U8-Übungsfilter: Bedeutung und Wunschfilter noch nicht geklärt, bei Bedarf nachfragen.
+- Eigentore werden nicht separat gespeichert (bräuchte eine neue DB-Spalte).
+- Saisonwechsel vor der nächsten Saison klären; tägliches Backup gelegentlich prüfen.
+- Sprint-Zeiten in Sekunden (z. B. "11:89") sind korrekt, kein Fehler.
