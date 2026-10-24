@@ -8,3 +8,5 @@ CLAUDE.md
 .claude
 wrangler.toml
 package.json
+tools
+.github

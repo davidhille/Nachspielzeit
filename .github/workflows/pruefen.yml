@@ -1,0 +1,26 @@
+name: Prüfen
+
+# Syntax, Lint (nicht definierte Namen) und Tests der Rechenlogik. Das Deployment (Cloudflare) läuft unabhängig davon:
+# schlägt dieser Lauf fehl, steht das im Actions-Tab und in der Mail von GitHub, die App wird aber trotzdem ausgeliefert.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Werkzeuge installieren
+        working-directory: tools
+        run: npm install --no-audit --no-fund
+      - name: Syntax, Lint und Tests
+        working-directory: tools
+        run: npm run alles
