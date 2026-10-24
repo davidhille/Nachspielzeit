@@ -19,6 +19,12 @@
     var _t = localStorage.getItem("nsz_darstellung");
     if (_t === "hell" || _t === "dunkel") document.documentElement.setAttribute("data-theme", _t === "dunkel" ? "dark" : "light");
   } catch (e) {}
+  // Seitentitel passend zur Adresse (Administration bzw. Team aus dem Hostnamen)
+  try {
+    var _m = location.hostname.match(/^([a-z0-9-]+)\.nachspielzeit\.app$/i);
+    if (_m && _m[1].toLowerCase() === "admin") document.title = "Nachspielzeit — Administration";
+    else if (_m && _m[1].toLowerCase() !== "www") document.title = "Nachspielzeit — SV Heimstetten " + _m[1].toUpperCase();
+  } catch (e) {}
 </script>
 <style>
   @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/inter-latin-400-normal.woff2") format("woff2"); }
@@ -900,7 +906,7 @@ function Gate({ onUnlock, hinweis = "" }) {
       <div style={styles.loginCard}>
         <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.loginLogo} />
         <div style={styles.loginTitle}>Nachspielzeit</div>
-        <div style={styles.loginSubtitle}>SV Heimstetten · U8</div>
+        <div style={styles.loginSubtitle}>{IS_ADMIN_HOST ? "Administration" : `SV Heimstetten · ${CURRENT_TEAM.toUpperCase()}`}</div>
         <input
           style={styles.loginInput}
           placeholder="Zugangscode"
