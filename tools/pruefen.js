@@ -22,7 +22,7 @@ const globals = {};
   .forEach((k) => (globals[k] = "readonly"));
 
 // Namen aus js/logik.js (klassisches Skript vor der App) sind in der App globale Variablen
-"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen".split(" ").forEach((k) => (globals[k] = "writable"));
+"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen Sitzung".split(" ").forEach((k) => (globals[k] = "writable"));
 
 const meldungen = new Linter()
   .verify(
@@ -40,4 +40,11 @@ const logikMeldungen = new Linter()
   .filter((m) => m.fatal || m.ruleId);
 logikMeldungen.forEach((m) => console.error(`logik.js ${m.line}:${m.column} ${m.ruleId} ${m.message}`));
 if (logikMeldungen.length) process.exit(1);
+// js/sitzung.js eigenständig prüfen (nutzt nur Browser-Globals)
+const sitzungGlobals = { window: "readonly", localStorage: "readonly", URLSearchParams: "readonly" };
+const sitzungMeldungen = new Linter()
+  .verify(require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "js", "sitzung.js"), "utf8"), [{ files: ["**/*.js"], languageOptions: { ecmaVersion: "latest", sourceType: "script", globals: sitzungGlobals }, rules: { "no-undef": "error", "no-redeclare": "error" } }], "sitzung.js")
+  .filter((m) => m.fatal || m.ruleId);
+sitzungMeldungen.forEach((m) => console.error(`sitzung.js ${m.line}:${m.column} ${m.ruleId} ${m.message}`));
+if (sitzungMeldungen.length) process.exit(1);
 console.log("LINT_OK");

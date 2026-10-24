@@ -1,7 +1,7 @@
 # Nachspielzeit – Projektanweisungen
 
 ## Projekt
-- App: `index.html` plus `js/logik.js` (reine Rechenlogik: Punkte, Saison, Karten; klassisches Skript vor der App, von den Tests direkt geprüft). Die React-Quelle (JSX) steht in `<script type="text/plain" id="app-source">` und wird im Browser von Babel kompiliert.
+- App: `index.html` plus `js/logik.js` (reine Rechenlogik: Punkte, Saison, Karten; klassisches Skript vor der App, von den Tests direkt geprüft) und `js/sitzung.js` (`Sitzung.code`, `.team`, `.info`; Anmelden/Abmelden nur über `Sitzung.merkeCode` / `Sitzung.vergiss`, nie `localStorage` direkt). Die React-Quelle (JSX) steht in `<script type="text/plain" id="app-source">` und wird im Browser von Babel kompiliert.
 - Backend: Supabase. Deployment: `git push origin main` → Cloudflare Workers (Repo davidhille/Nachspielzeit, Branch main).
 - Trainer-App: u8.nachspielzeit.app, Admin: admin.nachspielzeit.app. Nach jedem Push einmal hart neu laden.
 - Sprache der App und der Antworten: Deutsch. Kurz, konkret, handlungsorientiert. Subtiler Humor, nie platt.

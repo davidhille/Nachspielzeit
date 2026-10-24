@@ -39,6 +39,7 @@
 <script src="vendor/react-dom.production.min.js"></script>
 <script src="vendor/babel.min.js"></script>
 <script src="js/logik.js"></script>
+<script src="js/sitzung.js"></script>
 <script>
   window.addEventListener("error", function (e) {
     var root = document.getElementById("root");
@@ -189,29 +190,18 @@ const SUPABASE_URL = "https://ttydglqmpkgfqkrovdjf.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0eWRnbHFtcGtnZnFrcm92ZGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NjY4NzIsImV4cCI6MjEwNDE0Mjg3Mn0.GW-ppcVrqrFmuCs1FGfPsez3O-b23YSy4VzgooIrqCk";
 const REST = SUPABASE_URL + "/rest/v1/";
 
-let ACCESS_CODE = localStorage.getItem("nsz_access_code") || "";
-
 const baseHeaders = (extra = {}) => ({
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
   "Content-Type": "application/json",
   ...extra,
 });
-const dbHeaders = (extra = {}) => baseHeaders({ "x-access-code": ACCESS_CODE, ...extra });
+const dbHeaders = (extra = {}) => baseHeaders({ "x-access-code": Sitzung.code, ...extra });
 
 /* ---------- Teams (Mandanten-Vorbereitung) ----------
    Das aktuelle Team kommt aus dem Hostnamen (u8.nachspielzeit.app -> "u8"), ?team=… oder, im Admin, aus der Team-Auswahl.
    Tabellen in TEAM_TABLES werden nach team_id gefiltert; neue Zeilen bekommen automatisch die team_id.
    Fehlt die Spalte noch in der Datenbank, arbeitet die App wie bisher ohne Filter. */
-let CURRENT_TEAM = (() => {
-  try {
-    const q = new URLSearchParams(window.location.search).get("team");
-    if (q && /^[a-z0-9-]+$/i.test(q)) return q.toLowerCase();
-    const m = window.location.hostname.match(/^([a-z0-9-]+)\.nachspielzeit\.app$/i);
-    if (m && !["admin", "www"].includes(m[1].toLowerCase())) return m[1].toLowerCase();
-  } catch {}
-  return "u8";
-})();
 const TEAM_TABLES = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele", "torschuetzen",
   "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards", "training_boards",
@@ -222,15 +212,14 @@ const mitTeamId = (table, rowOrRows) => {
   const tag = (r) =>
     table === "uebungen"
       ? r.team_ids === undefined
-        ? { ...r, team_ids: [CURRENT_TEAM] }
+        ? { ...r, team_ids: [Sitzung.team] }
         : r
       : r.team_id === undefined
-      ? { ...r, team_id: CURRENT_TEAM }
+      ? { ...r, team_id: Sitzung.team }
       : r;
   return Array.isArray(rowOrRows) ? rowOrRows.map(tag) : tag(rowOrRows);
 };
 
-let ACCESS_INFO = null; // { ok, team_id }  (team_id leer = Admin mit Zugriff auf alle Teams)
 async function pruefeZugang(code) {
   const res = await nszFetch(REST + "rpc/check_access", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ code }) });
   if (res.ok) {
@@ -241,7 +230,7 @@ async function pruefeZugang(code) {
 }
 function zugangFehler(info) {
   if (IS_ADMIN_HOST) return info.team_id ? "Dieser Code hat keinen Zugriff auf die Administration." : "";
-  if (info.team_id && info.team_id !== CURRENT_TEAM) return "Dieser Code gehört zu einem anderen Team.";
+  if (info.team_id && info.team_id !== Sitzung.team) return "Dieser Code gehört zu einem anderen Team.";
   return "";
 }
 
@@ -275,7 +264,7 @@ let APP_STAND = "";
 const FEHLER_SITZUNG = { gesendet: new Set(), anzahl: 0, aus: false };
 function bereinigeFehlertext(t, max = 200) {
   let x = String(t == null ? "" : t);
-  if (ACCESS_CODE) x = x.split(ACCESS_CODE).join("***");
+  if (Sitzung.code) x = x.split(Sitzung.code).join("***");
   return x
     .replace(/\([^()]*\)=\([^()]*\)/g, "(…)=(…)") // Postgres-Detail: Key (spalte)=(wert) enthält echte Werte
     .replace(/(https?:\/\/[^\s?#]+)[?#]\S*/g, "$1") // keine Query-Parameter in URLs
@@ -291,7 +280,7 @@ function geraetKurz() {
 }
 function meldeFehler(kontext, e) {
   try {
-    if (FEHLER_SITZUNG.aus || FEHLER_SITZUNG.anzahl >= 10 || !ACCESS_CODE) return;
+    if (FEHLER_SITZUNG.aus || FEHLER_SITZUNG.anzahl >= 10 || !Sitzung.code) return;
     const meldung = bereinigeFehlertext(e && e.message !== undefined ? e.message : e);
     if (!meldung || /^Keine Verbindung/.test(meldung) || /^Script error/i.test(meldung) || /ResizeObserver loop/.test(meldung)) return;
     const schluessel = `${kontext}|${meldung}`;
@@ -304,7 +293,7 @@ function meldeFehler(kontext, e) {
       keepalive: true,
       headers: dbHeaders({ Prefer: "return=minimal" }),
       body: JSON.stringify({
-        team_id: IS_ADMIN_HOST ? "admin" : CURRENT_TEAM,
+        team_id: IS_ADMIN_HOST ? "admin" : Sitzung.team,
         kontext,
         bereich: FEHLER_BEREICH || null,
         meldung,
@@ -369,8 +358,8 @@ async function dbSelect(table, opts = {}) {
     const teamQs = !filter
       ? ""
       : table === "uebungen"
-      ? `&or=(team_ids.cs.{${encodeURIComponent(CURRENT_TEAM)}},team_ids.cs.{alle})`
-      : `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
+      ? `&or=(team_ids.cs.{${encodeURIComponent(Sitzung.team)}},team_ids.cs.{alle})`
+      : `&team_id=eq.${encodeURIComponent(Sitzung.team)}`;
     const res = await nszFetch(REST + table + "?select=*" + teamQs, {
       headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
     });
@@ -418,13 +407,13 @@ async function dbDelete(table, id, idCol = "id") {
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
 async function dbDeleteWhere(table, qs) {
-  if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
+  if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(Sitzung.team)}`;
   const res = await nszFetch(`${REST}${table}?${qs}`, { method: "DELETE", headers: dbHeaders() });
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
 // Nur die IDs der Zeilen holen, die auf den Filter passen (für Konfliktprüfung und "erst einfügen, dann Altes löschen")
 async function dbIdsWhere(table, qs) {
-  if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
+  if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(Sitzung.team)}`;
   const res = await nszFetch(`${REST}${table}?select=id&${qs}`, { headers: dbHeaders() });
   if (!res.ok) throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
   return (await res.json()).map((r) => String(r.id));
@@ -446,7 +435,7 @@ async function ersetzeGruppe(table, filterQs, rows) {
 const PHOTO_BUCKET = "profilbilder";
 // Bilder pro Team trennen: U8 behält die bisherigen Pfade, alle anderen Teams schreiben unter "<team>/…" (die Datenbank erlaubt ihnen nur diesen Ordner).
 // Nicht betroffen: karten/… (öffentlicher Elternlink, die Elternseite kennt das Team nicht; der Token ist geheim).
-const teamPfad = (p, team = CURRENT_TEAM) => (team === "u8" ? p : `${team}/${p}`);
+const teamPfad = (p, team = Sitzung.team) => (team === "u8" ? p : `${team}/${p}`);
 
 async function resizeImageFile(file, maxSize = 320, quality = 0.82) {
   const dataUrl = await new Promise((resolve, reject) => {
@@ -487,7 +476,7 @@ async function uploadProfilbild(playerId, file) {
       headers: {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
-        "x-access-code": ACCESS_CODE,
+        "x-access-code": Sitzung.code,
         "x-upsert": "true",
         "Content-Type": "image/jpeg",
       },
@@ -503,7 +492,7 @@ async function uploadProfilbild(playerId, file) {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}?t=${Date.now()}`;
 }
 
-async function uploadTeamFoto(file, team = CURRENT_TEAM) {
+async function uploadTeamFoto(file, team = Sitzung.team) {
   const blob = await resizeImageFile(file, 1200, 0.85);
   const path = teamPfad(team === "u8" ? `team/foto.jpg` : `team/foto-${team}.jpg`, team);
   const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
@@ -511,7 +500,7 @@ async function uploadTeamFoto(file, team = CURRENT_TEAM) {
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
+      "x-access-code": Sitzung.code,
       "x-upsert": "true",
       "Content-Type": "image/jpeg",
     },
@@ -535,7 +524,7 @@ async function uploadVereinsLogo(team, file) {
   const path = teamPfad(`team/wappen-${team}.png`, team);
   const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE, "x-upsert": "true", "Content-Type": "image/png" },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": Sitzung.code, "x-upsert": "true", "Content-Type": "image/png" },
     body: blob,
   });
   if (!res.ok) throw new Error(`Hochladen des Wappens fehlgeschlagen: ${await res.text()}`);
@@ -550,7 +539,7 @@ async function uploadUebungBild(uebungId, file) {
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
+      "x-access-code": Sitzung.code,
       "x-upsert": "true",
       "Content-Type": "image/jpeg",
     },
@@ -568,7 +557,7 @@ async function uploadTextBild(file) {
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
+      "x-access-code": Sitzung.code,
       "Content-Type": "image/jpeg",
     },
     body: blob,
@@ -585,7 +574,7 @@ async function uploadSpieltagFoto(spieltagId, file) {
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
+      "x-access-code": Sitzung.code,
       "x-upsert": "true",
       "Content-Type": "image/jpeg",
     },
@@ -855,8 +844,8 @@ function Gate({ onUnlock, hinweis = "" }) {
       } else if (zugangFehler(info)) {
         setFehler(zugangFehler(info));
       } else {
-        localStorage.setItem("nsz_access_code", code.trim());
-        ACCESS_INFO = info;
+        Sitzung.merkeCode(code.trim());
+        Sitzung.info = info;
         onUnlock(code.trim());
       }
     } catch (e) {
@@ -871,7 +860,7 @@ function Gate({ onUnlock, hinweis = "" }) {
       <div style={styles.loginCard}>
         <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.loginLogo} />
         <div style={styles.loginTitle}>Nachspielzeit</div>
-        <div style={styles.loginSubtitle}>{IS_ADMIN_HOST ? "Administration" : `SV Heimstetten · ${CURRENT_TEAM.toUpperCase()}`}</div>
+        <div style={styles.loginSubtitle}>{IS_ADMIN_HOST ? "Administration" : `SV Heimstetten · ${Sitzung.team.toUpperCase()}`}</div>
         <input
           style={styles.loginInput}
           placeholder="Zugangscode"
@@ -1556,7 +1545,7 @@ function ZugaengeVerwaltung({ teams }) {
     }
   };
   const umschalten = async (c) => {
-    if (c.code === ACCESS_CODE) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gesperrt werden.");
+    if (c.code === Sitzung.code) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gesperrt werden.");
     try {
       await dbUpdate("access_codes", c.code, { active: !c.active }, "code");
       await laden();
@@ -1565,7 +1554,7 @@ function ZugaengeVerwaltung({ teams }) {
     }
   };
   const loeschen = async (c) => {
-    if (c.code === ACCESS_CODE) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gelöscht werden.");
+    if (c.code === Sitzung.code) return setMeldung("Der Code, mit dem du gerade angemeldet bist, kann nicht gelöscht werden.");
     confirmAnd(`Code${c.label ? ` „${c.label}“` : ""} endgültig löschen?`, async () => {
       try {
         await dbDelete("access_codes", c.code, "code");
@@ -1620,7 +1609,7 @@ function ZugaengeVerwaltung({ teams }) {
                   <div style={{ fontWeight: 700, fontSize: 14 }}>
                     {c.label || "(ohne Bezeichnung)"}
                     {c.active ? "" : " · gesperrt"}
-                    {c.code === ACCESS_CODE ? " · dein aktueller Code" : ""}
+                    {c.code === Sitzung.code ? " · dein aktueller Code" : ""}
                   </div>
                   <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
                   <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, letterSpacing: "0.02em", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
@@ -2168,11 +2157,11 @@ function AdminApp() {
     try {
       t = localStorage.getItem("nsz_admin_team") || ADMIN_SCOPE;
     } catch {}
-    if (t !== ADMIN_SCOPE) CURRENT_TEAM = t;
+    if (t !== ADMIN_SCOPE) Sitzung.team = t;
     return t;
   });
   const setTeam = (t) => {
-    if (t !== ADMIN_SCOPE) CURRENT_TEAM = t;
+    if (t !== ADMIN_SCOPE) Sitzung.team = t;
     try {
       localStorage.setItem("nsz_admin_team", t);
     } catch {}
@@ -2319,7 +2308,7 @@ notify pgrst, 'reload schema';`;
           <button
             style={styles.logoutBtn}
             onClick={() => {
-              localStorage.removeItem("nsz_access_code");
+              Sitzung.vergiss();
               window.location.reload();
             }}
           >
@@ -2488,22 +2477,21 @@ function OfflineScreen({ onRetry }) {
 
 function Root() {
   const [unlocked, setUnlocked] = useState(false);
-  const [pruefung, setPruefung] = useState(!!ACCESS_CODE);
+  const [pruefung, setPruefung] = useState(!!Sitzung.code);
   const [hinweis, setHinweis] = useState("");
   const [offline, setOffline] = useState(false);
   const pruefeGespeichertenCode = () => {
-    if (!ACCESS_CODE) return;
+    if (!Sitzung.code) return;
     setOffline(false);
     setPruefung(true);
-    pruefeZugang(ACCESS_CODE)
+    pruefeZugang(Sitzung.code)
       .then((info) => {
         const f = info.ok ? zugangFehler(info) : "";
         if (info.ok && !f) {
-          ACCESS_INFO = info;
+          Sitzung.info = info;
           setUnlocked(true);
         } else {
-          localStorage.removeItem("nsz_access_code");
-          ACCESS_CODE = "";
+          Sitzung.vergiss();
           setHinweis(f || "Der Zugangscode ist nicht mehr gültig.");
         }
       })
@@ -2526,7 +2514,7 @@ function Root() {
       <Gate
         hinweis={hinweis}
         onUnlock={(code) => {
-          ACCESS_CODE = code;
+          Sitzung.code = code;
           setUnlocked(true);
         }}
       />
@@ -2773,7 +2761,7 @@ function App() {
       );
       setTeamSettings(teamSettingsRaw[0] || {});
       setFeatures(Object.fromEntries(featuresRaw.map((r) => [r.key, r.enabled !== false])));
-      const ti = teamsRaw.find((t) => t.id === CURRENT_TEAM) || null;
+      const ti = teamsRaw.find((t) => t.id === Sitzung.team) || null;
       setTeamInfo(ti);
       const st = ti && ti.config && ti.config.start_tab;
       if (!startTabErledigt.current) {
@@ -2792,7 +2780,7 @@ function App() {
             keywords: Array.isArray(u.keywords) ? u.keywords : [],
             material: Array.isArray(u.material) ? u.material : [],
             bildUrl: u.bild_url || null,
-            teamIds: Array.isArray(u.team_ids) ? u.team_ids : [CURRENT_TEAM],
+            teamIds: Array.isArray(u.team_ids) ? u.team_ids : [Sitzung.team],
           }))
           .sort((a, b) => a.titel.localeCompare(b.titel, "de"))
       );
@@ -2853,7 +2841,7 @@ function App() {
 
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   setzeEinstellungen(teamInfo?.config);
-  TEAM_NAME = (teamInfo && teamInfo.name) || CURRENT_TEAM.toUpperCase();
+  TEAM_NAME = (teamInfo && teamInfo.name) || Sitzung.team.toUpperCase();
   setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel);
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
@@ -2890,23 +2878,23 @@ function App() {
       // der bisherige Link bleibt vorerst aktiv (schon verschickt) und kann unten abgeschaltet werden
       const alt = kartenToken ? [kartenToken, ...kartenAlt] : kartenAlt;
       await veroeffentlicheAlle(alt, snap, plusNeu);
-      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_token: neu, share_alt: alt } });
+      await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), share_token: neu, share_alt: alt } });
     }, "Karten-Link erstellt");
   const kartenAltAbschalten = (tok) =>
     wrapAction(async () => {
       await loescheKarten(tok);
-      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_alt: kartenAlt.filter((x) => x !== tok) } });
+      await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), share_alt: kartenAlt.filter((x) => x !== tok) } });
     }, "Alter Link abgeschaltet");
   const kartenLinkSperren = () =>
     wrapAction(async () => {
       const cfg = { ...(teamInfo?.config || {}) };
       delete cfg.share_token;
       delete cfg.share_alt;
-      await dbUpdate("teams", CURRENT_TEAM, { config: cfg });
+      await dbUpdate("teams", Sitzung.team, { config: cfg });
       for (const t of [kartenToken, ...kartenAlt]) if (t) await loescheKarten(t);
     }, "Karten-Link gesperrt");
   const songsSpeichern = async (songs) => {
-    await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), songs } });
+    await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), songs } });
   };
   const songHinzufuegen = (files) =>
     wrapAction(async () => {
@@ -2950,7 +2938,7 @@ function App() {
   const kartenVollUmschalten = () =>
     wrapAction(async () => {
       const voll = !teamInfo?.config?.share_voll;
-      await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo?.config || {}), share_voll: voll } });
+      await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), share_voll: voll } });
     }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
@@ -3009,7 +2997,7 @@ function App() {
           beschreibung: u.beschreibung || null,
           keywords: u.keywords,
           bild_url: bildUrl,
-          ...(teamFilterAktiv("uebungen") ? { team_ids: u.teamIds || [CURRENT_TEAM] } : {}),
+          ...(teamFilterAktiv("uebungen") ? { team_ids: u.teamIds || [Sitzung.team] } : {}),
           deleted_at: null,
         },
         "id"
@@ -3105,7 +3093,7 @@ function App() {
             onUploadTeamFoto={(file) =>
               wrapAction(async () => {
                 const url = await uploadTeamFoto(file);
-                if (teamInfo) await dbUpdate("teams", CURRENT_TEAM, { config: { ...(teamInfo.config || {}), team_photo_url: url } });
+                if (teamInfo) await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo.config || {}), team_photo_url: url } });
                 else await dbUpsert("team_settings", { id: 1, team_photo_url: url }, "id");
               }, "Mannschaftsfoto aktualisiert")
             }
@@ -3430,7 +3418,7 @@ create policy "access via code" on training_boards for all to public using (nsz_
 notify pgrst, 'reload schema';`;
 
 function TrainingBoardSqlHinweis() {
-  if (!ACCESS_INFO || ACCESS_INFO.team_id) {
+  if (!Sitzung.info || Sitzung.info.team_id) {
     return <div style={{ fontSize: 13, color: "var(--muted)" }}>Diese Funktion ist noch nicht aktiviert. Bitte beim Admin nachfragen.</div>;
   }
   return (
@@ -5323,7 +5311,7 @@ function Header({ tab, setTab }) {
         <button
           style={styles.logoutBtn}
           onClick={() => {
-            localStorage.removeItem("nsz_access_code");
+            Sitzung.vergiss();
             window.location.reload();
           }}
         >
@@ -5367,7 +5355,7 @@ function BackupHinweis({ config }) {
   const [weg, setWeg] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
   if (!tage || weg) return null;
   // Nur Admin-Codes (ohne Team) können Backups machen – andere Trainer sehen den Hinweis nicht
-  if (!ACCESS_INFO || ACCESS_INFO.team_id) return null;
+  if (!Sitzung.info || Sitzung.info.team_id) return null;
   const alter = letztes ? Math.floor((Date.now() - letztes.getTime()) / 86400000) : null;
   if (alter !== null && alter < tage) return null;
   return (
@@ -5487,7 +5475,7 @@ async function ladeSongHoch(file) {
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
+      "x-access-code": Sitzung.code,
       "x-upsert": "true",
       "cache-control": "max-age=31536000",
       "Content-Type": file.type || "audio/mpeg",
@@ -5501,7 +5489,7 @@ async function loescheSongDatei(pfad) {
   try {
     await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
       method: "DELETE",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE },
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": Sitzung.code },
     });
   } catch (e) {}
 }
@@ -5563,7 +5551,7 @@ async function kartenPutJson(pfad, obj) {
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
-      "x-access-code": ACCESS_CODE,
+      "x-access-code": Sitzung.code,
       "x-upsert": "true",
       "cache-control": "max-age=60",
       "Content-Type": "application/json",
@@ -5603,7 +5591,7 @@ async function loescheKarten(token) {
     try {
       await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
         method: "DELETE",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE },
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": Sitzung.code },
       });
     } catch (e) {}
   }
@@ -7970,7 +7958,7 @@ function Dashboard({
         <div className="dash-left" style={{ minWidth: 0 }}>
           {fMannschaftsbild && (
           <TeamHero
-            photoUrl={teamInfo?.config?.team_photo_url || (CURRENT_TEAM === "u8" ? teamSettings?.team_photo_url : null) || null}
+            photoUrl={teamInfo?.config?.team_photo_url || (Sitzung.team === "u8" ? teamSettings?.team_photo_url : null) || null}
             teamName={`${CLUB.name} ${teamInfo?.name || TEAM_NAME}`}
             seasonLabel={season ? season.replace("-", "/") : ""}
             onUploadFoto={onUploadTeamFoto}
