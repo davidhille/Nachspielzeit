@@ -10723,7 +10723,7 @@ function DarstellungKarte() {
   const [wert, setWert] = useState(leseDarstellung);
   const optionen = [["auto", "Automatisch"], ["hell", "Hell"], ["dunkel", "Dunkel"]];
   return (
-    <div style={{ ...styles.card, marginTop: 20 }}>
+    <div style={styles.card}>
       <KartenTitel>Darstellung</KartenTitel>
       <div role="group" aria-label="Darstellung wählen" style={{ ...styles.segNav, marginBottom: 8 }}>
         {optionen.map(([k, l]) => (
@@ -10797,6 +10797,7 @@ function Verwaltung({
     ["spieltage", "Spieltage"],
     fMaterial && ["material", "Material"],
     fEltern && kartenBox && ["eltern", "Eltern-Seite"],
+    ["darstellung", "Darstellung"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ].filter(Boolean);
 
@@ -10866,6 +10867,7 @@ function Verwaltung({
           onDeleteMaterialEintrag={onDeleteMaterialEintrag}
         />
       )}
+      {subTab === "darstellung" && <DarstellungKarte />}
       {subTab === "papierkorb" && (
         <PapierkorbBereich
           trashPlayers={trashPlayers}
@@ -10875,7 +10877,6 @@ function Verwaltung({
           onHardDelete={onHardDelete}
         />
       )}
-      <DarstellungKarte />
     </section>
   );
 }
