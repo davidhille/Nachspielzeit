@@ -10,3 +10,5 @@ wrangler.toml
 package.json
 tools
 .github
+src
+vendor/babel.min.js

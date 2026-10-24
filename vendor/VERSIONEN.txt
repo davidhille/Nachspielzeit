@@ -3,7 +3,7 @@ Quelle der Dateien: cdn.jsdelivr.net (npm-Pakete, unverändert).
 
 react                        18.3.1   vendor/react.production.min.js
 react-dom                    18.3.1   vendor/react-dom.production.min.js
-@babel/standalone            8.0.9    vendor/babel.min.js
+@babel/standalone            8.0.9    vendor/babel.min.js  (nur noch für tools/bauen.js, wird nicht ausgeliefert)
 @fontsource/inter            5.3.0    vendor/fonts/inter-latin-{400,500,600,700}-normal.woff2
 @fontsource/space-grotesk    5.3.0    vendor/fonts/space-grotesk-latin-{500,700}-normal.woff2
 

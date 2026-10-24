@@ -1,7 +1,7 @@
 # Nachspielzeit – Projektanweisungen
 
 ## Projekt
-- App: `index.html` plus `js/logik.js` (reine Rechenlogik: Punkte, Saison, Karten; klassisches Skript vor der App, von den Tests direkt geprüft) und `js/sitzung.js` (`Sitzung.code`, `.team`, `.info`; Anmelden/Abmelden nur über `Sitzung.merkeCode` / `Sitzung.vergiss`, nie `localStorage` direkt) und `js/db.js` (Supabase-Zugriff: `dbSelect`/`dbInsert`/`dbUpsert`/`dbUpdate`/`dbDelete`/`dbDeleteWhere`/`dbIdsWhere`/`ersetzeGruppe`, `nszFetch`, `TEAM_TABLES`; hängt nur von `Sitzung` ab). Ladereihenfolge in `index.html`: logik, sitzung, db, dann die App. Die React-Quelle (JSX) steht in `<script type="text/plain" id="app-source">` und wird im Browser von Babel kompiliert.
+- App: Quelle ist `src/app.jsx` (React/JSX). **Nach jeder Änderung daran `node tools/bauen.js` ausführen** und `src/app.jsx`, die neue `app.<Hash>.js` und `index.html` gemeinsam committen; `index.html` lädt nur die gebaute Datei, der Browser übersetzt nichts mehr (CI schlägt fehl, wenn vergessen). Dazu `index.html` (Gerüst, Styles) plus `js/logik.js` (reine Rechenlogik: Punkte, Saison, Karten; klassisches Skript vor der App, von den Tests direkt geprüft) und `js/sitzung.js` (`Sitzung.code`, `.team`, `.info`; Anmelden/Abmelden nur über `Sitzung.merkeCode` / `Sitzung.vergiss`, nie `localStorage` direkt) und `js/db.js` (Supabase-Zugriff: `dbSelect`/`dbInsert`/`dbUpsert`/`dbUpdate`/`dbDelete`/`dbDeleteWhere`/`dbIdsWhere`/`ersetzeGruppe`, `nszFetch`, `TEAM_TABLES`; hängt nur von `Sitzung` ab). Ladereihenfolge in `index.html`: logik, sitzung, db, dann die App.
 - Backend: Supabase. Deployment: `git push origin main` → Cloudflare Workers (Repo davidhille/Nachspielzeit, Branch main).
 - Trainer-App: u8.nachspielzeit.app, Admin: admin.nachspielzeit.app. Nach jedem Push einmal hart neu laden.
 - Sprache der App und der Antworten: Deutsch. Kurz, konkret, handlungsorientiert. Subtiler Humor, nie platt.
@@ -38,11 +38,11 @@
 - Beschriftungen mit Feldern verknüpfen, sichtbarer Fokus, `lang="de"`, eine `h1` pro Seite.
 
 ## Nicht anfassen / Vorsicht
-- Taktik-Editor (Code ca. Zeilen 3000–4950): Schriftgrößen bewusst frei, nicht auf 12 px vereinheitlichen (Entscheidung von David). Geometrie über `tkGeo`, Rotation über `getScreenCTM`. Änderungen dort immer separat melden.
+- Taktik-Editor (Code in `src/app.jsx`, ca. Zeilen 2800–4750): Schriftgrößen bewusst frei, nicht auf 12 px vereinheitlichen (Entscheidung von David). Geometrie über `tkGeo`, Rotation über `getScreenCTM`. Änderungen dort immer separat melden.
 - Berechnungen für Punkte und Anwesenheit (`js/logik.js`) nicht ohne Rückfrage ändern. Neue Rechenfunktionen ohne React/DB-Bezug dorthin, nicht in `index.html`.
 
 ## Technische Details (Muster im Code)
-- Prüfung: `cd /opt/node-tools && node -e "…"` parst den Inhalt von `app-source` mit acorn + acorn-jsx und gibt `ACORN_OK` aus.
+- Prüfung: `cd /opt/node-tools && node -e "…"` parst `src/app.jsx` mit acorn + acorn-jsx und gibt `ACORN_OK` aus. Einfacher: `cd tools && npm run alles` (Syntax, Lint, Build-Prüfung, Tests).
 - Aktionen mit `wrapAction(fn, successMsg, undo)` (liefert true/false) und `showToast`. Globale Helfer: `confirmAnd`, `meldung`, `frageAnd` (nutzen `TkDialog`).
 - Kontexte: `FeatureCtx`, `TrainingBoardCtx`, `NavCtx` (setTab).
 - `styles`-Objekt: `card`, `primaryBtn`/`secondaryBtn`, `linkBtn`, `dangerBtn`, `iconBtn`, `segNav`/`segBtn`, `chip`, `playerNameBtn`, `fieldRow`, `range`, `empty`. Neue Stile dort ergänzen, nicht inline duplizieren.

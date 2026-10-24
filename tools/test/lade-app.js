@@ -7,10 +7,8 @@ const acorn = require("acorn");
 const jsx = require("acorn-jsx");
 
 function appQuelle() {
-  const html = fs.readFileSync(path.join(__dirname, "..", "..", "index.html"), "utf8");
-  const m = html.match(/<script type="text\/plain" id="app-source">([\s\S]*?)<\/script>/);
-  if (!m) throw new Error("app-source nicht gefunden");
-  return m[1];
+  // Quelle der App: src/app.jsx (index.html lädt nur die daraus gebaute app.<Hash>.js, siehe tools/bauen.js)
+  return fs.readFileSync(path.join(__dirname, "..", "..", "src", "app.jsx"), "utf8");
 }
 
 function logikQuelle() {

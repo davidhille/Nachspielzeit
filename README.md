@@ -1,11 +1,11 @@
 # Nachspielzeit
 
-Web-App zur Spielerbewertung für Jugendmannschaften (SV Heimstetten). Einzeldatei-App: `index.html` enthält Styles und die React-Quelle (JSX in `<script type="text/plain" id="app-source">`), die der Browser mit dem mitgelieferten Babel (`vendor/`) übersetzt. Es gibt keinen Build-Schritt.
+Web-App zur Spielerbewertung für Jugendmannschaften (SV Heimstetten). App: Quelle in `src/app.jsx` (React/JSX), Gerüst und Styles in `index.html`. `tools/bauen.js` übersetzt die Quelle mit dem mitgelieferten Babel zu `app.<Hash>.js`, `index.html` lädt nur diese Datei. Das Ergebnis wird mit committet, bei Cloudflare gibt es keinen Build-Schritt.
 
 ## Aufbau
 | Teil | Ort |
 |---|---|
-| App | `index.html` |
+| App | `src/app.jsx` → `app.<Hash>.js`, Gerüst `index.html` |
 | Bibliotheken, Schriften (selbst gehostet) | `vendor/` (Versionen in `vendor/VERSIONEN.txt`) |
 | Datenbank | Supabase, Schema in `supabase/` |
 | Hosting | Cloudflare Workers (`wrangler.toml`), Deployment per `git push origin main` |
@@ -15,7 +15,7 @@ Adressen: Trainer-App `u8.nachspielzeit.app` (Team aus dem Hostnamen oder `?team
 
 ## Entwickeln
 - Projektregeln (Design, Barrierefreiheit, Vorgehen) stehen in `CLAUDE.md`.
-- Syntaxprüfung der App-Quelle: Inhalt von `app-source` mit acorn + acorn-jsx parsen.
+- Nach Änderungen an `src/app.jsx`: `node tools/bauen.js`. Prüfung: `cd tools && npm install && npm run alles`.
 - Lokal: `python3 -m http.server` im Ordner, dann `http://localhost:8000/index.html`.
 - Neue Tabellen: RLS an, Policy „access via code“ mit `nsz_code_ok(team_id)`, in `TEAM_TABLES` und `BACKUP_TABELLEN` eintragen.
 
