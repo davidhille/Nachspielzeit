@@ -14,6 +14,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Nachspielzeit" />
 <!-- Alles selbst ausgeliefert (vendor/): keine Aufrufe an Google oder unpkg, feste Versionen (siehe vendor/VERSIONEN.txt) -->
+<script>
+  try {
+    var _t = localStorage.getItem("nsz_darstellung");
+    if (_t === "hell" || _t === "dunkel") document.documentElement.setAttribute("data-theme", _t === "dunkel" ? "dark" : "light");
+  } catch (e) {}
+</script>
 <style>
   @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/inter-latin-400-normal.woff2") format("woff2"); }
   @font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("vendor/fonts/inter-latin-500-normal.woff2") format("woff2"); }
@@ -71,8 +77,10 @@
     --sh-3: 0 18px 40px rgba(0,0,0,0.28);
     --header-grad-btn: linear-gradient(135deg, #D2271F, #96161A);
   }
+  /* Darstellung: "Automatisch" folgt dem System; Hell/Dunkel setzt data-theme auf <html> (Auswahl pro Gerät, siehe DarstellungKarte) */
+  :root[data-theme="light"] { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #161112; --surface: #221A1B; --surface-2: #2A2122; --divider: #332829; --border: #3D3132; --border-strong: #4A3B3C;
       --text: #F1EAE9; --text-2: #D6C6C6; --muted: #BFA9A9; --muted-2: #A48C8C;
       --accent-text: #FF8F87; --accent-soft: #3A2224; --danger-text: #F28B82; --success-text: #81C995; --loss-text: #F28B82;
@@ -86,6 +94,21 @@
       --sh-2: 0 4px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.3);
       --sh-3: 0 18px 40px rgba(0,0,0,0.55);
     }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #161112; --surface: #221A1B; --surface-2: #2A2122; --divider: #332829; --border: #3D3132; --border-strong: #4A3B3C;
+    --text: #F1EAE9; --text-2: #D6C6C6; --muted: #BFA9A9; --muted-2: #A48C8C;
+    --accent-text: #FF8F87; --accent-soft: #3A2224; --danger-text: #F28B82; --success-text: #81C995; --loss-text: #F28B82;
+    --pos-bg: #1E3A2A; --pos-text: #A7E3BC; --neg-bg: #4A2224;
+    --win-bg: #1C3324; --loss-bg: #3E2022; --draw-bg: #2C2C2C;
+    --warn-bg: #3D3218; --warn-text: #F2D27A; --info-bg: #1C2A40; --info-text: #A8C7FA;
+    --focus: #FF8F87;
+    --tan-bg: #3A2F1D; --tan-text: #F2C879;
+    --lav-bg: #2A2640; --lav-text: #B7ACE8;
+    --sh-1: 0 1px 2px rgba(0,0,0,0.35);
+    --sh-2: 0 4px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.3);
+    --sh-3: 0 18px 40px rgba(0,0,0,0.55);
   }
   * { box-sizing: border-box; }
   .nz-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -607,6 +630,12 @@ const sichereTeamfarbe = (hex) => {
   return rgbHex(c);
 };
 let letzteTeamfarbe = null;
+const istDunkel = () => {
+  const t = document.documentElement.getAttribute("data-theme");
+  if (t === "dark") return true;
+  if (t === "light") return false;
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+};
 const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--accent-soft", "--focus", "--header-grad", "--header-grad-btn"];
 const wendeTeamfarbeAn = () => {
   try {
@@ -616,7 +645,7 @@ const wendeTeamfarbeAn = () => {
       TEAMFARBEN_VARS.forEach((v) => root.removeProperty(v));
       return;
     }
-    const c = hexRgb(hex), dunkel = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const c = hexRgb(hex), dunkel = istDunkel();
     const schwarz = [0, 0, 0], weiss = [255, 255, 255];
     const akzent = farbMix(c, schwarz, 0.12);
     root.setProperty("--accent", akzent);
@@ -10679,6 +10708,40 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
 
 /* ---------- Verwaltung ---------- */
 
+/* Darstellung pro Gerät: auto (System) | hell | dunkel */
+const DARSTELLUNG_KEY = "nsz_darstellung";
+const leseDarstellung = () => {
+  try { const v = localStorage.getItem(DARSTELLUNG_KEY); return v === "hell" || v === "dunkel" ? v : "auto"; } catch (e) { return "auto"; }
+};
+const setzeDarstellung = (wert) => {
+  try { if (wert === "auto") localStorage.removeItem(DARSTELLUNG_KEY); else localStorage.setItem(DARSTELLUNG_KEY, wert); } catch (e) {}
+  const root = document.documentElement;
+  if (wert === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", wert === "dunkel" ? "dark" : "light");
+  wendeTeamfarbeAn(); // Akzentfarben hängen vom aktiven Modus ab
+};
+function DarstellungKarte() {
+  const [wert, setWert] = useState(leseDarstellung);
+  const optionen = [["auto", "Automatisch"], ["hell", "Hell"], ["dunkel", "Dunkel"]];
+  return (
+    <div style={{ ...styles.card, marginTop: 20 }}>
+      <KartenTitel>Darstellung</KartenTitel>
+      <div role="group" aria-label="Darstellung wählen" style={{ ...styles.segNav, marginBottom: 8 }}>
+        {optionen.map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => { setWert(k); setzeDarstellung(k); }}
+            aria-pressed={!!(wert === k)}
+            style={{ ...styles.segBtn, ...(wert === k ? styles.segBtnActive : {}) }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      <div style={{ fontSize: 13, color: "var(--muted)" }}>Automatisch folgt der Einstellung deines Geräts. Die Auswahl gilt nur für dieses Gerät.</div>
+    </div>
+  );
+}
+
 function Verwaltung({
   players,
   basis,
@@ -10812,6 +10875,7 @@ function Verwaltung({
           onHardDelete={onHardDelete}
         />
       )}
+      <DarstellungKarte />
     </section>
   );
 }
