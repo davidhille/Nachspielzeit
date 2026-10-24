@@ -6240,7 +6240,6 @@ function KartenSeitePlus({ token }) {
   const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
   // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
   const panel = (k, inhalt) => (besucht[k] || aktTab === k ? <div style={{ display: aktTab === k ? "block" : "none" }}>{inhalt}</div> : null);
-  const diffFarbe = (d) => (d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "var(--muted)");
   return (
     <div style={styles.app}>
       <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
@@ -6419,10 +6418,9 @@ function KartenSeiteVorschau({ token }) {
   const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
   // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
   const panel = (k, inhalt) => (besucht[k] || aktTab === k ? <div style={{ display: aktTab === k ? "block" : "none" }}>{inhalt}</div> : null);
-  const diffFarbe = (d) => (d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "var(--muted)");
   return (
     <div style={styles.app}>
-      <div style={{ background: "#FFF3CD", color: "#664D03", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 12px" }}>Vorschau – so könnte die nächste Version der Eltern-Seite aussehen. Eltern sehen diese Seite nicht.</div>
+      <div style={{ background: "var(--warn-bg)", color: "var(--warn-text)", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 12px" }}>Vorschau – so könnte die nächste Version der Eltern-Seite aussehen. Eltern sehen diese Seite nicht.</div>
       <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
         <div style={{ ...styles.headerTop, maxWidth: 1100, margin: "0 auto" }}>
           <img src={CLUB.logo} alt={CLUB.name} style={styles.crestImg} />
@@ -11145,7 +11143,7 @@ function JerseyBadge({ number, size = 20 }) {
   const zweistellig = String(number).length >= 2;
   return (
     <span style={{ position: "relative", display: "inline-flex", width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="#AE1E1D">
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="var(--accent)">
         <path d="M16 3l-2.2 1.8a2.2 2.2 0 0 1-3.6 0L8 3 2 7.5 4.3 11H7v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9h2.7L22 7.5 16 3z" />
       </svg>
       <span
