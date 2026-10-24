@@ -987,8 +987,8 @@ const SQL_TEAMS = `create table if not exists teams (
 );
 alter table teams enable row level security;
 grant select, insert, update, delete on table teams to anon, authenticated, service_role;
+-- Alte, offene Policy entfernen. Zugriff regelt erst das Zugangs-Skript (Admin → Zugänge): ohne dieses ist die Tabelle gesperrt.
 drop policy if exists "access via code" on teams;
-create policy "access via code" on teams for all to public using (true) with check (true);
 insert into teams (id, name) values ('u8', 'U8') on conflict (id) do nothing;
 
 -- Daten den Teams zuordnen (bestehende Daten gehören zu "u8")
