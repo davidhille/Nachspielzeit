@@ -22,7 +22,7 @@ const globals = {};
   .forEach((k) => (globals[k] = "readonly"));
 
 // Namen aus js/logik.js (klassisches Skript vor der App) sind in der App globale Variablen
-"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen Sitzung".split(" ").forEach((k) => (globals[k] = "writable"));
+"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen Sitzung SUPABASE_URL SUPABASE_KEY REST baseHeaders dbHeaders TEAM_TABLES teamFilterAktiv mitTeamId pruefeZugang nszFetch dbSelect dbInsert dbUpsert dbUpdate dbDelete dbDeleteWhere dbIdsWhere ersetzeGruppe".split(" ").forEach((k) => (globals[k] = "writable"));
 
 const meldungen = new Linter()
   .verify(
@@ -47,4 +47,11 @@ const sitzungMeldungen = new Linter()
   .filter((m) => m.fatal || m.ruleId);
 sitzungMeldungen.forEach((m) => console.error(`sitzung.js ${m.line}:${m.column} ${m.ruleId} ${m.message}`));
 if (sitzungMeldungen.length) process.exit(1);
+// js/db.js eigenständig prüfen: darf nur Sitzung und Browser-Globals brauchen
+const dbGlobals = { Sitzung: "readonly", fetch: "readonly", AbortController: "readonly", setTimeout: "readonly", clearTimeout: "readonly", encodeURIComponent: "readonly", JSON: "readonly", String: "readonly", Error: "readonly", TypeError: "readonly", Array: "readonly" };
+const dbMeldungen = new Linter()
+  .verify(require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "js", "db.js"), "utf8"), [{ files: ["**/*.js"], languageOptions: { ecmaVersion: "latest", sourceType: "script", globals: dbGlobals }, rules: { "no-undef": "error", "no-redeclare": "error" } }], "db.js")
+  .filter((m) => m.fatal || m.ruleId);
+dbMeldungen.forEach((m) => console.error(`db.js ${m.line}:${m.column} ${m.ruleId} ${m.message}`));
+if (dbMeldungen.length) process.exit(1);
 console.log("LINT_OK");
