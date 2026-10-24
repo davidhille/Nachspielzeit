@@ -20,7 +20,7 @@ Adressen: Trainer-App `u8.nachspielzeit.app` (Team aus dem Hostnamen oder `?team
 - Neue Tabellen: RLS an, Policy „access via code“ mit `nsz_code_ok(team_id)`, in `TEAM_TABLES` und `BACKUP_TABELLEN` eintragen.
 
 ## Betrieb
-- **Backup**: Workflow „Supabase Backup“ im Repo `nachspielzeit-backup`, täglich ca. 05:17 Uhr. Er sichert Schema, Daten und verlinkte Bilder, bricht bei unplausiblen Dumps ab und meldet fehlende Bilder als Fehler. Stände älter als 90 Tage werden zu einem zusammengefasst.
+- **Backup**: Workflow „Supabase Backup“ im Repo `nachspielzeit-backup`, täglich (geplant 05:17 Uhr, GitHub startet den Lauf oft Stunden später). Er sichert Schema, Daten und verlinkte Bilder, bricht bei unplausiblen Dumps ab und meldet fehlende Bilder als Fehler. Stände älter als 90 Tage werden zu einem zusammengefasst.
 - **Löschkonzept**: Austritt/Widerruf → Papierkorb, nach 30 Tagen Erinnerung zum endgültigen Löschen (von Hand, Frist einstellbar). Aus dem Backup verschwinden gelöschte Daten nach spätestens ca. 90 Tagen.
 - **Fehlerprotokoll**: anonyme Fehlermeldungen (ohne Namen/Codes) unter Administration → Fehler.
 - **Datenschutz**: Einwilligung der Eltern, Verträge mit Dienstleistern und Hinweise für Eltern gehören dem Verein; Arbeitsunterlagen liegen nicht im Repo.
