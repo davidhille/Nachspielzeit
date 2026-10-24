@@ -417,6 +417,24 @@ async function dbDeleteWhere(table, qs) {
   const res = await nszFetch(`${REST}${table}?${qs}`, { method: "DELETE", headers: dbHeaders() });
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
+// Nur die IDs der Zeilen holen, die auf den Filter passen (für Konfliktprüfung und "erst einfügen, dann Altes löschen")
+async function dbIdsWhere(table, qs) {
+  if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
+  const res = await nszFetch(`${REST}${table}?select=id&${qs}`, { headers: dbHeaders() });
+  if (!res.ok) throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
+  return (await res.json()).map((r) => String(r.id));
+}
+// Sammel-Speichern ohne Datenverlust: erst die neuen Zeilen einfügen, danach nur die alten löschen.
+// Bricht das Einfügen ab, bleiben die alten Daten vollständig erhalten.
+async function ersetzeGruppe(table, filterQs, rows) {
+  const neueIds = rows.map((r) => String(r.id));
+  await dbInsert(table, rows);
+  const alt = await dbIdsWhere(table, filterQs);
+  const weg = alt.filter((id) => !neueIds.includes(id));
+  for (let i = 0; i < weg.length; i += 50) {
+    await dbDeleteWhere(table, `id=in.(${weg.slice(i, i + 50).map(encodeURIComponent).join(",")})`);
+  }
+}
 
 /* ---------- Profilbilder ---------- */
 
@@ -2823,6 +2841,21 @@ function App() {
 
   const activePlayers = useMemo(() => players.filter((p) => p.active !== false), [players]);
 
+  // Vor dem Überschreiben prüfen, ob jemand anderes die Daten inzwischen geändert hat (Vergleich der gespeicherten IDs).
+  // Bei Abweichung: Rückfrage; die Eingaben bleiben stehen (Rückgabe false), bis bestätigt wird.
+  const speichernMitKonflikt = async ({ kennung, bekannt, holeServer, speichern }) => {
+    let abweichung = false;
+    try {
+      const server = await holeServer();
+      abweichung = server.length !== bekannt.length || server.some((id) => !bekannt.includes(id));
+    } catch (e) {
+      console.error(e); // Prüfung gescheitert: nicht blockieren, normal speichern
+    }
+    if (!abweichung) return speichern();
+    confirmAnd(`${kennung} wurde inzwischen von jemand anderem gespeichert. Trotzdem überschreiben?`, () => { speichern(); });
+    return false;
+  };
+
   const wrapAction = async (fn, successMsg, undo) => {
     setBusy(true);
     try {
@@ -3110,21 +3143,27 @@ function App() {
             termine={termine}
             onSaveTerminNotiz={(id, text) => wrapAction(() => dbUpdate("trainingstermine", id, { bewertung_notizen: text }), "Notiz gespeichert")}
             onSave={(entries, date) =>
-              wrapAction(async () => {
-                await dbDeleteWhere("trainings", `date=eq.${date}`);
-                await dbInsert(
-                  "trainings",
-                  entries.map((e) => ({
-                    id: e.id,
-                    date: e.date,
-                    player_id: e.playerId,
-                    vorkommnis: e.vorkommnis,
-                    karte: e.karte,
-                    teilnahme: e.teilnahme,
-                    kommentar: e.kommentar || "",
-                  }))
-                );
-              }, "Trainingsbewertung gespeichert")
+              speichernMitKonflikt({
+                kennung: "Dieses Training",
+                bekannt: trainings.filter((t) => t.date === date).map((t) => String(t.id)),
+                holeServer: () => dbIdsWhere("trainings", `date=eq.${date}`),
+                speichern: () =>
+                  wrapAction(async () => {
+                    await ersetzeGruppe(
+                      "trainings",
+                      `date=eq.${date}`,
+                      entries.map((e) => ({
+                        id: e.id,
+                        date: e.date,
+                        player_id: e.playerId,
+                        vorkommnis: e.vorkommnis,
+                        karte: e.karte,
+                        teilnahme: e.teilnahme,
+                        kommentar: e.kommentar || "",
+                      }))
+                    );
+                  }, "Trainingsbewertung gespeichert"),
+              })
             }
             onDelete={(date) =>
               wrapAction(async () => {
@@ -3138,13 +3177,19 @@ function App() {
             players={activePlayers}
             entwicklungen={entwicklungen}
             onSave={(entries, month) =>
-              wrapAction(async () => {
-                await dbDeleteWhere("entwicklungen", `month=eq.${month}`);
-                await dbInsert(
-                  "entwicklungen",
-                  entries.map((e) => ({ id: e.id, month: e.month, player_id: e.playerId, punkte: e.punkte }))
-                );
-              }, "Monatsentwicklung gespeichert")
+              speichernMitKonflikt({
+                kennung: "Dieser Monat",
+                bekannt: entwicklungen.filter((e) => e.month === month).map((e) => String(e.id)),
+                holeServer: () => dbIdsWhere("entwicklungen", `month=eq.${month}`),
+                speichern: () =>
+                  wrapAction(async () => {
+                    await ersetzeGruppe(
+                      "entwicklungen",
+                      `month=eq.${month}`,
+                      entries.map((e) => ({ id: e.id, month: e.month, player_id: e.playerId, punkte: e.punkte }))
+                    );
+                  }, "Monatsentwicklung gespeichert"),
+              })
             }
           />
         )}
