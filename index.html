@@ -297,6 +297,9 @@ async function dbDeleteWhere(table, qs) {
 /* ---------- Profilbilder ---------- */
 
 const PHOTO_BUCKET = "profilbilder";
+// Bilder pro Team trennen: U8 behält die bisherigen Pfade, alle anderen Teams schreiben unter "<team>/…" (die Datenbank erlaubt ihnen nur diesen Ordner).
+// Nicht betroffen: karten/… (öffentlicher Elternlink, die Elternseite kennt das Team nicht; der Token ist geheim).
+const teamPfad = (p, team = CURRENT_TEAM) => (team === "u8" ? p : `${team}/${p}`);
 
 async function resizeImageFile(file, maxSize = 320, quality = 0.82) {
   const dataUrl = await new Promise((resolve, reject) => {
@@ -330,7 +333,7 @@ async function uploadProfilbild(playerId, file) {
   // Kleine Version für Listen/Avatare, zusätzlich hochauflösend (-hd) für die Sammelkarte
   const blob = await resizeImageFile(file);
   const blobHd = await resizeImageFile(file, 1000, 0.9);
-  const path = `players/${playerId}.jpg`;
+  const path = teamPfad(`players/${playerId}.jpg`);
   const put = (p, b) =>
     fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${p}`, {
       method: "POST",
@@ -346,7 +349,7 @@ async function uploadProfilbild(playerId, file) {
   const res = await put(path, blob);
   if (!res.ok) throw new Error(`Hochladen des Profilbilds fehlgeschlagen: ${await res.text()}`);
   try {
-    await put(`players/${playerId}-hd.jpg`, blobHd);
+    await put(teamPfad(`players/${playerId}-hd.jpg`), blobHd);
   } catch (e) {
     // HD ist optional; die Sammelkarte nutzt sonst die kleine Version
   }
@@ -355,7 +358,7 @@ async function uploadProfilbild(playerId, file) {
 
 async function uploadTeamFoto(file, team = CURRENT_TEAM) {
   const blob = await resizeImageFile(file, 1200, 0.85);
-  const path = team === "u8" ? `team/foto.jpg` : `team/foto-${team}.jpg`;
+  const path = teamPfad(team === "u8" ? `team/foto.jpg` : `team/foto-${team}.jpg`, team);
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
@@ -382,7 +385,7 @@ async function uploadVereinsLogo(team, file) {
   c.height = Math.max(1, Math.round(img.naturalHeight * f));
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
   const blob = await new Promise((res) => c.toBlob(res, "image/png"));
-  const path = `team/wappen-${team}.png`;
+  const path = teamPfad(`team/wappen-${team}.png`, team);
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE, "x-upsert": "true", "Content-Type": "image/png" },
@@ -394,7 +397,7 @@ async function uploadVereinsLogo(team, file) {
 
 async function uploadUebungBild(uebungId, file) {
   const blob = await resizeImageFile(file, 900, 0.85);
-  const path = `uebungen/${uebungId}.jpg`;
+  const path = teamPfad(`uebungen/${uebungId}.jpg`);
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
@@ -412,7 +415,7 @@ async function uploadUebungBild(uebungId, file) {
 
 async function uploadTextBild(file) {
   const blob = await resizeImageFile(file, 1000, 0.85);
-  const path = `textbilder/${uid()}.jpg`;
+  const path = teamPfad(`textbilder/${uid()}.jpg`);
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
@@ -429,7 +432,7 @@ async function uploadTextBild(file) {
 
 async function uploadSpieltagFoto(spieltagId, file) {
   const blob = await resizeImageFile(file, 1200, 0.85);
-  const path = `spieltage/${spieltagId}.jpg`;
+  const path = teamPfad(`spieltage/${spieltagId}.jpg`);
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
@@ -5084,7 +5087,7 @@ function songUrl(pfad) {
 }
 async function ladeSongHoch(file) {
   const endung = (file.name.match(/\.([a-z0-9]{2,4})$/i) || [, "mp3"])[1].toLowerCase();
-  const pfad = `songs/${uid()}.${endung}`;
+  const pfad = teamPfad(`songs/${uid()}.${endung}`);
   const res = await fetch(`${KARTEN_OBJ}/${PHOTO_BUCKET}/${pfad}`, {
     method: "POST",
     headers: {
