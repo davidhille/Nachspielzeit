@@ -8766,7 +8766,7 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <KartenTitel>Training bewerten</KartenTitel>
         {geplanteTermine.length > 0 ? (
-          <select style={{ ...styles.select, width: "100%" }} value={date} onChange={(e) => setDate(e.target.value)}>
+          <select aria-label="Trainingstermin" style={{ ...styles.select, width: "100%" }} value={date} onChange={(e) => setDate(e.target.value)}>
             {geplanteTermine.filter((t, i, arr) => t.date <= today || t.date === date || arr.filter((x) => x.date > today && x.date < t.date).length < 2).map((t) => (
               <option key={t.id} value={t.date}>
                 {formatTerminLabel(t.date)}
@@ -8962,6 +8962,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
         </div>
         <input
           type="month"
+          aria-label="Monat"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
           style={{ ...styles.select, minWidth: 150 }}
@@ -8979,6 +8980,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
             <div style={styles.fieldRow}>
               <input
                 type="range"
+                aria-label={`Extrapunkte ${p.name}`}
                 min={-1}
                 max={1}
                 step={0.25}
@@ -9167,6 +9169,7 @@ function ZeitSelect({ value, onChange }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
       <select
+        aria-label="Stunde"
         style={{ ...styles.select, width: 62 }}
         value={h || ""}
         onChange={(e) => onChange(`${e.target.value}:${m || "00"}`)}
@@ -9182,6 +9185,7 @@ function ZeitSelect({ value, onChange }) {
       </select>
       <span style={{ color: "var(--muted)" }}>:</span>
       <select
+        aria-label="Minute"
         style={{ ...styles.select, width: 62 }}
         value={m || ""}
         onChange={(e) => onChange(`${h || "00"}:${e.target.value}`)}
@@ -10869,6 +10873,7 @@ function SpielerBereich({
       <div style={styles.addRow}>
         <input
           style={styles.input}
+          aria-label="Name des Spielers"
           placeholder="Name des Spielers"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -12065,7 +12070,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                       <span style={{ ...styles.hint, marginTop: 10, marginBottom: 0 }}>Alle hinterlegten Gegner sind bereits zugeordnet.</span>
                     ) : (
                       <div style={{ ...styles.addRow, marginTop: 10, marginBottom: 0 }}>
-                        <select style={styles.select} value={neuerGegnerId} onChange={(e) => setNeuerGegnerId(e.target.value)}>
+                        <select aria-label="Gegner hinzufügen" style={styles.select} value={neuerGegnerId} onChange={(e) => setNeuerGegnerId(e.target.value)}>
                           <option value="">Gegner wählen …</option>
                           {verfuegbareGegner.map((g) => (
                             <option key={g.id} value={g.id}>{g.name}</option>
