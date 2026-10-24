@@ -1,7 +1,7 @@
 # Nachspielzeit – Projektanweisungen
 
 ## Projekt
-- Einzeldatei-App: `index.html`. Die React-Quelle (JSX) steht in `<script type="text/plain" id="app-source">` und wird im Browser von Babel kompiliert.
+- App: `index.html` plus `js/logik.js` (reine Rechenlogik: Punkte, Saison, Karten; klassisches Skript vor der App, von den Tests direkt geprüft). Die React-Quelle (JSX) steht in `<script type="text/plain" id="app-source">` und wird im Browser von Babel kompiliert.
 - Backend: Supabase. Deployment: `git push origin main` → Cloudflare Workers (Repo davidhille/Nachspielzeit, Branch main).
 - Trainer-App: u8.nachspielzeit.app, Admin: admin.nachspielzeit.app. Nach jedem Push einmal hart neu laden.
 - Sprache der App und der Antworten: Deutsch. Kurz, konkret, handlungsorientiert. Subtiler Humor, nie platt.
@@ -39,7 +39,7 @@
 
 ## Nicht anfassen / Vorsicht
 - Taktik-Editor (Code ca. Zeilen 3000–4950): Schriftgrößen bewusst frei, nicht auf 12 px vereinheitlichen (Entscheidung von David). Geometrie über `tkGeo`, Rotation über `getScreenCTM`. Änderungen dort immer separat melden.
-- Berechnungen für Punkte und Anwesenheit nicht ohne Rückfrage ändern.
+- Berechnungen für Punkte und Anwesenheit (`js/logik.js`) nicht ohne Rückfrage ändern. Neue Rechenfunktionen ohne React/DB-Bezug dorthin, nicht in `index.html`.
 
 ## Technische Details (Muster im Code)
 - Prüfung: `cd /opt/node-tools && node -e "…"` parst den Inhalt von `app-source` mit acorn + acorn-jsx und gibt `ACORN_OK` aus.

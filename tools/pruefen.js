@@ -3,7 +3,7 @@
 const acorn = require("acorn");
 const jsx = require("acorn-jsx");
 const { Linter } = require("eslint");
-const { appQuelle } = require("./test/lade-app");
+const { appQuelle, logikQuelle } = require("./test/lade-app");
 
 const src = appQuelle();
 try {
@@ -21,6 +21,9 @@ const globals = {};
   .split(" ")
   .forEach((k) => (globals[k] = "readonly"));
 
+// Namen aus js/logik.js (klassisches Skript vor der App) sind in der App globale Variablen
+"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen".split(" ").forEach((k) => (globals[k] = "writable"));
+
 const meldungen = new Linter()
   .verify(
     src,
@@ -30,4 +33,11 @@ const meldungen = new Linter()
   .filter((m) => m.fatal || m.ruleId);
 meldungen.forEach((m) => console.error(`${m.line}:${m.column} ${m.ruleId} ${m.message}`));
 if (meldungen.length) process.exit(1);
+// js/logik.js eigenständig prüfen: Syntax und keine undefinierten Namen (die Logik darf nichts außer sich selbst brauchen)
+const logikGlobals = { Number: "readonly", Math: "readonly", String: "readonly", Object: "readonly", Array: "readonly" };
+const logikMeldungen = new Linter()
+  .verify(logikQuelle(), [{ files: ["**/*.js"], languageOptions: { ecmaVersion: "latest", sourceType: "script", globals: logikGlobals }, rules: { "no-undef": "error", "no-redeclare": "error" } }], "logik.js")
+  .filter((m) => m.fatal || m.ruleId);
+logikMeldungen.forEach((m) => console.error(`logik.js ${m.line}:${m.column} ${m.ruleId} ${m.message}`));
+if (logikMeldungen.length) process.exit(1);
 console.log("LINT_OK");

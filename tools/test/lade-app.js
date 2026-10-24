@@ -13,9 +13,14 @@ function appQuelle() {
   return m[1];
 }
 
+function logikQuelle() {
+  return fs.readFileSync(path.join(__dirname, "..", "..", "js", "logik.js"), "utf8");
+}
+
 /** Gibt ein Objekt mit den angeforderten Namen zurück (Funktionen oder Konstanten). */
 function ladeAusApp(namen) {
-  const src = appQuelle();
+  // Rechenlogik liegt in js/logik.js, alles andere in der App-Quelle; beide werden gemeinsam durchsucht.
+  const src = logikQuelle() + "\n" + appQuelle();
   const ast = acorn.Parser.extend(jsx()).parse(src, { ecmaVersion: "latest", sourceType: "script" });
   const teile = [];
   for (const node of ast.body) {
@@ -29,4 +34,4 @@ function ladeAusApp(namen) {
   return ctx.__out;
 }
 
-module.exports = { ladeAusApp, appQuelle };
+module.exports = { ladeAusApp, appQuelle, logikQuelle };
