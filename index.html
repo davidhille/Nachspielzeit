@@ -9460,7 +9460,8 @@ function ImageIcon({ size = 16 }) {
    Gespeichert wird weiterhin das einfache Text-Format (**fett**, __unterstrichen__, *kursiv*, "• ", "1. ", ![](URL)),
    angezeigt/bearbeitet wird es als formatierter Text (contenteditable). */
 function escapeHtml(t) {
-  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Anführungszeichen mit escapen: escapeHtml landet auch in Attributwerten (<img src="…">), sonst ließen sich dort Attribute einschleusen
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function markupZuHtml(text) {
