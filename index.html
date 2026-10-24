@@ -599,6 +599,7 @@ const LOGO_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMYAAADwCAY
 /* Verein (Name + Wappen): Standard SV Heimstetten, pro Team in den Einstellungen änderbar */
 const CLUB_STD = { name: "SV Heimstetten", logo: LOGO_DATA_URI, farbe: "#C4271F", titel: "Unsere Saison" };
 let CLUB = { ...CLUB_STD };
+let TEAM_NAME = "U8"; // Anzeigename des Teams (aus teams.name, sonst Kürzel aus der Adresse); wird in App gesetzt
 /* Teamfarbe: leitet die Akzentfarben der Oberfläche von einer Farbe ab */
 const hexRgb = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ""); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const rgbHex = (c) => "#" + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
@@ -2888,6 +2889,7 @@ function App() {
 
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   setzeEinstellungen(teamInfo?.config);
+  TEAM_NAME = (teamInfo && teamInfo.name) || CURRENT_TEAM.toUpperCase();
   setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel);
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
@@ -5826,7 +5828,7 @@ function SpieltagKartenBild({ tag, team, onFehler, minH }) {
     let alt = null;
     let weg = false;
     const { st, gegnerListe, pl } = tagZuShare(tag);
-    generateSpieltagShareImage(st, tag.nummer, gegnerListe, pl, { minH })
+    generateSpieltagShareImage(st, tag.nummer, gegnerListe, pl, { minH, teamName: team })
       .then((b) => {
         if (weg) return;
         alt = URL.createObjectURL(b);
@@ -6212,7 +6214,7 @@ function KartenSeitePlus({ token }) {
   useEffect(() => {
     if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
     let weg = false;
-    Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true }); }))
+    Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true, teamName: karten.team }); }))
       .then((hs) => !weg && setMaxH(Math.max(...hs)))
       .catch(() => {});
     return () => { weg = true; };
@@ -6390,7 +6392,7 @@ function KartenSeiteVorschau({ token }) {
   useEffect(() => {
     if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
     let weg = false;
-    Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true }); }))
+    Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true, teamName: karten.team }); }))
       .then((hs) => !weg && setMaxH(Math.max(...hs)))
       .catch(() => {});
     return () => { weg = true; };
@@ -7003,7 +7005,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   }
 
   // Untertitel: Geburtsdatum / Alter
-  let untertitel = player.alter != null ? `${player.alter} Jahre` : "SV HEIMSTETTEN " + teamName;
+  let untertitel = player.alter != null ? `${player.alter} Jahre` : CLUB.name.toUpperCase() + " " + teamName;
   if (player.geburtsdatum) {
     const alter = alterVonGeburtsdatum(String(player.geburtsdatum).slice(0, 10));
     untertitel = `Geboren ${formatGeburtsdatum(player.geburtsdatum)}` + (alter != null ? ` · ${alter} Jahre` : "");
@@ -7087,7 +7089,7 @@ async function generateSammelkarte(player, stats, saisonLabel, teamName) {
   ctx.textAlign = "center";
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = "700 20px 'Inter', sans-serif";
-  ctx.fillText(`SV HEIMSTETTEN ${teamName}${saisonLabel ? " · SAISON " + saisonLabel : ""}`, W / 2, H - 38);
+  ctx.fillText(`${CLUB.name.toUpperCase()} ${teamName}${saisonLabel ? " · SAISON " + saisonLabel : ""}`, W / 2, H - 38);
 
   // Glanzeffekt
   ctx.save();
@@ -7208,7 +7210,7 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players
   ctx.fillStyle = verlauf;
   ctx.fillRect(0, photoH - 250, W, 250);
 
-  // Vereinslogo (Data-URI, daher kein CORS-Problem) + "U8"
+  // Vereinslogo (Data-URI, daher kein CORS-Problem) + Teamname
   const logoH = 120;
   const logoX = padding;
   const logoY = 32;
@@ -7224,13 +7226,13 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players
     logoW = Math.round(logoH * (logoImg.naturalWidth / logoImg.naturalHeight));
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
   } catch (e) {
-    // Ohne Logo weiter, nur "U8" anzeigen
+    // Ohne Logo weiter, nur den Teamnamen anzeigen
   }
   ctx.fillStyle = "#fff";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.font = "800 56px 'Space Grotesk', sans-serif";
-  ctx.fillText("U8", logoX + logoW + 20, logoY + logoH / 2 + 2);
+  ctx.fillText((opts && opts.teamName) || TEAM_NAME, logoX + logoW + 20, logoY + logoH / 2 + 2);
 
   const bezeichnung = spieltagLabel(spieltag, nummer);
   const datumFormatiert = new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", {
@@ -8003,7 +8005,7 @@ function Dashboard({
         month={month}
         onClose={() => onSelectPlayer(null)}
         onOpenSettings={onOpenSettings}
-        teamName={teamInfo?.name || "U8"}
+        teamName={teamInfo?.name || TEAM_NAME}
       />
     );
   }
@@ -8017,7 +8019,7 @@ function Dashboard({
           {fMannschaftsbild && (
           <TeamHero
             photoUrl={teamInfo?.config?.team_photo_url || (CURRENT_TEAM === "u8" ? teamSettings?.team_photo_url : null) || null}
-            teamName={`${CLUB.name} ${teamInfo?.name || "U8"}`}
+            teamName={`${CLUB.name} ${teamInfo?.name || TEAM_NAME}`}
             seasonLabel={season ? season.replace("-", "/") : ""}
             onUploadFoto={onUploadTeamFoto}
             titleAbove
@@ -8416,7 +8418,7 @@ function SpielerSlider({ rows, players, onSelect }) {
   );
 }
 
-function PlayerCard({ player, stats }) {
+function PlayerCard({ player, stats, teamName = TEAM_NAME }) {
   return (
     <div
       style={{
@@ -8483,7 +8485,7 @@ function PlayerCard({ player, stats }) {
             <div style={{ fontSize: 13, fontStyle: "italic", fontWeight: 600, color: "var(--gold)", marginTop: 4 }}>„{player.spitzname}“</div>
           )}
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", marginTop: 3 }}>
-            SV HEIMSTETTEN U8
+            {CLUB.name.toUpperCase()} {teamName}
           </div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 6, lineHeight: 1.5 }}>
             <div>{player.geburtsdatum ? `Geboren am ${formatGeburtsdatum(player.geburtsdatum)}` : "\u00A0"}</div>
@@ -8625,7 +8627,7 @@ function PlayerStammdaten({ player, onSave, trikot }) {
   );
 }
 
-function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings, teamName = "U8", vorheriger, naechster, onNavigate }) {
+function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, month, onClose, onOpenSettings, teamName = TEAM_NAME, vorheriger, naechster, onNavigate }) {
   const [historieTab, setHistorieTab] = useState("training");
   const [kartenLaeuft, setKartenLaeuft] = useState(false);
   const [kartenFehler, setKartenFehler] = useState(null);
@@ -8736,6 +8738,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
       )}
       <PlayerCard
         player={player}
+        teamName={teamName}
         stats={[
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
