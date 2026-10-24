@@ -1,0 +1,976 @@
+-- Nachspielzeit: Datenbankschema (Schema "public")
+-- Quelle: pg_dump --schema-only vom Backup-Lauf am 24.10.2026, bereinigt um die Altfunktion check_access_code.
+-- Der Dump enthält keine Berechtigungen (GRANTs); siehe README.md.
+-- Diese Datei ist ein Abbild, keine Migration: bei Schemaänderungen neu aus dem Backup-Dump erzeugen (siehe README.md).
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict bEzbnQ3jyf1bRV8WRWfKEhC8KEreGC0xq4tZdkdXKYykVto2a5NTG7jMmRqF9CM
+
+-- Dumped from database version 17.6
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg24.04+2)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA public;
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+-- Name: check_access(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_access(code text) RETURNS json
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select coalesce(
+    (select json_build_object('ok', true, 'team_id', a.team_id) from access_codes a where a.code = check_access.code and a.active limit 1),
+    json_build_object('ok', false))
+$$;
+
+
+--
+-- Name: nsz_code_ok(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.nsz_code_ok(t text DEFAULT NULL::text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and (team_id is null or t is null or team_id = t))
+$$;
+
+
+--
+-- Name: nsz_code_ok_arr(text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.nsz_code_ok_arr(t text[]) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and (team_id is null or team_id = any(t)))
+$$;
+
+
+--
+-- Name: nsz_header_code(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.nsz_header_code() RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  select nullif(current_setting('request.headers', true), '')::json ->> 'x-access-code'
+$$;
+
+
+--
+-- Name: nsz_is_admin(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.nsz_is_admin() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and team_id is null)
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: access_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.access_codes (
+    code text NOT NULL,
+    team_id text,
+    label text,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: app_features; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_features (
+    key text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    updated_at timestamp with time zone DEFAULT now(),
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: basisqualitaet; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.basisqualitaet (
+    player_id text NOT NULL,
+    wert numeric DEFAULT 0 NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: entwicklungen; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.entwicklungen (
+    id text NOT NULL,
+    month text NOT NULL,
+    player_id text,
+    punkte numeric DEFAULT 0 NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: gegner; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.gegner (
+    id text NOT NULL,
+    name text NOT NULL,
+    deleted_at timestamp with time zone,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: material_bestand; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.material_bestand (
+    id text DEFAULT (gen_random_uuid())::text NOT NULL,
+    date date NOT NULL,
+    material text NOT NULL,
+    menge integer NOT NULL,
+    gruppe text,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: players; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.players (
+    id text NOT NULL,
+    name text NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    deleted_at timestamp with time zone,
+    photo_url text,
+    trikotnummer integer,
+    nachname text,
+    geburtsdatum date,
+    passnummer text,
+    team_id text DEFAULT 'u8'::text NOT NULL,
+    spitzname text
+);
+
+
+--
+-- Name: spiele; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.spiele (
+    id text NOT NULL,
+    spieltag_id text,
+    opponent_id text,
+    our_goals integer DEFAULT 0 NOT NULL,
+    their_goals integer DEFAULT 0 NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: spieltag_gegner; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.spieltag_gegner (
+    spieltag_id text NOT NULL,
+    opponent_id text NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: spieltag_teilnehmer; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.spieltag_teilnehmer (
+    spieltag_id text NOT NULL,
+    player_id text NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: spieltage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.spieltage (
+    id text NOT NULL,
+    date date NOT NULL,
+    deleted_at timestamp with time zone,
+    notizen text,
+    foto_url text,
+    zeit text,
+    typ text DEFAULT 'spieltag'::text,
+    ort text,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: taktik_boards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.taktik_boards (
+    id text NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL,
+    name text DEFAULT 'Neues Board'::text NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted_at timestamp with time zone
+);
+
+
+--
+-- Name: team_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.team_settings (
+    id integer DEFAULT 1 NOT NULL,
+    team_photo_url text,
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: teams; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.teams (
+    id text NOT NULL,
+    name text NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    archived boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: torschuetzen; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.torschuetzen (
+    id text NOT NULL,
+    spiel_id text,
+    player_id text,
+    tore integer DEFAULT 1 NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: training_boards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.training_boards (
+    id text NOT NULL,
+    team_id text DEFAULT 'u8'::text NOT NULL,
+    termin_id text NOT NULL,
+    board_id text NOT NULL,
+    "position" integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: training_uebungen; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.training_uebungen (
+    id text NOT NULL,
+    termin_id text NOT NULL,
+    uebung_id text NOT NULL,
+    "position" integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: trainings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.trainings (
+    id text NOT NULL,
+    date date NOT NULL,
+    player_id text,
+    vorkommnis numeric DEFAULT 0 NOT NULL,
+    karte text DEFAULT 'keine'::text NOT NULL,
+    teilnahme text DEFAULT 'anwesend'::text NOT NULL,
+    kommentar text DEFAULT ''::text,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: trainingstermine; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.trainingstermine (
+    id text NOT NULL,
+    date date NOT NULL,
+    status text DEFAULT 'geplant'::text NOT NULL,
+    typ text DEFAULT 'training'::text NOT NULL,
+    start_zeit text,
+    end_zeit text,
+    notizen text,
+    bewertung_notizen text,
+    team_id text DEFAULT 'u8'::text NOT NULL
+);
+
+
+--
+-- Name: uebungen; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.uebungen (
+    id text NOT NULL,
+    titel text NOT NULL,
+    beschreibung text,
+    dauer integer,
+    kinder text,
+    keywords text[] DEFAULT '{}'::text[] NOT NULL,
+    material text[] DEFAULT '{}'::text[] NOT NULL,
+    bild_url text,
+    deleted_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    team_id text DEFAULT 'u8'::text NOT NULL,
+    team_ids text[] DEFAULT '{u8}'::text[] NOT NULL
+);
+
+
+--
+-- Name: access_codes access_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.access_codes
+    ADD CONSTRAINT access_codes_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: app_features app_features_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_features
+    ADD CONSTRAINT app_features_pkey PRIMARY KEY (team_id, key);
+
+
+--
+-- Name: basisqualitaet basisqualitaet_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.basisqualitaet
+    ADD CONSTRAINT basisqualitaet_pkey PRIMARY KEY (player_id);
+
+
+--
+-- Name: entwicklungen entwicklungen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.entwicklungen
+    ADD CONSTRAINT entwicklungen_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: gegner gegner_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gegner
+    ADD CONSTRAINT gegner_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: material_bestand material_bestand_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.material_bestand
+    ADD CONSTRAINT material_bestand_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: material_bestand material_bestand_team_date_material_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.material_bestand
+    ADD CONSTRAINT material_bestand_team_date_material_key UNIQUE (team_id, date, material);
+
+
+--
+-- Name: players players_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.players
+    ADD CONSTRAINT players_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: spiele spiele_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spiele
+    ADD CONSTRAINT spiele_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: spieltag_gegner spieltag_gegner_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltag_gegner
+    ADD CONSTRAINT spieltag_gegner_pkey PRIMARY KEY (spieltag_id, opponent_id);
+
+
+--
+-- Name: spieltag_teilnehmer spieltag_teilnehmer_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltag_teilnehmer
+    ADD CONSTRAINT spieltag_teilnehmer_pkey PRIMARY KEY (spieltag_id, player_id);
+
+
+--
+-- Name: spieltage spieltage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltage
+    ADD CONSTRAINT spieltage_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: taktik_boards taktik_boards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.taktik_boards
+    ADD CONSTRAINT taktik_boards_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: team_settings team_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_settings
+    ADD CONSTRAINT team_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: torschuetzen torschuetzen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.torschuetzen
+    ADD CONSTRAINT torschuetzen_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: training_boards training_boards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.training_boards
+    ADD CONSTRAINT training_boards_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: training_uebungen training_uebungen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.training_uebungen
+    ADD CONSTRAINT training_uebungen_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trainings trainings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trainings
+    ADD CONSTRAINT trainings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trainingstermine trainingstermine_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trainingstermine
+    ADD CONSTRAINT trainingstermine_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: uebungen uebungen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.uebungen
+    ADD CONSTRAINT uebungen_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: basisqualitaet basisqualitaet_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.basisqualitaet
+    ADD CONSTRAINT basisqualitaet_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+
+
+--
+-- Name: entwicklungen entwicklungen_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.entwicklungen
+    ADD CONSTRAINT entwicklungen_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spiele spiele_opponent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spiele
+    ADD CONSTRAINT spiele_opponent_id_fkey FOREIGN KEY (opponent_id) REFERENCES public.gegner(id);
+
+
+--
+-- Name: spiele spiele_spieltag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spiele
+    ADD CONSTRAINT spiele_spieltag_id_fkey FOREIGN KEY (spieltag_id) REFERENCES public.spieltage(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spieltag_gegner spieltag_gegner_opponent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltag_gegner
+    ADD CONSTRAINT spieltag_gegner_opponent_id_fkey FOREIGN KEY (opponent_id) REFERENCES public.gegner(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spieltag_gegner spieltag_gegner_spieltag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltag_gegner
+    ADD CONSTRAINT spieltag_gegner_spieltag_id_fkey FOREIGN KEY (spieltag_id) REFERENCES public.spieltage(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spieltag_teilnehmer spieltag_teilnehmer_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltag_teilnehmer
+    ADD CONSTRAINT spieltag_teilnehmer_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spieltag_teilnehmer spieltag_teilnehmer_spieltag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spieltag_teilnehmer
+    ADD CONSTRAINT spieltag_teilnehmer_spieltag_id_fkey FOREIGN KEY (spieltag_id) REFERENCES public.spieltage(id) ON DELETE CASCADE;
+
+
+--
+-- Name: torschuetzen torschuetzen_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.torschuetzen
+    ADD CONSTRAINT torschuetzen_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id);
+
+
+--
+-- Name: torschuetzen torschuetzen_spiel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.torschuetzen
+    ADD CONSTRAINT torschuetzen_spiel_id_fkey FOREIGN KEY (spiel_id) REFERENCES public.spiele(id) ON DELETE CASCADE;
+
+
+--
+-- Name: trainings trainings_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trainings
+    ADD CONSTRAINT trainings_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_features access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.app_features USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: basisqualitaet access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.basisqualitaet USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: entwicklungen access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.entwicklungen USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: gegner access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.gegner USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: material_bestand access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.material_bestand USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: players access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.players USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: spiele access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.spiele USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: spieltag_gegner access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.spieltag_gegner USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: spieltag_teilnehmer access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.spieltag_teilnehmer USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: spieltage access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.spieltage USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: taktik_boards access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.taktik_boards USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: team_settings access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.team_settings USING (public.nsz_code_ok()) WITH CHECK (public.nsz_code_ok());
+
+
+--
+-- Name: torschuetzen access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.torschuetzen USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: training_boards access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.training_boards USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: training_uebungen access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.training_uebungen USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: trainings access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.trainings USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: trainingstermine access via code; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "access via code" ON public.trainingstermine USING (public.nsz_code_ok(team_id)) WITH CHECK (public.nsz_code_ok(team_id));
+
+
+--
+-- Name: access_codes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.access_codes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: app_features; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.app_features ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: basisqualitaet; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.basisqualitaet ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: entwicklungen; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.entwicklungen ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: gegner; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.gegner ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: material_bestand; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.material_bestand ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: access_codes nur admin; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "nur admin" ON public.access_codes USING (public.nsz_is_admin()) WITH CHECK (public.nsz_is_admin());
+
+
+--
+-- Name: players; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: spiele; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.spiele ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: spieltag_gegner; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.spieltag_gegner ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: spieltag_teilnehmer; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.spieltag_teilnehmer ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: spieltage; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.spieltage ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: taktik_boards; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.taktik_boards ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: team_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.team_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: teams; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: teams teams aendern; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "teams aendern" ON public.teams FOR UPDATE USING (public.nsz_code_ok(id)) WITH CHECK (public.nsz_code_ok(id));
+
+
+--
+-- Name: teams teams anlegen; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "teams anlegen" ON public.teams FOR INSERT WITH CHECK (public.nsz_is_admin());
+
+
+--
+-- Name: teams teams lesen; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "teams lesen" ON public.teams FOR SELECT USING (public.nsz_code_ok());
+
+
+--
+-- Name: teams teams loeschen; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "teams loeschen" ON public.teams FOR DELETE USING (public.nsz_is_admin());
+
+
+--
+-- Name: torschuetzen; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.torschuetzen ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: training_boards; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.training_boards ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: training_uebungen; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.training_uebungen ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: trainings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.trainings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: trainingstermine; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.trainingstermine ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: uebungen; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.uebungen ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: uebungen uebungen aendern; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "uebungen aendern" ON public.uebungen FOR UPDATE USING (public.nsz_code_ok_arr(team_ids)) WITH CHECK (public.nsz_code_ok_arr(team_ids));
+
+
+--
+-- Name: uebungen uebungen anlegen; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "uebungen anlegen" ON public.uebungen FOR INSERT WITH CHECK (public.nsz_code_ok_arr(team_ids));
+
+
+--
+-- Name: uebungen uebungen lesen; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "uebungen lesen" ON public.uebungen FOR SELECT USING ((public.nsz_code_ok_arr(team_ids) OR (('alle'::text = ANY (team_ids)) AND public.nsz_code_ok())));
+
+
+--
+-- Name: uebungen uebungen loeschen; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "uebungen loeschen" ON public.uebungen FOR DELETE USING (public.nsz_code_ok_arr(team_ids));
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict bEzbnQ3jyf1bRV8WRWfKEhC8KEreGC0xq4tZdkdXKYykVto2a5NTG7jMmRqF9CM
+
+
+-- ======================================================================
+-- Ergänzung nach dem Dump vom 24.10.2026: anonymes Fehlerprotokoll
+-- (im Dump noch nicht enthalten; das SQL steht auch in der App unter Administration -> Fehler)
+-- ======================================================================
+-- Nachspielzeit: anonymes Fehlerprotokoll (wiederholbar)
+create table if not exists fehlerprotokoll (
+  id bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  team_id text not null,
+  kontext text not null check (char_length(kontext) <= 20),
+  bereich text check (char_length(bereich) <= 40),
+  meldung text not null check (char_length(meldung) <= 300),
+  stack text check (char_length(stack) <= 600),
+  stand text check (char_length(stand) <= 20),
+  geraet text check (char_length(geraet) <= 40)
+);
+alter table fehlerprotokoll enable row level security;
+grant select, insert, delete on table fehlerprotokoll to anon, authenticated, service_role;
+drop policy if exists "fehler eintragen" on fehlerprotokoll;
+drop policy if exists "fehler lesen" on fehlerprotokoll;
+drop policy if exists "fehler loeschen" on fehlerprotokoll;
+-- Eintragen: jeder gültige Code für sein Team. Lesen und Löschen: nur Admin-Codes.
+create policy "fehler eintragen" on fehlerprotokoll for insert to public with check (nsz_code_ok(team_id));
+create policy "fehler lesen" on fehlerprotokoll for select to public using (nsz_is_admin());
+create policy "fehler loeschen" on fehlerprotokoll for delete to public using (nsz_is_admin());
+notify pgrst, 'reload schema';
