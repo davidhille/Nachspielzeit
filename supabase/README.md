@@ -18,5 +18,5 @@
 
 ## Was dieses Schema nicht enthält (offen)
 - **Berechtigungen (GRANTs)**: der Dump wird mit `--no-privileges` erstellt. Meldet PostgREST „permission denied“, die GRANT-Zeilen aus den SQL-Hinweisen in der App (Administration) ausführen.
-- **Storage-Regeln** (Schema `storage`, Bucket `profilbilder`): liegen nicht in diesem Dump. Live vorhanden sind vier Regeln auf `storage.objects` (lesen, schreiben, aendern, loeschen, Stand 24.10.2026); die Funktion `nsz_storage_ok(obj)` steckt im Dump. Die genauen Regeltexte sind noch nicht im Repo (Abfrage: `select policyname, cmd, qual, with_check from pg_policies where schemaname = 'storage' and tablename = 'objects';`).
+- **Storage-Regeln**: stehen am Ende von `schema.sql` (aus der Live-Datenbank übernommen). Der Bucket `profilbilder` selbst muss im Dashboard angelegt werden.
 - Das Backup sichert Daten und Bilder, die in den Daten verlinkt sind. Nicht im Backup: `auth`-Daten (werden nicht genutzt) und Bilder ohne Verweis.

@@ -974,3 +974,21 @@ create policy "fehler eintragen" on fehlerprotokoll for insert to public with ch
 create policy "fehler lesen" on fehlerprotokoll for select to public using (nsz_is_admin());
 create policy "fehler loeschen" on fehlerprotokoll for delete to public using (nsz_is_admin());
 notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- Storage-Regeln (Bucket profilbilder), Stand 24.10.2026 aus pg_policies.
+-- Der Bucket selbst (öffentlich) wird im Supabase-Dashboard angelegt.
+-- ---------------------------------------------------------------------------
+drop policy if exists "profilbilder lesen" on storage.objects;
+drop policy if exists "profilbilder schreiben" on storage.objects;
+drop policy if exists "profilbilder aendern" on storage.objects;
+drop policy if exists "profilbilder loeschen" on storage.objects;
+create policy "profilbilder lesen" on storage.objects for select
+  using (bucket_id = 'profilbilder' and nsz_storage_ok(name));
+create policy "profilbilder schreiben" on storage.objects for insert
+  with check (bucket_id = 'profilbilder' and nsz_storage_ok(name));
+create policy "profilbilder aendern" on storage.objects for update
+  using (bucket_id = 'profilbilder' and nsz_storage_ok(name))
+  with check (bucket_id = 'profilbilder' and nsz_storage_ok(name));
+create policy "profilbilder loeschen" on storage.objects for delete
+  using (bucket_id = 'profilbilder' and nsz_storage_ok(name));
