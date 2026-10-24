@@ -5824,13 +5824,14 @@ function KartenSeitePlus({ token }) {
   const [tab, setTab] = useState(null);
   const [besucht, setBesucht] = useState({});
   useEffect(() => {
-    if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
+    // Beide Dateien laden unabhängig: erst rechnen, wenn karten UND plus da sind (sonst Absturz = weiße Seite)
+    if (!karten || !plus || !plus.spieltage || plus.spieltage.length === 0) return;
     let weg = false;
     Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true, teamName: karten.team }); }))
       .then((hs) => !weg && setMaxH(Math.max(...hs)))
       .catch(() => {});
     return () => { weg = true; };
-  }, [plus]);
+  }, [plus, karten]);
   useEffect(() => {
     const m = document.createElement("meta");
     m.name = "robots";
@@ -6002,13 +6003,14 @@ function KartenSeiteVorschau({ token }) {
   const [tab, setTab] = useState(null);
   const [besucht, setBesucht] = useState({});
   useEffect(() => {
-    if (!plus || !plus.spieltage || plus.spieltage.length === 0) return;
+    // Beide Dateien laden unabhängig: erst rechnen, wenn karten UND plus da sind (sonst Absturz = weiße Seite)
+    if (!karten || !plus || !plus.spieltage || plus.spieltage.length === 0) return;
     let weg = false;
     Promise.all(plus.spieltage.map((t) => { const { st, gegnerListe, pl } = tagZuShare(t); return generateSpieltagShareImage(st, t.nummer, gegnerListe, pl, { nurHoehe: true, teamName: karten.team }); }))
       .then((hs) => !weg && setMaxH(Math.max(...hs)))
       .catch(() => {});
     return () => { weg = true; };
-  }, [plus]);
+  }, [plus, karten]);
   useEffect(() => {
     const m = document.createElement("meta");
     m.name = "robots";
