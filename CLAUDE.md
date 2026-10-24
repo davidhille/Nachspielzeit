@@ -20,6 +20,9 @@
 - Neue Tabellen brauchen: RLS an, GRANT für anon/authenticated/service_role, Policy "access via code" mit `nsz_code_ok(team_id)`, danach `notify pgrst, 'reload schema'`.
 - Team-Tabellen in `TEAM_TABLES` und `BACKUP_TABELLEN` eintragen. SQL immer dem Nutzer zum einmaligen Ausführen im Supabase SQL Editor geben (und in der App als Hinweis zeigen, nur für Admin).
 - Löschen: Soft-Delete/Papierkorb bevorzugen.
+- Der Server entscheidet, der Client filtert nur: Zugriffsschutz liegt in RLS (`nsz_code_ok`, `nsz_is_admin`), der Teamfilter im Client ist Komfort.
+- Sonderfall `uebungen`: nutzt `team_ids[]` statt `team_id` (`'alle'` = für alle Teams lesbar, Prüfung über `nsz_code_ok_arr`). Schema und Wiederherstellung: `supabase/`.
+- Entwicklungsdateien (README, CLAUDE.md, supabase/) stehen in `.assetsignore` und werden nicht ausgeliefert.
 
 ## Design-Regeln
 - Tokens nutzen (`--accent`, `--surface`, `--muted` …), keine festen Hex-Werte, damit der Dunkelmodus stimmt.
