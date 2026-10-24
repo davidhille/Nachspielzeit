@@ -192,16 +192,6 @@ const baseHeaders = (extra = {}) => ({
 });
 const dbHeaders = (extra = {}) => baseHeaders({ "x-access-code": ACCESS_CODE, ...extra });
 
-async function verifyAccessCode(code) {
-  const res = await fetch(REST + "rpc/check_access_code", {
-    method: "POST",
-    headers: baseHeaders(),
-    body: JSON.stringify({ code }),
-  });
-  if (!res.ok) return false;
-  return (await res.json()) === true;
-}
-
 /* ---------- Teams (Mandanten-Vorbereitung) ----------
    Das aktuelle Team kommt aus dem Hostnamen (u8.nachspielzeit.app -> "u8"), ?team=… oder, im Admin, aus der Team-Auswahl.
    Tabellen in TEAM_TABLES werden nach team_id gefiltert; neue Zeilen bekommen automatisch die team_id.
@@ -219,8 +209,7 @@ const TEAM_TABLES = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele", "torschuetzen",
   "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards", "training_boards",
 ];
-const TEAM_COL_FEHLT = new Set(); // Tabellen, in denen die Spalte team_id (noch) nicht existiert
-const teamFilterAktiv = (table) => TEAM_TABLES.includes(table) && !TEAM_COL_FEHLT.has(table);
+const teamFilterAktiv = (table) => TEAM_TABLES.includes(table);
 const mitTeamId = (table, rowOrRows) => {
   if (!teamFilterAktiv(table)) return rowOrRows;
   const tag = (r) =>
@@ -241,8 +230,6 @@ async function pruefeZugang(code) {
     const j = await res.json();
     return { ok: !!(j && j.ok), team_id: (j && j.team_id) || null };
   }
-  // Datenbank noch nicht umgestellt: alter Einzelcode gilt als Admin-Code
-  if (res.status === 404 || res.status === 400) return { ok: await verifyAccessCode(code), team_id: null };
   throw new Error("Zugang konnte nicht geprüft werden");
 }
 function zugangFehler(info) {
@@ -381,12 +368,7 @@ async function dbSelect(table, opts = {}) {
       headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
     });
     if (!res.ok) {
-      const txt = await res.text();
-      if (filter && /team_id/.test(txt)) {
-        TEAM_COL_FEHLT.add(table);
-        return dbSelect(table, opts);
-      }
-      throw new Error(`Laden von "${table}" fehlgeschlagen: ${txt}`);
+      throw new Error(`Laden von "${table}" fehlgeschlagen: ${await res.text()}`);
     }
     const teil = await res.json();
     alle = alle.concat(teil);
@@ -404,21 +386,14 @@ async function dbInsert(table, rowOrRows) {
   return res.json();
 }
 async function dbUpsert(table, row, conflictCol) {
-  // Tabellen mit team_id: Konflikt-Schlüssel enthält das Team (Fallback auf den alten Schlüssel, solange die DB noch nicht umgestellt ist)
+  // Tabellen mit team_id: Konflikt-Schlüssel enthält das Team (app_features, material_bestand haben dafür einen zusammengesetzten Schlüssel)
   const mitTeam = teamFilterAktiv(table) && conflictCol !== "id" && conflictCol !== "player_id";
   const col = mitTeam ? `team_id,${conflictCol}` : conflictCol;
-  let res = await nszFetch(`${REST}${table}?on_conflict=${col}`, {
+  const res = await nszFetch(`${REST}${table}?on_conflict=${col}`, {
     method: "POST",
     headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
     body: JSON.stringify(mitTeamId(table, row)),
   });
-  if (!res.ok && mitTeam) {
-    res = await nszFetch(`${REST}${table}?on_conflict=${conflictCol}`, {
-      method: "POST",
-      headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
-      body: JSON.stringify(mitTeamId(table, row)),
-    });
-  }
   if (!res.ok) throw new Error(`Speichern in "${table}" fehlgeschlagen: ${await res.text()}`);
   return res.json();
 }
