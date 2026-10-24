@@ -213,7 +213,7 @@ const mitTeamId = (table, rowOrRows) => {
 
 let ACCESS_INFO = null; // { ok, team_id }  (team_id leer = Admin mit Zugriff auf alle Teams)
 async function pruefeZugang(code) {
-  const res = await fetch(REST + "rpc/check_access", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ code }) });
+  const res = await nszFetch(REST + "rpc/check_access", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ code }) });
   if (res.ok) {
     const j = await res.json();
     return { ok: !!(j && j.ok), team_id: (j && j.team_id) || null };
@@ -228,6 +228,27 @@ function zugangFehler(info) {
   return "";
 }
 
+/* fetch mit Zeitlimit: hängt das Netz (z. B. am Platz), kommt nach 20 s (Uploads 60 s) eine verständliche Meldung statt endlosem Warten.
+   Bei Schreibzugriffen ist nach einem Zeitlimit offen, ob der Server die Änderung noch angenommen hat, daher die vorsichtige Formulierung. */
+async function nszFetch(url, opts = {}, ms = String(url).includes("/storage/v1/") ? 60000 : 20000) {
+  const schreibt = !!opts.method && opts.method !== "GET";
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctl.signal });
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      throw new Error(schreibt
+        ? "Verbindung zu schwach, Speichern nicht bestätigt. Bitte prüfen und nochmal versuchen."
+        : "Verbindung zu schwach. Bitte nochmal versuchen.");
+    }
+    if (e instanceof TypeError) throw new Error("Keine Verbindung. Bitte Netz prüfen und nochmal versuchen.");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function dbSelect(table, opts = {}) {
   const SEITE = 1000;
   const filter = !opts.alle && teamFilterAktiv(table);
@@ -238,7 +259,7 @@ async function dbSelect(table, opts = {}) {
       : table === "uebungen"
       ? `&or=(team_ids.cs.{${encodeURIComponent(CURRENT_TEAM)}},team_ids.cs.{alle})`
       : `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
-    const res = await fetch(REST + table + "?select=*" + teamQs, {
+    const res = await nszFetch(REST + table + "?select=*" + teamQs, {
       headers: dbHeaders({ Range: `${von}-${von + SEITE - 1}`, "Range-Unit": "items" }),
     });
     if (!res.ok) {
@@ -256,7 +277,7 @@ async function dbSelect(table, opts = {}) {
   return alle;
 }
 async function dbInsert(table, rowOrRows) {
-  const res = await fetch(REST + table, {
+  const res = await nszFetch(REST + table, {
     method: "POST",
     headers: dbHeaders({ Prefer: "return=representation" }),
     body: JSON.stringify(mitTeamId(table, rowOrRows)),
@@ -268,13 +289,13 @@ async function dbUpsert(table, row, conflictCol) {
   // Tabellen mit team_id: Konflikt-Schlüssel enthält das Team (Fallback auf den alten Schlüssel, solange die DB noch nicht umgestellt ist)
   const mitTeam = teamFilterAktiv(table) && conflictCol !== "id" && conflictCol !== "player_id";
   const col = mitTeam ? `team_id,${conflictCol}` : conflictCol;
-  let res = await fetch(`${REST}${table}?on_conflict=${col}`, {
+  let res = await nszFetch(`${REST}${table}?on_conflict=${col}`, {
     method: "POST",
     headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
     body: JSON.stringify(mitTeamId(table, row)),
   });
   if (!res.ok && mitTeam) {
-    res = await fetch(`${REST}${table}?on_conflict=${conflictCol}`, {
+    res = await nszFetch(`${REST}${table}?on_conflict=${conflictCol}`, {
       method: "POST",
       headers: dbHeaders({ Prefer: "resolution=merge-duplicates,return=representation" }),
       body: JSON.stringify(mitTeamId(table, row)),
@@ -284,7 +305,7 @@ async function dbUpsert(table, row, conflictCol) {
   return res.json();
 }
 async function dbUpdate(table, id, patch, idCol = "id") {
-  const res = await fetch(`${REST}${table}?${idCol}=eq.${id}`, {
+  const res = await nszFetch(`${REST}${table}?${idCol}=eq.${id}`, {
     method: "PATCH",
     headers: dbHeaders({ Prefer: "return=representation" }),
     body: JSON.stringify(patch),
@@ -293,12 +314,12 @@ async function dbUpdate(table, id, patch, idCol = "id") {
   return res.json();
 }
 async function dbDelete(table, id, idCol = "id") {
-  const res = await fetch(`${REST}${table}?${idCol}=eq.${id}`, { method: "DELETE", headers: dbHeaders() });
+  const res = await nszFetch(`${REST}${table}?${idCol}=eq.${id}`, { method: "DELETE", headers: dbHeaders() });
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
 async function dbDeleteWhere(table, qs) {
   if (teamFilterAktiv(table)) qs += `&team_id=eq.${encodeURIComponent(CURRENT_TEAM)}`;
-  const res = await fetch(`${REST}${table}?${qs}`, { method: "DELETE", headers: dbHeaders() });
+  const res = await nszFetch(`${REST}${table}?${qs}`, { method: "DELETE", headers: dbHeaders() });
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);
 }
 
@@ -343,7 +364,7 @@ async function uploadProfilbild(playerId, file) {
   const blobHd = await resizeImageFile(file, 1000, 0.9);
   const path = teamPfad(`players/${playerId}.jpg`);
   const put = (p, b) =>
-    fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${p}`, {
+    nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${p}`, {
       method: "POST",
       headers: {
         apikey: SUPABASE_KEY,
@@ -367,7 +388,7 @@ async function uploadProfilbild(playerId, file) {
 async function uploadTeamFoto(file, team = CURRENT_TEAM) {
   const blob = await resizeImageFile(file, 1200, 0.85);
   const path = teamPfad(team === "u8" ? `team/foto.jpg` : `team/foto-${team}.jpg`, team);
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+  const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_KEY,
@@ -394,7 +415,7 @@ async function uploadVereinsLogo(team, file) {
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
   const blob = await new Promise((res) => c.toBlob(res, "image/png"));
   const path = teamPfad(`team/wappen-${team}.png`, team);
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+  const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": ACCESS_CODE, "x-upsert": "true", "Content-Type": "image/png" },
     body: blob,
@@ -406,7 +427,7 @@ async function uploadVereinsLogo(team, file) {
 async function uploadUebungBild(uebungId, file) {
   const blob = await resizeImageFile(file, 900, 0.85);
   const path = teamPfad(`uebungen/${uebungId}.jpg`);
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+  const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_KEY,
@@ -424,7 +445,7 @@ async function uploadUebungBild(uebungId, file) {
 async function uploadTextBild(file) {
   const blob = await resizeImageFile(file, 1000, 0.85);
   const path = teamPfad(`textbilder/${uid()}.jpg`);
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+  const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_KEY,
@@ -441,7 +462,7 @@ async function uploadTextBild(file) {
 async function uploadSpieltagFoto(spieltagId, file) {
   const blob = await resizeImageFile(file, 1200, 0.85);
   const path = teamPfad(`spieltage/${spieltagId}.jpg`);
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
+  const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_KEY,
@@ -2089,6 +2110,7 @@ notify pgrst, 'reload schema';`;
         </nav>
       </header>
       <main className="app-main" style={styles.main}>
+        <FehlerGrenze key={tab}>
         {tab === "backup" && (
           <section>
             <div style={styles.card}>
@@ -2185,7 +2207,50 @@ notify pgrst, 'reload schema';`;
             )}
           </section>
         )}
+      </FehlerGrenze>
       </main>
+    </div>
+  );
+}
+
+/* Fehlergrenze: ein Fehler beim Zeichnen eines Bereichs legt nicht mehr die ganze App lahm.
+   Mit key={tab} um den Inhalt gesetzt, wird sie beim Wechsel des Bereichs zurückgesetzt; Kopfzeile, Navigation und Eingaben anderer Bereiche bleiben erhalten. */
+class FehlerGrenze extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { fehler: null };
+  }
+  static getDerivedStateFromError(fehler) {
+    return { fehler };
+  }
+  componentDidCatch(fehler, info) {
+    console.error("Renderfehler:", fehler, info && info.componentStack);
+  }
+  render() {
+    if (!this.state.fehler) return this.props.children;
+    return (
+      <div role="alert" style={{ ...styles.card, margin: "24px auto", maxWidth: 420, textAlign: "center", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: "var(--text)" }}>Da ist etwas schiefgelaufen.</div>
+        <div style={{ fontSize: 14, color: "var(--text-2)" }}>Deine bereits gespeicherten Daten sind nicht betroffen.</div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+          <button style={styles.primaryBtn} onClick={() => window.location.reload()}>Neu laden</button>
+          {this.props.onUebersicht && (
+            <button style={styles.secondaryBtn} onClick={() => { this.setState({ fehler: null }); this.props.onUebersicht(); }}>Zur Übersicht</button>
+          )}
+        </div>
+      </div>
+    );
+  }
+}
+
+function OfflineScreen({ onRetry }) {
+  return (
+    <div style={styles.loadingScreen}>
+      <div style={styles.loginCard} role="alert">
+        <div style={styles.loginTitle}>Offline</div>
+        <div style={{ fontSize: 14, color: "var(--text-2)", textAlign: "center" }}>Daten werden geladen, sobald das Netz da ist.</div>
+        <button style={styles.primaryBtn} onClick={onRetry}>Erneut versuchen</button>
+      </div>
     </div>
   );
 }
@@ -2194,8 +2259,11 @@ function Root() {
   const [unlocked, setUnlocked] = useState(false);
   const [pruefung, setPruefung] = useState(!!ACCESS_CODE);
   const [hinweis, setHinweis] = useState("");
-  useEffect(() => {
+  const [offline, setOffline] = useState(false);
+  const pruefeGespeichertenCode = () => {
     if (!ACCESS_CODE) return;
+    setOffline(false);
+    setPruefung(true);
     pruefeZugang(ACCESS_CODE)
       .then((info) => {
         const f = info.ok ? zugangFehler(info) : "";
@@ -2208,10 +2276,20 @@ function Root() {
           setHinweis(f || "Der Zugangscode ist nicht mehr gültig.");
         }
       })
-      .catch(() => setUnlocked(true)) // offline: wie bisher durchlassen, die App zeigt ihren eigenen Fehler
+      .catch(() => setOffline(true)) // Netz weg: Hinweis statt scheinbar geöffneter App; Datenzugriff schützt ohnehin die Datenbank
       .finally(() => setPruefung(false));
+  };
+  useEffect(() => {
+    pruefeGespeichertenCode();
   }, []);
+  // sobald das Netz zurück ist, automatisch erneut prüfen
+  useEffect(() => {
+    if (!offline) return undefined;
+    window.addEventListener("online", pruefeGespeichertenCode);
+    return () => window.removeEventListener("online", pruefeGespeichertenCode);
+  }, [offline]);
   if (pruefung) return <div style={styles.loadingScreen}>Lade …</div>;
+  if (offline) return <OfflineScreen onRetry={pruefeGespeichertenCode} />;
   if (!unlocked) {
     return (
       <Gate
@@ -2223,7 +2301,7 @@ function Root() {
       />
     );
   }
-  return IS_ADMIN_HOST ? <AdminApp /> : <App />;
+  return <FehlerGrenze>{IS_ADMIN_HOST ? <AdminApp /> : <App />}</FehlerGrenze>;
 }
 
 /* ---------- App ---------- */
@@ -2747,6 +2825,7 @@ function App() {
     <div style={styles.app}>
       <Header tab={tab} setTab={(k) => { setZiel(null); setTab(k); }} />
       <main className="app-main" style={styles.main}>
+        <FehlerGrenze key={tab} onUebersicht={() => setTab("dashboard")}>
         <h1 className="nz-sr">{{ dashboard: "Übersicht", training: "Training bewerten", entwicklung: "Monatsentwicklung", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Verwaltung" }[tab] || "Nachspielzeit"}</h1>
         {tab === "dashboard" && (
           <Dashboard
@@ -3007,6 +3086,7 @@ function App() {
             onDeleteMaterialEintrag={(id) => wrapAction(() => dbDelete("material_bestand", id))}
           />
         )}
+      </FehlerGrenze>
       </main>
       {busy && <div style={styles.progressBar} />}
       {toast && (
