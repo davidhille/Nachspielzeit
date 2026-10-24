@@ -724,13 +724,13 @@ let SAISON = { start: 9, ende: 7 };
 const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.25, unentschuldigt: -0.25, entschuldigt: 0 };
 const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
 const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
-let EINST = { backupTage: 7, papierkorbTage: 0 };
+let EINST = { backupTage: 7, papierkorbTage: 30 };
 let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "" } };
 const setzeEinstellungen = (cfg) => {
   cfg = cfg || {};
   EINST = {
     backupTage: cfg.backup_tage === undefined ? 7 : Math.max(0, Math.min(365, Number(cfg.backup_tage) || 0)),
-    papierkorbTage: Math.max(0, Math.min(3650, Number(cfg.papierkorb_tage) || 0)),
+    papierkorbTage: cfg.papierkorb_tage === undefined || cfg.papierkorb_tage === null ? 30 : Math.max(0, Math.min(3650, Number(cfg.papierkorb_tage) || 0)),
   };
   const tr = cfg.training_std || {};
   STANDARDS = {
@@ -1690,7 +1690,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [stOrt, setStOrt] = useState((cfg.spieltag_std && cfg.spieltag_std.ort) || "");
   const [startTab, setStartTab] = useState(cfg.start_tab || "letzte");
   const [backupTage, setBackupTage] = useState(String(cfg.backup_tage === undefined ? 7 : cfg.backup_tage));
-  const [papierTage, setPapierTage] = useState(String(cfg.papierkorb_tage || 0));
+  const [papierTage, setPapierTage] = useState(String(cfg.papierkorb_tage === undefined || cfg.papierkorb_tage === null ? 30 : cfg.papierkorb_tage));
   const [codes, setCodes] = useState(null);
   useEffect(() => {
     dbSelect("access_codes", { alle: true }).then((r) => setCodes(r.filter((c) => c.team_id === team))).catch(() => setCodes([]));
@@ -1750,7 +1750,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       const bt = Math.max(0, Math.min(365, parseInt(backupTage, 10) || 0));
       if (bt === 7) delete neuCfg.backup_tage; else neuCfg.backup_tage = bt;
       const pt = Math.max(0, Math.min(3650, parseInt(papierTage, 10) || 0));
-      if (pt === 0) delete neuCfg.papierkorb_tage; else neuCfg.papierkorb_tage = pt;
+      neuCfg.papierkorb_tage = pt; // 0 = bewusst aus (ohne Eintrag gilt der Standard 30)
       const bNeu = {};
       Object.keys(bewertung).forEach((k) => {
         const std = { ...KARTEN_STD, ...TEILNAHME_STD }[k];
@@ -1882,7 +1882,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Papierkorb: Hinweis nach … Tagen
           <input type="number" min="0" max="3650" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={papierTage} onChange={(e) => setPapierTage(e.target.value)} />
           <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Im Papierkorb wird markiert, was länger als diese Frist liegt, mit einem Knopf zum endgültigen Löschen. Es wird nie automatisch gelöscht. 0 = kein Hinweis.
+            Im Papierkorb wird markiert, was länger als diese Frist liegt, mit einem Knopf zum endgültigen Löschen. Es wird nie automatisch gelöscht. 0 = kein Hinweis. Standard: 30.
           </div>
         </label>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
