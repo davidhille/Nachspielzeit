@@ -3089,8 +3089,9 @@ function App() {
       </FehlerGrenze>
       </main>
       {busy && <div style={styles.progressBar} />}
+      <div className="nz-sr" role="status" aria-live="polite" aria-atomic="true">{toast && toast.type !== "error" ? toast.message : ""}</div>
       {toast && (
-        <div role={toast.type === "error" ? "alert" : "status"} style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
+        <div role={toast.type === "error" ? "alert" : undefined} style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
           <span>
             {toast.type === "error" ? "⚠ " : ""}
             {toast.message}
@@ -3110,7 +3111,7 @@ function App() {
       )}
       {promptState && <TkDialog dialog={promptState} onClose={() => setPromptState(null)} />}
       {confirmState && (
-        <div style={styles.modalOverlay} onClick={() => setConfirmState(null)}>
+        <div style={styles.modalOverlay}>
           <div
             ref={confirmCardRef}
             role="alertdialog"
@@ -3176,6 +3177,7 @@ function TrainingBoardSqlHinweis() {
 
 /* Auswahl im Board-Editor: Board einem oder mehreren Trainings zuordnen (Tippen schaltet um) */
 function TkTrainingWahl({ board, onClose }) {
+  const karteRef = useDialogFokus(onClose);
   const tb = React.useContext(TrainingBoardCtx);
   const heute = todayISO();
   const termine = useMemo(() => {
@@ -3189,7 +3191,7 @@ function TkTrainingWahl({ board, onClose }) {
   return (
     <div role="dialog" aria-modal="true" aria-label="Zu Training hinzufügen" onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(20,12,12,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 420, maxHeight: "80vh", padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "var(--sh-3)" }}>
+      <div ref={karteRef} onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 420, maxHeight: "80vh", padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "var(--sh-3)" }}>
         <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600 }}>Zu Training hinzufügen</div>
         {tb && tb.fehlt ? (
           <TrainingBoardSqlHinweis />
@@ -3826,17 +3828,55 @@ const TK_MAGNET_ICON = {
 };
 
 /* Eingabefenster (statt Browser-Popup) */
+/* Dialog-Verhalten für Tastatur und Screenreader: Fokus in den Dialog, Tab bleibt im Dialog, Escape schließt, Fokus kehrt zum Auslöser zurück.
+   Das zurückgegebene ref gehört an die Dialog-Karte. */
+function useDialogFokus(onClose) {
+  const ref = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  // Auslöser beim ersten Rendern merken: ein autoFocus im Dialog greift schon vor dem Effekt
+  const vorherRef = useRef(null);
+  if (vorherRef.current === null) vorherRef.current = document.activeElement;
+  useEffect(() => {
+    const vorher = vorherRef.current;
+    const karte = ref.current;
+    const fokussierbar = () =>
+      karte ? Array.from(karte.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])")) : [];
+    if (karte && !karte.contains(document.activeElement) && fokussierbar()[0]) fokussierbar()[0].focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeRef.current();
+      } else if (e.key === "Tab") {
+        const items = fokussierbar();
+        if (!items.length) return;
+        const erstes = items[0];
+        const letztes = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === erstes) { e.preventDefault(); letztes.focus(); }
+        else if (!e.shiftKey && document.activeElement === letztes) { e.preventDefault(); erstes.focus(); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (vorher && vorher.focus && document.contains(vorher)) vorher.focus();
+    };
+  }, []);
+  return ref;
+}
+
 function TkDialog({ dialog, onClose }) {
   const [wert, setWert] = useState(dialog.wert || "");
   const ok = () => { dialog.onOk(wert); onClose(); };
+  const karteRef = useDialogFokus(onClose);
   return (
     <div role="dialog" aria-modal="true" aria-label={dialog.titel} onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(20,12,12,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 360, padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "var(--sh-3)" }}>
+      <div ref={karteRef} onClick={(e) => e.stopPropagation()} style={{ ...styles.card, width: "100%", maxWidth: 360, padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "var(--sh-3)" }}>
         <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600 }}>{dialog.titel}</div>
         <input autoFocus value={wert} placeholder={dialog.platzhalter || ""} inputMode={dialog.zahl ? "numeric" : undefined}
           onChange={(e) => setWert(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") ok(); if (e.key === "Escape") onClose(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") ok(); }}
           style={{ ...styles.input, width: "100%", boxSizing: "border-box", fontSize: 16 }} />
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <TkBtn label="Abbrechen" onClick={onClose} />
@@ -6962,6 +7002,7 @@ async function generateSpieltagShareImage(spieltag, nummer, gegnerListe, players
 }
 
 function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
+  const karteRef = useDialogFokus(onCancel);
   const [frameSize, setFrameSize] = useState({ w: 320, h: 320 / aspect });
   const [imgEl, setImgEl] = useState(null);
   const [baseScale, setBaseScale] = useState(1);
@@ -7055,7 +7096,7 @@ function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
 
   return (
     <div style={styles.modalOverlay} onClick={onCancel}>
-      <div style={{ ...styles.modalCard, maxWidth: frameSize.w + 40 }} onClick={(e) => e.stopPropagation()}>
+      <div ref={karteRef} role="dialog" aria-modal="true" aria-label="Bildausschnitt wählen" style={{ ...styles.modalCard, maxWidth: frameSize.w + 40 }} onClick={(e) => e.stopPropagation()}>
         <p style={{ ...styles.modalText, marginBottom: 10 }}>
           Bildausschnitt wählen — ziehen zum Verschieben, Regler zum Zoomen.
         </p>
@@ -7716,8 +7757,8 @@ function Dashboard({
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {seasons.length > 1 && (
             <div style={styles.selectGroup}>
-              <label style={styles.selectGroupLabel}>Saison</label>
-              <select style={styles.select} value={season || ""} onChange={(e) => setSeason(e.target.value)}>
+              <label htmlFor={"sel-saison"} style={styles.selectGroupLabel}>Saison</label>
+              <select id={"sel-saison"} style={styles.select} value={season || ""} onChange={(e) => setSeason(e.target.value)}>
                 {seasons.map((s) => (
                   <option key={s} value={s}>
                     {s.replace("-", "/")}
@@ -7728,8 +7769,8 @@ function Dashboard({
           )}
           {uebersichtTab === "training" && (
             <div style={styles.selectGroup}>
-              <label style={styles.selectGroupLabel}>Monat</label>
-              <select style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
+              <label htmlFor={"sel-monat"} style={styles.selectGroupLabel}>Monat</label>
+              <select id={"sel-monat"} style={styles.select} value={month} onChange={(e) => setMonth(e.target.value)}>
                 {monateDerSaison.map((m) => (
                   <option key={m} value={m}>
                     {monthLabel(m)}
@@ -8239,8 +8280,8 @@ function PlayerStammdaten({ player, onSave, trikot }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px 12px" }}>
       <div>
-        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Vorname</label>
-        <input
+        <label htmlFor={`sd-vorname-${player.id}`} style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Vorname</label>
+        <input id={`sd-vorname-${player.id}`}
           style={{ ...styles.input, width: "100%" }}
           value={vorname}
           onChange={(e) => setVorname(e.target.value)}
@@ -8252,8 +8293,8 @@ function PlayerStammdaten({ player, onSave, trikot }) {
         />
       </div>
       <div>
-        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Nachname (nur im Profil)</label>
-        <input
+        <label htmlFor={`sd-nachname-${player.id}`} style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Nachname (nur im Profil)</label>
+        <input id={`sd-nachname-${player.id}`}
           style={{ ...styles.input, width: "100%" }}
           value={nachname}
           onChange={(e) => setNachname(e.target.value)}
@@ -8262,8 +8303,8 @@ function PlayerStammdaten({ player, onSave, trikot }) {
       </div>
       {trikot}
       <div>
-        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
-        <input
+        <label htmlFor={`sd-geb-${player.id}`} style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Geburtsdatum</label>
+        <input id={`sd-geb-${player.id}`}
           type="date"
           style={{ ...styles.input, width: "100%" }}
           value={geb}
@@ -8272,8 +8313,8 @@ function PlayerStammdaten({ player, onSave, trikot }) {
         />
       </div>
       <div>
-        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Spitzname (Sammelkarte)</label>
-        <input
+        <label htmlFor={`sd-spitz-${player.id}`} style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Spitzname (Sammelkarte)</label>
+        <input id={`sd-spitz-${player.id}`}
           style={{ ...styles.input, width: "100%" }}
           value={spitz}
           maxLength={28}
@@ -8905,8 +8946,8 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
               </div>
 
               <div style={styles.fieldRow}>
-                <label style={styles.label}>Teilnahme</label>
-                <select style={styles.select} value={row.teilnahme} onChange={(e) => setRow(p.id, { teilnahme: e.target.value })}>
+                <label htmlFor={`tn-${p.id}`} style={styles.label}>Teilnahme</label>
+                <select id={`tn-${p.id}`} style={styles.select} value={row.teilnahme} onChange={(e) => setRow(p.id, { teilnahme: e.target.value })}>
                   {Object.keys(TEILNAHME).map((k) => (
                     <option key={k} value={k}>
                       {TEILNAHME_LABEL[k]} ({TEILNAHME[k] > 0 ? "+" : ""}
@@ -8917,9 +8958,10 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
               </div>
 
               <div style={styles.fieldRow}>
-                <label style={{ ...styles.label, flexBasis: "100%" }}>Besonderes Vorkommnis</label>
+                <label htmlFor={`vk-${p.id}`} style={{ ...styles.label, flexBasis: "100%" }}>Besonderes Vorkommnis</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 100%" }}>
                   <input
+                    id={`vk-${p.id}`}
                     type="range"
                     min={-1}
                     max={1}
@@ -8936,8 +8978,8 @@ function TrainingBewertung({ zielDatum, players, trainings, termine, onSave, onD
               </div>
 
               <div style={styles.fieldRow}>
-                <label style={styles.label}>Karte</label>
-                <div style={styles.chipGroup}>
+                <span id={`karte-${p.id}`} style={styles.label}>Karte</span>
+                <div role="group" aria-labelledby={`karte-${p.id}`} style={styles.chipGroup}>
                   {Object.keys(KARTEN).map((k) => (
                     <button
                       key={k}
@@ -10221,8 +10263,8 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
 
                   {!editorOpponentFixed && (
                     <div>
-                      <label style={styles.label}>Gegner</label>
-                      <div style={{ ...styles.chipGroup, marginTop: 6 }}>
+                      <span id={`sp-gegner-${spieltag.id}`} style={styles.label}>Gegner</span>
+                      <div role="group" aria-labelledby={`sp-gegner-${spieltag.id}`} style={{ ...styles.chipGroup, marginTop: 6 }}>
                         {spielGegnerOptionen.length === 0 && (
                           <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>
                         )}
@@ -10240,8 +10282,8 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                   )}
 
                   <div style={{ marginTop: 8 }}>
-                    <label style={styles.label}>Ergebnis (Wir : Gegner)</label>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                    <span id={`sp-ergebnis-${spieltag.id}`} style={styles.label}>Ergebnis (Wir : Gegner)</span>
+                    <div role="group" aria-labelledby={`sp-ergebnis-${spieltag.id}`} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
                       <GoalStepper value={ourGoals} onChange={setOurGoals} />
                       <span>:</span>
                       <GoalStepper value={theirGoals} onChange={setTheirGoals} />
@@ -10313,8 +10355,8 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
 
           {spieltagTab === "teilnehmer" && (
             <div style={{ marginBottom: 4 }}>
-              <label style={styles.label}>Kader an diesem Spieltag</label>
-              <div style={{ ...styles.chipGroup, marginTop: 6 }}>
+              <span id={`sp-kader-${spieltag.id}`} style={styles.label}>Kader an diesem Spieltag</span>
+              <div role="group" aria-labelledby={`sp-kader-${spieltag.id}`} style={{ ...styles.chipGroup, marginTop: 6 }}>
                 {players.length === 0 && <span style={styles.hint}>Noch keine Spieler in der Verwaltung angelegt.</span>}
                 {players.map((p) => {
                   const dabei = spieltag.teilnehmer.includes(p.id);
@@ -10711,15 +10753,15 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
               {offen && (
                 <div>
                   <div style={styles.fieldRow}>
-                    <label style={styles.label}>Datum</label>
-                    <input
+                    <label htmlFor={"mat-datum"} style={styles.label}>Datum</label>
+                    <input id={"mat-datum"}
                       type="date"
                       style={{ ...styles.input, flex: "none", width: 160 }}
                       value={formDate}
                       onChange={(e) => setFormDate(e.target.value)}
                     />
-                    <label style={styles.label}>Menge</label>
-                    <input
+                    <label htmlFor={"mat-menge"} style={styles.label}>Menge</label>
+                    <input id={"mat-menge"}
                       type="number"
                       min={0}
                       style={{ ...styles.input, flex: "none", width: 90 }}
@@ -10953,9 +10995,10 @@ function SpielerBereich({
               {open && (
                 <div style={styles.basisGrid}>
                   <div>
-                    <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Basis-Qualität</label>
+                    <label htmlFor={`bq-${p.id}`} style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Basis-Qualität</label>
                     <div style={styles.basisItem}>
                       <input
+                        id={`bq-${p.id}`}
                         type="range"
                         min={0}
                         max={40}
@@ -10969,9 +11012,10 @@ function SpielerBereich({
                   </div>
                   <PlayerStammdaten trikot={(
                       <div>
-                        <label style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Trikotnummer</label>
+                        <label htmlFor={`trikot-${p.id}`} style={{ ...styles.label, display: "block", minWidth: 0, marginBottom: 4 }}>Trikotnummer</label>
                         <div style={styles.basisItem}>
                           <input
+                            id={`trikot-${p.id}`}
                             type="number"
                             min={0}
                             max={99}
@@ -11098,8 +11142,8 @@ function TrainingsplanBereich({
       <div style={styles.card}>
         <KartenTitel>Termine generieren</KartenTitel>
         <div style={styles.fieldRow}>
-          <label style={styles.label}>Erstes Training ab</label>
-          <input
+          <label htmlFor={"tt-start"} style={styles.label}>Erstes Training ab</label>
+          <input id={"tt-start"}
             type="date"
             style={{ ...styles.input, flex: "none", width: 160 }}
             value={startDatum}
@@ -11107,8 +11151,8 @@ function TrainingsplanBereich({
           />
         </div>
         <div style={styles.fieldRow}>
-          <label style={styles.label}>Art</label>
-          <div style={styles.chipGroup}>
+          <span id={"tt-art"} style={styles.label}>Art</span>
+          <div role="group" aria-labelledby={"tt-art"} style={styles.chipGroup}>
             <button
               onClick={(e) => { waehleTyp("training"); e.currentTarget.blur(); }}
               aria-pressed={!!(terminTyp === "training")} style={{ ...styles.chip, ...(terminTyp === "training" ? styles.chipActive : {}) }}
@@ -11124,16 +11168,16 @@ function TrainingsplanBereich({
           </div>
         </div>
         <div style={styles.fieldRow}>
-          <label style={styles.label}>Uhrzeit</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span id={"tt-zeit"} style={styles.label}>Uhrzeit</span>
+          <div role="group" aria-labelledby={"tt-zeit"} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <ZeitSelect value={vonZeit} onChange={setVonZeit} />
             <span style={{ color: "var(--muted)" }}>bis</span>
             <ZeitSelect value={bisZeit} onChange={setBisZeit} />
           </div>
         </div>
         <div style={styles.fieldRow}>
-          <label style={styles.label}>Wochentage</label>
-          <div style={styles.chipGroup}>
+          <span id={"tt-tage"} style={styles.label}>Wochentage</span>
+          <div role="group" aria-labelledby={"tt-tage"} style={styles.chipGroup}>
             {[1, 2, 3, 4, 5, 6].map((idx) => (
               <button
                 key={idx}
@@ -11146,8 +11190,8 @@ function TrainingsplanBereich({
           </div>
         </div>
         <div style={styles.fieldRow}>
-          <label style={styles.label}>Rhythmus</label>
-          <div style={styles.chipGroup}>
+          <span id={"tt-rhythmus"} style={styles.label}>Rhythmus</span>
+          <div role="group" aria-labelledby={"tt-rhythmus"} style={styles.chipGroup}>
             <button
               onClick={(e) => { setRhythmus("woechentlich"); e.currentTarget.blur(); }}
               aria-pressed={!!(rhythmus === "woechentlich")} style={{ ...styles.chip, ...(rhythmus === "woechentlich" ? styles.chipActive : {}) }}
@@ -11163,8 +11207,8 @@ function TrainingsplanBereich({
           </div>
         </div>
         <div style={styles.fieldRow}>
-          <label style={{ ...styles.label, flexBasis: "100%" }}>Wochen im Voraus</label>
-          <input
+          <label htmlFor={"tt-wochen"} style={{ ...styles.label, flexBasis: "100%" }}>Wochen im Voraus</label>
+          <input id={"tt-wochen"}
             type="number"
             min={1}
             max={52}
