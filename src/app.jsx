@@ -7176,7 +7176,8 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
               display: "flex",
               alignItems: "center",
               gap: 6,
-              padding: "6px 10px",
+              padding: "6px 14px",
+              minHeight: 44,
               borderRadius: 999,
               border: "none",
               background: "rgba(0,0,0,0.4)",
@@ -7886,7 +7887,7 @@ function TrainerNotizen({ trainings, players, month, onOpenPlayer }) {
               <button
                 onClick={() => setOffen((o) => ({ ...o, [g.id]: !o[g.id] }))}
                 aria-expanded={isOpen}
-                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", minHeight: 44, background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
               >
                 <Avatar name={g.name} size={36} photoUrl={g.photoUrl} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -11731,7 +11732,7 @@ function TerminBoards({ termin }) {
                     <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</div>
                     <div style={{ fontSize: 13, color: "var(--muted)" }}>{info(b)}</div>
                   </div>
-                  <button style={{ ...styles.primaryBtn, padding: "0 16px", height: 40, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }} onClick={() => tb.add(termin.id, b.id)}>Hinzufügen</button>
+                  <button style={{ ...styles.primaryBtn, padding: "0 16px", height: 44, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }} onClick={() => tb.add(termin.id, b.id)}>Hinzufügen</button>
                 </div>
               ))}
             </div>
@@ -11855,7 +11856,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
                             )}
                           </div>
                           <button
-                            style={{ ...styles.primaryBtn, padding: "0 16px", height: 40, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
+                            style={{ ...styles.primaryBtn, padding: "0 16px", height: 44, width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
                             onClick={() => onAdd(termin.id, u.id)}
                           >
                             Hinzufügen
@@ -12273,7 +12274,8 @@ const styles = {
     color: "#F8E9E8",
     fontSize: 13,
     fontWeight: 600,
-    padding: "6px 11px",
+    padding: "6px 14px",
+    minHeight: 44,
     cursor: "pointer",
   },
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 8, padding: 3 },
@@ -12295,7 +12297,7 @@ const styles = {
     cursor: "pointer",
     borderBottom: "2px solid transparent",
     whiteSpace: "nowrap",
-    minHeight: 40,
+    minHeight: 44,
   },
   navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
   subNav: {
@@ -12359,6 +12361,7 @@ const styles = {
     border: "1px solid var(--border-strong)",
     background: "var(--surface)",
     borderRadius: 8,
+    minHeight: 44,
     padding: "8px 10px",
     fontSize: 14,
     color: "var(--text)",
@@ -12545,6 +12548,7 @@ const styles = {
     fontWeight: 600,
     cursor: "pointer",
     width: "100%",
+    minHeight: 44,
     boxShadow: "var(--sh-1)",
     transition: "box-shadow 150ms ease, transform 100ms ease",
   },
@@ -12562,7 +12566,7 @@ const styles = {
     border: "none",
     borderRadius: 12,
     padding: "0 18px",
-    height: 40,
+    height: 44,
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
