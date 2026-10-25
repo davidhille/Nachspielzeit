@@ -93,7 +93,7 @@ function VersionsHinweis() {
   }, []);
   if (!neu || spaeter) return null;
   return (
-    <div role="status" style={{ position: "sticky", top: 0, zIndex: 1100, background: "var(--accent-soft)", color: "var(--text)", borderBottom: "1px solid var(--border-strong)", padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", fontSize: 14 }}>
+    <div role="status" style={{ position: "sticky", top: 0, zIndex: 1100, background: "var(--info-bg)", color: "var(--info-text)", borderBottom: "1px solid var(--border-strong)", padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", fontSize: 14 }}>
       <span style={{ fontWeight: 600 }}>Neue Version verfügbar. Bitte neu laden.</span>
       <button style={{ ...styles.primaryBtn, width: "auto", height: 44, padding: "0 18px" }} onClick={() => window.location.reload()}>Neu laden</button>
       <button style={{ ...styles.linkBtn, minHeight: 44 }} onClick={() => { setSpaeter(true); setTimeout(() => setSpaeter(false), 30 * 60 * 1000); }}>Später</button>
@@ -280,7 +280,7 @@ const istDunkel = () => {
   if (t === "light") return false;
   return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 };
-const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--accent-soft", "--focus", "--header-grad", "--header-grad-btn"];
+const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn"];
 const wendeTeamfarbeAn = () => {
   try {
     const root = document.documentElement.style;
@@ -294,7 +294,6 @@ const wendeTeamfarbeAn = () => {
     const akzent = farbMix(c, schwarz, 0.12);
     root.setProperty("--accent", akzent);
     root.setProperty("--accent-text", dunkel ? farbMix(c, weiss, 0.5) : akzent);
-    root.setProperty("--accent-soft", dunkel ? farbMix([34, 26, 27], c, 0.22) : farbMix(c, weiss, 0.9));
     root.setProperty("--focus", hex);
     root.setProperty("--header-grad", `linear-gradient(135deg, ${hex} 0%, ${farbMix(c, schwarz, 0.28)} 100%)`);
     root.setProperty("--header-grad-btn", `linear-gradient(135deg, ${farbMix(c, weiss, 0.06)}, ${farbMix(c, schwarz, 0.25)})`);
@@ -5874,7 +5873,7 @@ function SongPlayer({ songs, cover, team, token, textStart = false }) {
   };
 
   const iconBtn = { background: "none", border: "none", cursor: "pointer", padding: 10, fontFamily: "inherit", lineHeight: 0, color: "inherit", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" };
-  const pille = (an) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", minHeight: 44, borderRadius: 999, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${an ? ROT : "var(--border)"}`, background: an ? "rgba(196,39,31,0.10)" : "transparent", color: an ? ROT : "inherit" });
+  const pille = (an) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", minHeight: 44, borderRadius: 999, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${an ? ROT : "var(--border)"}`, background: an ? ROT : "transparent", color: an ? "#fff" : "inherit" });
   const toggleFarbe = (an) => ({ ...iconBtn, color: an ? ROT : "var(--muted)" });
 
   return (
@@ -5999,7 +5998,7 @@ function SongPlayer({ songs, cover, team, token, textStart = false }) {
       {songs.length > 1 && offen && (
         <div style={{ maxHeight: 340, overflowY: "auto", paddingRight: 2 }}>
           {songs.map((x, i) => (
-            <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 12, alignItems: "center", textAlign: "left", border: "none", borderRadius: 12, padding: "10px 12px", marginBottom: 4, fontSize: 16, fontFamily: "inherit", cursor: "pointer", background: i === aktiv ? "rgba(196,39,31,0.10)" : "transparent", color: i === aktiv ? ROT : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
+            <button key={x.url} onClick={() => wahl(i)} style={{ display: "flex", width: "100%", gap: 12, alignItems: "center", textAlign: "left", border: "none", borderRadius: 12, padding: "10px 12px", marginBottom: 4, fontSize: 16, fontFamily: "inherit", cursor: "pointer", background: i === aktiv ? "var(--track)" : "transparent", color: i === aktiv ? "var(--accent-text)" : "inherit", fontWeight: i === aktiv ? 700 : 500 }}>
               <span style={{ width: 22, display: "inline-flex", justifyContent: "center" }}>
                 {i === aktiv ? <Equalizer aktiv={laeuft} farbe={ROT} hoehe={14} /> : <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>}
               </span>
@@ -10095,7 +10094,7 @@ function SperreAbdeckung({ onFrei, uhr }) {
         aria-label="Gesperrt. Zum Entsperren eine Sekunde gedrückt halten."
         style={{ position: "relative", overflow: "hidden", minHeight: 56, padding: "0 22px", borderRadius: 999, border: "2px solid var(--accent)", background: "var(--surface)", color: "var(--accent-text)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
       >
-        <span aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: haelt ? "100%" : "0%", background: "var(--accent-soft)", transition: haelt ? `width ${SPERRE_HALTEN_MS}ms linear` : "none" }} />
+        <span aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: haelt ? "100%" : "0%", background: "var(--track)", transition: haelt ? `width ${SPERRE_HALTEN_MS}ms linear` : "none" }} />
         <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8 }}><LockIcon size={18} /> Gesperrt · 1 s halten</span>
       </button>
     </div>
@@ -12645,7 +12644,7 @@ function EmptyState({ text, nach }) {
   const rest = m ? m[2] : null;
   return (
     <div style={styles.empty}>
-      <div aria-hidden="true" style={{ width: 48, height: 48, borderRadius: 999, background: "var(--accent-soft)", color: "var(--accent-text)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+      <div aria-hidden="true" style={{ width: 48, height: 48, borderRadius: 999, background: "var(--track)", color: "var(--accent-text)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{EMPTY_ICONS[emptyIconFuer(text)]}</svg>
       </div>
       <div style={{ fontWeight: 600, color: "var(--text)" }}>{kopf}</div>
@@ -12822,13 +12821,14 @@ const styles = {
     borderBottom: "2px solid transparent",
     marginBottom: -1,
   },
-  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--surface) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--surface) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--surface)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
+  // Umschalter: grauer Track, der aktive Reiter liegt weiß mit feinem Schatten darauf (Bedienelement-Rahmen für Kontrast)
+  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--track) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--track) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--track)", border: "1px solid var(--border)", borderRadius: 12, overflowX: "auto" },
   segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", minHeight: 44, padding: "8px 14px", borderRadius: 8, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
-  segBtnActive: { background: "rgba(196,39,31,0.10)", color: "var(--accent-text)" },
+  segBtnActive: { background: "var(--surface)", color: "var(--text)", fontWeight: 700, boxShadow: "var(--sh-1)" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
-    background: "var(--surface-2)",
+    background: "var(--track)",
     borderRadius: 12,
     padding: 4,
     marginTop: 20,
@@ -12848,7 +12848,7 @@ const styles = {
   segmentedBtnActive: {
     background: "var(--surface)",
     boxShadow: "var(--sh-1)",
-    color: "var(--accent-text)",
+    color: "var(--text)",
     fontWeight: 700,
   },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
@@ -12943,7 +12943,7 @@ const styles = {
     flexShrink: 0,
   },
   iconBtnLavender: { background: "var(--lav-bg)", color: "var(--lav-text)" },
-  iconBtnDanger: { background: "var(--accent-soft)", color: "var(--danger-text)" },
+  iconBtnDanger: { background: "var(--track)", color: "var(--danger-text)" },
   teilnehmerChip: {
     display: "flex",
     alignItems: "center",
@@ -12959,10 +12959,10 @@ const styles = {
     color: "var(--text)",
   },
   teilnehmerChipActive: {
-    background: "linear-gradient(135deg, var(--accent-soft), var(--accent-soft))",
+    background: "var(--surface)",
     border: "1.5px solid var(--accent)",
-    color: "var(--danger-text)",
-    boxShadow: "0 4px 10px -6px rgba(196,39,31,0.5)",
+    color: "var(--text)",
+    boxShadow: "var(--sh-1)",
   },
   teilnehmerChipAvatarWrap: { position: "relative", flexShrink: 0, display: "flex" },
   teilnehmerChipCheck: {
@@ -13039,7 +13039,7 @@ const styles = {
   chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
-  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-text)", whiteSpace: "nowrap" },
+  tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600, background: "var(--track)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
     background: "var(--accent)",
     color: "#fff",
@@ -13161,7 +13161,7 @@ const styles = {
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
   scorerTile: { border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface)", display: "flex", alignItems: "center", minHeight: 48, boxShadow: "var(--sh-1)" },
-  scorerTileActive: { border: "1px solid var(--accent)", background: "var(--accent-soft)" },
+  scorerTileActive: { border: "1px solid var(--accent)", background: "var(--surface)" },
   scorerName: { flex: 1, minWidth: 0, minHeight: 48, padding: "0 8px 0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, background: "transparent", border: "none", textAlign: "left", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" },
   scorerBadge: { minWidth: 30, height: 30, borderRadius: 999, border: "1px solid var(--border-strong)", color: "var(--muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 },
   scorerBadgeAktiv: { background: "var(--accent)", borderColor: "var(--accent)", color: "#fff" },
