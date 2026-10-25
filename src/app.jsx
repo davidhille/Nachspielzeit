@@ -435,7 +435,7 @@ function spieltagNummern(spieltage) {
   return map;
 }
 const spieltagLabel = (spieltag, nummer) => {
-  const bezeichnung = spieltag.typ === "hallenturnier" ? "Hallenturnier" : spieltag.typ === "turnier" ? "Turnier" : "Spieltag";
+  const bezeichnung = spieltag.typ === "hallenturnier" ? "Hallenturnier" : spieltag.typ === "turnier" ? "Turnier" : spieltag.typ === "freundschaftsspiel" ? "Freundschaftsspiel" : "Spieltag";
   return nummer ? `${bezeichnung} ${nummer}` : bezeichnung;
 };
 let _confirmHandler = null;
@@ -2676,7 +2676,7 @@ function App() {
         id: newId,
         date,
         zeit: zeit || null,
-        typ: typ === "turnier" ? "turnier" : typ === "hallenturnier" ? "hallenturnier" : "spieltag",
+        typ: ["turnier", "hallenturnier", "freundschaftsspiel"].includes(typ) ? typ : "spieltag",
         ort: ort || null,
       });
       const letzterSpieltag = [...spieltage].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -2797,7 +2797,7 @@ function App() {
             teamInfo={teamInfo}
             termine={termine}
             onOpenTermin={(e) => {
-              if (e.typ === "spieltag" || e.typ === "turnier" || e.typ === "hallenturnier") {
+              if (e.typ === "spieltag" || e.typ === "turnier" || e.typ === "hallenturnier" || e.typ === "freundschaftsspiel") {
                 if (features.spieltage === false) return;
                 setZiel({ typ: "spieltag", id: e.spieltagId });
                 setTab("spieltage");
@@ -7493,7 +7493,7 @@ function HeuteKarte({ termine, spieltage, trainings, onOpen }) {
         <div style={zeile}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>
-              {naechster.date === heute ? "Heute" : formatTerminLabel(naechster.date)} · {naechster.kind === "spieltag" ? (naechster.typ === "turnier" ? "Turnier" : naechster.typ === "hallenturnier" ? "Hallenturnier" : "Spieltag") : naechster.typ === "hallentraining" ? "Hallentraining" : "Training"}
+              {naechster.date === heute ? "Heute" : formatTerminLabel(naechster.date)} · {naechster.kind === "spieltag" ? (naechster.typ === "turnier" ? "Turnier" : naechster.typ === "hallenturnier" ? "Hallenturnier" : naechster.typ === "freundschaftsspiel" ? "Freundschaftsspiel" : "Spieltag") : naechster.typ === "hallentraining" ? "Hallentraining" : "Training"}
             </div>
             {naechster.zeit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>{String(naechster.zeit).slice(0, 5)} Uhr</div> : null}
           </div>
@@ -7522,7 +7522,7 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
       }));
     const spieltagEintraege = (spieltage || [])
       .filter((s) => s.date >= heute)
-      .map((s) => ({ id: `s-${s.id}`, spieltagId: s.id, date: s.date, typ: s.typ === "turnier" ? "turnier" : s.typ === "hallenturnier" ? "hallenturnier" : "spieltag", zeit: s.zeit || null }));
+      .map((s) => ({ id: `s-${s.id}`, spieltagId: s.id, date: s.date, typ: ["turnier", "hallenturnier", "freundschaftsspiel"].includes(s.typ) ? s.typ : "spieltag", zeit: s.zeit || null }));
     return [...trainingsEintraege, ...spieltagEintraege].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   }, [termine, spieltage, heute]);
 
@@ -7559,6 +7559,17 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
           <path d="M12 12v4" />
           <path d="M9 20h6" />
           <path d="M10 16h4l1 4H9z" />
+        </svg>
+      ),
+    },
+    freundschaftsspiel: {
+      label: "Freundsch.",
+      color: "var(--success-text)",
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 9l3 2-1.2 3.5h-3.6L9 11z" />
+          <path d="M12 4v5M15 11l4.5-1.5M13.8 14.5l2.7 3.5M10.2 14.5L7.5 18M9 11L4.5 9.5" />
         </svg>
       ),
     },
@@ -7619,7 +7630,7 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
                 tabIndex={onOpen ? 0 : undefined}
                 onClick={onOpen ? () => onOpen(eintrag) : undefined}
                 onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(eintrag); } } : undefined}
-                title={onOpen ? (eintrag.typ === "spieltag" || eintrag.typ === "turnier" || eintrag.typ === "hallenturnier" ? "Spieltag öffnen" : "Training bewerten") : undefined}
+                title={onOpen ? (eintrag.typ === "spieltag" || eintrag.typ === "turnier" || eintrag.typ === "hallenturnier" || eintrag.typ === "freundschaftsspiel" ? "Spieltag öffnen" : "Training bewerten") : undefined}
                 style={{
                   cursor: onOpen ? "pointer" : "default",
                   flex: 1,
@@ -12303,6 +12314,12 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
           >
             Hallenturnier
           </button>
+          <button
+            onClick={(e) => { setNeuerTyp("freundschaftsspiel"); e.currentTarget.blur(); }}
+            aria-pressed={!!(neuerTyp === "freundschaftsspiel")} style={{ ...styles.chip, ...(neuerTyp === "freundschaftsspiel" ? styles.chipActive : {}) }}
+          >
+            Freundschaftsspiel
+          </button>
         </div>
         <div style={{ ...styles.addRow, flexWrap: "wrap", rowGap: 8, marginTop: 8 }}>
           <input type="date" style={styles.select} value={neuesDatum} onChange={(e) => setNeuesDatum(e.target.value)} />
@@ -12325,7 +12342,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
             Anlegen
           </button>
         </div>
-        <Hinweis style={{ marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere und Hallenturniere werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</Hinweis>
+        <Hinweis style={{ marginTop: 6, marginBottom: 0 }}>Spieltage, Turniere, Hallenturniere und Freundschaftsspiele werden getrennt durchnummeriert (Spieltag 1, 2, … bzw. Turnier 1, 2, …). Uhrzeit und Ort sind optional.</Hinweis>
       </div>
 
       {/* Spieltag-Liste mit Gegner-Zuordnung */}
