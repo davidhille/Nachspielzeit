@@ -5760,7 +5760,7 @@ function SongPlayer({ songs, cover, team }) {
         onEnded={ende}
       />
       <div style={{ display: "flex", gap: breit ? 24 : 14, alignItems: "center" }}>
-      <div style={{ position: "relative", width: breit ? 230 : 104, flex: "none", aspectRatio: "1 / 1", borderRadius: breit ? 18 : 14, overflow: "hidden", boxShadow: "var(--sh-glow)", background: cover ? "#222" : "linear-gradient(135deg,#C4271F,#8E1416)" }}>
+      <div style={{ position: "relative", width: breit ? 230 : 104, flex: "none", aspectRatio: "1 / 1", borderRadius: breit ? 18 : 14, overflow: "hidden", background: cover ? "#222" : "linear-gradient(135deg,#C4271F,#8E1416)" }}>
         {cover ? (
           <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : (
