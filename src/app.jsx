@@ -5740,16 +5740,18 @@ function SongPlayer({ songs, cover, team, token, textStart = false }) {
   const teilen = async (x) => {
     if (!token) return;
     const url = songLinkUrl(token, x);
+    // Der Titel steht in der Nachricht selbst, weil die Link-Vorschau (WhatsApp) nur den allgemeinen Seitentitel kennt
+    const nachricht = `🎵 ${x.titel} – Mannschaftssong ${CLUB.name} ${team || "U8"}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: x.titel, text: `${x.titel} – Mannschaftssong`, url });
+        await navigator.share({ title: x.titel, text: nachricht, url });
         return;
       }
     } catch (e) {
       if (e && e.name === "AbortError") return;
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(`${nachricht}\n${url}`);
       setKopiert("ok");
       setTimeout(() => setKopiert(false), 2500);
     } catch (e) {
