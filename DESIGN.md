@@ -11,6 +11,7 @@ Gilt für Trainer-App und Admin. Die Regeln stehen in `CLAUDE.md`, der Design-Ch
 | Text | `--text`, `--text-2`, `--muted`, `--muted-2`, `--accent-text`, `--danger-text`, `--success-text`, `--loss-text` |
 | Akzent | `--accent` (Teamfarbe, wird per `wendeTeamfarbeAn` überschrieben), `--focus`. Kein blasses Akzent-Rosa mehr: Gewählte Umschalter/Chips = Vollfläche in `--auswahl` (Weinrot, aus `--accent` abgedunkelt, folgt der Teamfarbe; bewusst anders als Kopfzeile und Buttons), Hintergründe neutral über `--track` |
 | Status | `--pos-bg/-text`, `--neg-bg`, `--win-bg`, `--loss-bg`, `--draw-bg`, `--warn-bg/-text`, `--info-bg/-text` |
+| Einzelfarben je Team | `--auswahl` (Umschalter/Chips), `--trikot` / `--trikot-text` (Trikot-Symbol); einstellbar im Admin (Kopfzeile, Buttons & Akzent, Auswahl, Trikot), Standard folgt der Teamfarbe |
 | Sonstige Töne | `--gold`, `--gold-2`, `--tan-*`, `--lav-*` |
 | Kopfzeile | `--header-grad` (Trainer), `--header-grad-admin` (Admin), Text darauf: `--on-header`, `--on-header-soft` |
 | Schatten | `--sh-1` Karten, `--sh-2` Überlagerungen, `--sh-3` Dialoge; `--sh-glow-sm` roter Schein (nur runde Play-Knöpfe) |
