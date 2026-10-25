@@ -2350,7 +2350,7 @@ function App() {
   const showToast = (msg, undo, type = "info") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message: msg, undo: undo || null, type });
-    const duration = undo ? 6000 : type === "error" ? 5000 : 2200;
+    const duration = undo ? 6000 : type === "error" ? 5000 : 4000;
     toastTimerRef.current = setTimeout(() => setToast(null), duration);
   };  useEffect(() => {
     registerToastHandler((m, t) => showToast(m, null, t));
@@ -3061,7 +3061,7 @@ function App() {
       {busy && <div style={styles.progressBar} />}
       <div className="nz-sr" role="status" aria-live="polite" aria-atomic="true">{toast && toast.type !== "error" ? toast.message : ""}</div>
       {toast && (
-        <div className="nz-toast" role={toast.type === "error" ? "alert" : undefined} style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
+        <div className="nz-toast" role={toast.type === "error" ? "alert" : undefined} style={{ ...styles.toast, background: toast.type === "error" ? "var(--danger-solid)" : "var(--accent)" }}>
           <span>
             {toast.type === "error" ? "⚠ " : ""}
             {toast.message}
