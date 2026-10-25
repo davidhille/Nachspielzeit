@@ -9,7 +9,7 @@ Gilt für Trainer-App und Admin. Die Regeln stehen in `CLAUDE.md`, der Design-Ch
 | Tokens | Alle in `index.html` (`:root`, dazu Dunkel für `prefers-color-scheme` und `data-theme="dark"`). Neue Tokens immer in **allen drei** Blöcken anlegen. |
 | Flächen | `--bg`, `--surface`, `--surface-2`, `--divider`, `--border`, `--border-strong`, `--track` (neutraler Grau-Ton für Tags, Leer-Symbole, Song-Zeile) |
 | Text | `--text`, `--text-2`, `--muted`, `--muted-2`, `--accent-text`, `--danger-text`, `--success-text`, `--loss-text` |
-| Akzent | `--accent` (Teamfarbe, wird per `wendeTeamfarbeAn` überschrieben), `--focus`. Kein blasses Akzent-Rosa mehr: Auswahl = Vollfläche (`--accent`), Hintergründe neutral über `--track` |
+| Akzent | `--accent` (Teamfarbe, wird per `wendeTeamfarbeAn` überschrieben), `--focus`. Kein blasses Akzent-Rosa mehr: Gewählte Umschalter/Chips = Vollfläche in `--auswahl` (Weinrot, aus `--accent` abgedunkelt, folgt der Teamfarbe; bewusst anders als Kopfzeile und Buttons), Hintergründe neutral über `--track` |
 | Status | `--pos-bg/-text`, `--neg-bg`, `--win-bg`, `--loss-bg`, `--draw-bg`, `--warn-bg/-text`, `--info-bg/-text` |
 | Sonstige Töne | `--gold`, `--gold-2`, `--tan-*`, `--lav-*` |
 | Kopfzeile | `--header-grad` (Trainer), `--header-grad-admin` (Admin), Text darauf: `--on-header`, `--on-header-soft` |
@@ -34,7 +34,7 @@ Neue Stile im `styles`-Objekt (`src/app.jsx`) ergänzen, nicht inline dupliziere
 | `styles.dangerBtn` | Löschen, Zurücksetzen | **Teilstil**, immer mit Grundknopf kombinieren: `{ ...styles.rowBtn, ...styles.dangerBtn }` | Löschen über `confirmAnd` bestätigen |
 | `styles.iconBtn` (+ `iconBtnLavender`, `iconBtnDanger`) | Runde Icon-Aktion in Karten | 44 px, Kreis, braucht `aria-label` | |
 | `styles.chip` / `chipActive` | Filter, Mehrfachauswahl | Umschalter mit `aria-pressed` | |
-| `styles.segNav` / `segBtn` / `segBtnActive` | Umschalten zwischen Ansichten | Weißer Rahmen, aktiver Reiter Vollfläche `--accent` mit weißem Text (wie `chipActive`) | `aria-pressed`. Auswahl = Vollfläche, nie blasse Tönung |
+| `styles.segNav` / `segBtn` / `segBtnActive` | Umschalten zwischen Ansichten | Weißer Rahmen, aktiver Reiter Vollfläche `--auswahl` (Weinrot) mit weißem Text, wie `chipActive` | `aria-pressed`. Auswahl = Vollfläche, nie blasse Tönung |
 | `styles.card` | Inhaltsblock | Radius 16, Schatten `--sh-1` | Titel mit `KartenTitel` |
 | `KartenTitel` | Einklappbarer Kartentitel | `block`, `aktion`, `zuStart` | Zustand pro Titel gemerkt (`NZ_ZU`) |
 | `EmptyState` | Leerzustand: Icon, Überschrift, Hinweis, Weiter-Link | Text "Satz. Hinweis." wird geteilt | Nutzt `NavCtx` für den Sprung |

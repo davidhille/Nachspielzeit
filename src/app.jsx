@@ -12821,10 +12821,10 @@ const styles = {
     borderBottom: "2px solid transparent",
     marginBottom: -1,
   },
-  // Umschalter: weißer Rahmen, der aktive Reiter ist Vollfläche in --accent (wie die Filter-Chips)
+  // Umschalter: weißer Rahmen, der aktive Reiter ist Vollfläche in --auswahl (Weinrot, wie die Filter-Chips)
   segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--surface) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--surface) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--surface)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
   segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", minHeight: 44, padding: "8px 14px", borderRadius: 8, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
-  segBtnActive: { background: "var(--accent)", color: "#fff" },
+  segBtnActive: { background: "var(--auswahl)", color: "#fff" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
@@ -12846,7 +12846,7 @@ const styles = {
     cursor: "pointer",
   },
   segmentedBtnActive: {
-    background: "var(--accent)",
+    background: "var(--auswahl)",
     boxShadow: "var(--sh-1)",
     color: "#fff",
     fontWeight: 700,
@@ -13037,7 +13037,7 @@ const styles = {
   // Spieluhr: bewusst groß (40), damit sie auf dem Spielfeld lesbar ist; Ausnahme von der Schriftskala
   uhrZeit: { fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 40, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" },
   chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
-  chipActive: { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" },
+  chipActive: { background: "var(--auswahl)", color: "#fff", border: "1px solid var(--auswahl)" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600, background: "var(--track)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
