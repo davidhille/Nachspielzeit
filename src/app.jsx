@@ -1765,7 +1765,7 @@ function FehlerAnsicht() {
               Älter als 30 Tage löschen
             </button>
             <button
-              style={{ ...styles.dangerBtn, width: "auto", height: 44, padding: "0 16px" }}
+              style={{ ...styles.secondaryBtn, ...styles.dangerBtn, width: "auto", height: 44, padding: "0 16px" }}
               disabled={!zeilen.length}
               onClick={() => confirmAnd(`Alle ${zeilen.length} Einträge löschen?`, () => loesche("id=gt.0", "Alle Einträge gelöscht"))}
             >
