@@ -273,43 +273,69 @@ const sichereTeamfarbe = (hex) => {
   for (let i = 0; i < 12 && farbLum(c) > 0.42; i++) c = hexRgb(farbMix(c, [0, 0, 0], 0.12));
   return rgbHex(c);
 };
-let letzteTeamfarbe = null;
+let letzteFarben = { basis: null, einzel: {} };
 const istDunkel = () => {
   const t = document.documentElement.getAttribute("data-theme");
   if (t === "dark") return true;
   if (t === "light") return false;
   return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 };
-const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn"];
+const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn", "--auswahl"];
+/* Farben: Teamfarbe = Grundfarbe; Kopfzeile, Buttons & Akzent und Auswahl lassen sich einzeln überschreiben (leer = Teamfarbe).
+   Zu helle Farben werden abgedunkelt, damit weiße Schrift lesbar bleibt. */
+const berechneFarben = (basis, einzel, dunkel) => {
+  const e = einzel || {};
+  const sw = [0, 0, 0], ws = [255, 255, 255];
+  const std = CLUB_STD.farbe.toLowerCase();
+  const wahl = (h) => (hexRgb(h) ? sichereTeamfarbe(h) : basis);
+  const kopf = wahl(e.kopf), akz = wahl(e.akzent);
+  const ca = hexRgb(akz), ck = hexRgb(kopf);
+  const akzent = farbMix(ca, sw, 0.12);
+  return {
+    kopfStd: kopf.toLowerCase() === std,
+    akzentStd: akz.toLowerCase() === std,
+    accent: akzent,
+    accentText: dunkel ? farbMix(ca, ws, 0.5) : akzent,
+    focus: akz,
+    kopfGrad: `linear-gradient(135deg, ${kopf} 0%, ${farbMix(ck, sw, 0.28)} 100%)`,
+    kopfBtn: `linear-gradient(135deg, ${farbMix(ck, ws, 0.06)}, ${farbMix(ck, sw, 0.25)})`,
+    kopfMeta: farbMix(ck, sw, 0.12),
+    auswahl: hexRgb(e.auswahl) ? sichereTeamfarbe(e.auswahl) : null, // null = aus dem Akzent abgedunkelt (siehe --auswahl in index.html)
+    auswahlStandard: farbMix(ca, sw, 0.32),
+  };
+};
 const wendeTeamfarbeAn = () => {
   try {
     const root = document.documentElement.style;
-    const hex = letzteTeamfarbe;
-    if (!hex || hex.toLowerCase() === CLUB_STD.farbe.toLowerCase()) {
-      TEAMFARBEN_VARS.forEach((v) => root.removeProperty(v));
-      return;
+    const basis = letzteFarben.basis;
+    if (!basis) { TEAMFARBEN_VARS.forEach((v) => root.removeProperty(v)); return; }
+    const f = berechneFarben(basis, letzteFarben.einzel, istDunkel());
+    if (f.akzentStd) ["--accent", "--accent-text", "--focus"].forEach((v) => root.removeProperty(v));
+    else {
+      root.setProperty("--accent", f.accent);
+      root.setProperty("--accent-text", f.accentText);
+      root.setProperty("--focus", f.focus);
     }
-    const c = hexRgb(hex), dunkel = istDunkel();
-    const schwarz = [0, 0, 0], weiss = [255, 255, 255];
-    const akzent = farbMix(c, schwarz, 0.12);
-    root.setProperty("--accent", akzent);
-    root.setProperty("--accent-text", dunkel ? farbMix(c, weiss, 0.5) : akzent);
-    root.setProperty("--focus", hex);
-    root.setProperty("--header-grad", `linear-gradient(135deg, ${hex} 0%, ${farbMix(c, schwarz, 0.28)} 100%)`);
-    root.setProperty("--header-grad-btn", `linear-gradient(135deg, ${farbMix(c, weiss, 0.06)}, ${farbMix(c, schwarz, 0.25)})`);
+    if (f.kopfStd) ["--header-grad", "--header-grad-btn"].forEach((v) => root.removeProperty(v));
+    else {
+      root.setProperty("--header-grad", f.kopfGrad);
+      root.setProperty("--header-grad-btn", f.kopfBtn);
+    }
+    if (f.auswahl) root.setProperty("--auswahl", f.auswahl); else root.removeProperty("--auswahl");
     const meta = document.querySelector('meta[name="theme-color"]');
     // In der Administration bleibt die Statusleiste dunkel (siehe index.html), sie folgt nicht der Teamfarbe
-    if (meta && !/^admin\./i.test(window.location.hostname) && !/[?&]admin=1\b/.test(window.location.search)) meta.setAttribute("content", akzent);
+    if (meta && !f.kopfStd && !/^admin\./i.test(window.location.hostname) && !/[?&]admin=1\b/.test(window.location.search)) meta.setAttribute("content", f.kopfMeta);
   } catch (e) {}
 };
 try {
   if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", wendeTeamfarbeAn);
 } catch (e) {}
-const setzeClub = (name, logo, farbe, titel) => {
+const setzeClub = (name, logo, farbe, titel, einzel) => {
   const f = farbe ? sichereTeamfarbe(farbe) : CLUB_STD.farbe;
   CLUB = { name: (name && String(name).trim()) || CLUB_STD.name, logo: logo || CLUB_STD.logo, farbe: f, titel: (titel && String(titel).trim()) || CLUB_STD.titel };
-  if (letzteTeamfarbe !== f) {
-    letzteTeamfarbe = f;
+  const e = { kopf: (einzel && einzel.kopf) || "", akzent: (einzel && einzel.akzent) || "", auswahl: (einzel && einzel.auswahl) || "" };
+  if (letzteFarben.basis !== f || JSON.stringify(letzteFarben.einzel) !== JSON.stringify(e)) {
+    letzteFarben = { basis: f, einzel: e };
     wendeTeamfarbeAn();
   }
 };
@@ -1318,6 +1344,54 @@ function ZugaengeVerwaltung({ teams }) {
   );
 }
 
+const FARB_PALETTE = [["#C4271F", "Rot"], ["#1F5FBF", "Blau"], ["#1E7A46", "Grün"], ["#D9731A", "Orange"], ["#6A3FA6", "Lila"], ["#26323F", "Anthrazit"]];
+
+/* Farbauswahl: Palette + eigene Farbe + Zurücksetzen. `wert` leer = nichts gewählt (z. B. "wie Teamfarbe"). */
+function FarbWahl({ titel, hinweis, wert, onChange, leer, onLeer }) {
+  const an = (h) => !!wert && wert.toLowerCase() === h.toLowerCase();
+  return (
+    <div style={{ fontSize: 13, fontWeight: 700 }}>
+      <span id={`fw-${titel}`}>{titel}</span>
+      <div role="group" aria-labelledby={`fw-${titel}`} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        {FARB_PALETTE.map(([h, l]) => (
+          <button key={h} title={l} aria-label={l} aria-pressed={an(h)} onClick={() => onChange(h)} style={{ width: 44, height: 44, borderRadius: 999, background: h, cursor: "pointer", padding: 0, border: an(h) ? "3px solid var(--text)" : "2px solid var(--border-strong)" }} />
+        ))}
+        <input type="color" value={wert || CLUB_STD.farbe} onChange={(e) => onChange(e.target.value)} aria-label={`${titel}: eigene Farbe`} style={{ width: 44, height: 44, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
+        {leer && <button style={styles.linkBtn} aria-pressed={!wert && leer !== "Zurücksetzen"} onClick={onLeer}>{leer}</button>}
+      </div>
+      {hinweis && <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>{hinweis}</div>}
+    </div>
+  );
+}
+
+/* Vorschau der Farben im Admin: Kopfzeile, Umschalter, Button, Link und Chips mit den gewählten Farben (noch nicht gespeichert) */
+function FarbVorschau({ basis, kopf, akzent, auswahl }) {
+  const b = sichereTeamfarbe(basis || CLUB_STD.farbe);
+  const f = berechneFarben(b, { kopf, akzent, auswahl }, istDunkel());
+  const aus = f.auswahl || f.auswahlStandard;
+  const seg = { flex: 1, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 14, fontWeight: 600 };
+  return (
+    <div role="img" aria-label="Vorschau der gewählten Farben" style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
+      <div style={{ background: f.kopfGrad, color: "#fff", padding: "12px 14px", fontSize: 14, fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>Kopfzeile</span>
+        <span style={{ background: f.kopfBtn, borderRadius: 999, padding: "4px 12px", fontSize: 12 }}>Team</span>
+      </div>
+      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", gap: 4, padding: 4, border: "1px solid var(--divider)", borderRadius: 12 }}>
+          <span style={{ ...seg, background: aus, color: "#fff" }}>Training</span>
+          <span style={{ ...seg, color: "var(--muted)" }}>Saison</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ background: f.accent, color: "#fff", borderRadius: 12, padding: "0 18px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 14, fontWeight: 600 }}>Speichern</span>
+          <span style={{ color: f.accentText, fontSize: 14, fontWeight: 600 }}>Link-Text</span>
+          <span style={{ background: aus, color: "#fff", border: `1px solid ${aus}`, borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip aktiv</span>
+          <span style={{ border: "1px solid var(--border-strong)", color: "var(--muted)", borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TeamEinstellungen({ team, teamRow, onSaved }) {
   const cfg = (teamRow && teamRow.config) || {};
   const [name, setName] = useState(teamRow ? teamRow.name : "");
@@ -1327,6 +1401,9 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [logoUrl, setLogoUrl] = useState(cfg.verein_logo_url || "");
   const [logoBusy, setLogoBusy] = useState(false);
   const [farbe, setFarbe] = useState(cfg.verein_farbe || "");
+  const [farbeKopf, setFarbeKopf] = useState(cfg.farbe_kopf || "");
+  const [farbeAkzent, setFarbeAkzent] = useState(cfg.farbe_akzent || "");
+  const [farbeAuswahl, setFarbeAuswahl] = useState(cfg.farbe_auswahl || "");
   const [titel, setTitel] = useState(cfg.eltern_titel || "");
   const [fotoUrl, setFotoUrl] = useState(cfg.team_photo_url || "");
   const [fotoBusy, setFotoBusy] = useState(false);
@@ -1389,6 +1466,9 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (verein.trim()) neuCfg.verein_name = verein.trim(); else delete neuCfg.verein_name;
       if (logoUrl) neuCfg.verein_logo_url = logoUrl; else delete neuCfg.verein_logo_url;
       if (farbe) neuCfg.verein_farbe = farbe; else delete neuCfg.verein_farbe;
+      if (farbeKopf) neuCfg.farbe_kopf = farbeKopf; else delete neuCfg.farbe_kopf;
+      if (farbeAkzent) neuCfg.farbe_akzent = farbeAkzent; else delete neuCfg.farbe_akzent;
+      if (farbeAuswahl) neuCfg.farbe_auswahl = farbeAuswahl; else delete neuCfg.farbe_auswahl;
       if (titel.trim()) neuCfg.eltern_titel = titel.trim(); else delete neuCfg.eltern_titel;
       if (fotoUrl) neuCfg.team_photo_url = fotoUrl;
       const sS = Number(saisonStart), sE = Number(saisonEnde);
@@ -1460,19 +1540,19 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             Am besten PNG mit transparentem Hintergrund. Leer = Standard-Wappen.
           </div>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Teamfarbe
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-            {[["#C4271F", "Rot (Standard)"], ["#1F5FBF", "Blau"], ["#1E7A46", "Grün"], ["#D9731A", "Orange"], ["#6A3FA6", "Lila"], ["#26323F", "Anthrazit"]].map(([h, l]) => {
-              const an = (farbe || CLUB_STD.farbe).toLowerCase() === h.toLowerCase();
-              return <button key={h} title={l} aria-label={l} onClick={() => setFarbe(h === CLUB_STD.farbe ? "" : h)} style={{ width: 44, height: 44, borderRadius: 999, background: h, cursor: "pointer", padding: 0, border: an ? "3px solid var(--text)" : "2px solid var(--border-strong)" }} />;
-            })}
-            <input type="color" value={farbe || CLUB_STD.farbe} onChange={(e) => setFarbe(e.target.value)} aria-label="Eigene Farbe" style={{ width: 44, height: 44, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
-            {farbe && <button style={styles.linkBtn} onClick={() => setFarbe("")}>Zurücksetzen</button>}
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Färbt Kopfzeile, Schaltflächen und die Eltern-Seite. Zu helle Farben werden automatisch abgedunkelt. Die Sammelkarten behalten ihr Design.
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <FarbWahl
+            titel="Teamfarbe"
+            hinweis="Grundfarbe: Kopfzeile, Schaltflächen und die Eltern-Seite. Zu helle Farben werden automatisch abgedunkelt. Die Sammelkarten behalten ihr Design."
+            wert={farbe || CLUB_STD.farbe}
+            onChange={(h) => setFarbe(h.toLowerCase() === CLUB_STD.farbe.toLowerCase() ? "" : h)}
+            leer={farbe ? "Zurücksetzen" : null}
+            onLeer={() => setFarbe("")}
+          />
+          <FarbWahl titel="Kopfzeile" hinweis="Nur der Header der Trainer-App. Leer = Teamfarbe." wert={farbeKopf} onChange={setFarbeKopf} leer="Wie Teamfarbe" onLeer={() => setFarbeKopf("")} />
+          <FarbWahl titel="Buttons & Akzent" hinweis="Hauptknöpfe, Links, Fokus und Akzenttext. Leer = Teamfarbe." wert={farbeAkzent} onChange={setFarbeAkzent} leer="Wie Teamfarbe" onLeer={() => setFarbeAkzent("")} />
+          <FarbWahl titel="Auswahl" hinweis="Aktive Umschalter und Filter-Chips. Leer = dunklere Variante der Buttons-Farbe." wert={farbeAuswahl} onChange={setFarbeAuswahl} leer="Automatisch" onLeer={() => setFarbeAuswahl("")} />
+          <FarbVorschau basis={farbe} kopf={farbeKopf} akzent={farbeAkzent} auswahl={farbeAuswahl} />
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Titel der Eltern-Seite
@@ -2599,7 +2679,7 @@ function App() {
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   setzeEinstellungen(teamInfo?.config);
   TEAM_NAME = (teamInfo && teamInfo.name) || Sitzung.team.toUpperCase();
-  setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel);
+  setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel, { kopf: teamInfo?.config?.farbe_kopf, akzent: teamInfo?.config?.farbe_akzent, auswahl: teamInfo?.config?.farbe_auswahl });
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
   const kartenAltKey = kartenAlt.join(",");
