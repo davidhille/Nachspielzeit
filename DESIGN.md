@@ -31,7 +31,7 @@ Neue Stile im `styles`-Objekt (`src/app.jsx`) ergänzen, nicht inline dupliziere
 | `styles.primaryBtn` | Hauptaktion einer Ansicht (Speichern) | Volle Breite, 44 px hoch | Pro Ansicht höchstens eine |
 | `styles.rowBtn` | Weitere Aktion in Zeilen (Hinzufügen) | Höhe 44, Breite nach Inhalt | Zeilenknopf, bewusst mit Akzentfläche (früher `secondaryBtn`, umbenannt, weil der Name eine zurückgenommene Optik versprach) |
 | `styles.linkBtn` | Textaktion, z. B. "Alle anzeigen" | Transparent, 44 px Tippfläche | |
-| `styles.dangerBtn` | Löschen, Zurücksetzen | **Teilstil**, immer mit Grundknopf kombinieren: `{ ...styles.rowBtn, ...styles.dangerBtn }` | Löschen über `confirmAnd` bestätigen |
+| `styles.dangerBtn` | Löschen, Zurücksetzen (nur rote Schrift, keine Fläche) | **Teilstil**, immer mit Grundknopf kombinieren: `{ ...styles.rowBtn, ...styles.dangerBtn }` | Löschen über `confirmAnd` bestätigen |
 | `styles.iconBtn` (+ `iconBtnLavender`, `iconBtnDanger`) | Runde Icon-Aktion in Karten | 44 px, Kreis, braucht `aria-label` | |
 | `styles.chip` / `chipActive` | Filter, Mehrfachauswahl | Umschalter mit `aria-pressed` | |
 | `styles.segNav` / `segBtn` / `segBtnActive` | Umschalten zwischen Ansichten | Weißer Rahmen, aktiver Reiter Vollfläche `--auswahl` (Weinrot) mit weißem Text, wie `chipActive` | `aria-pressed`. Auswahl = Vollfläche, nie blasse Tönung |

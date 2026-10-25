@@ -13074,7 +13074,7 @@ const styles = {
     cursor: "pointer",
     boxShadow: "var(--sh-1)",
   },
-  dangerBtn: { color: "var(--danger-text)", background: "var(--neg-bg)", fontWeight: 700, borderRadius: 12, padding: "6px 12px" },
+  dangerBtn: { color: "var(--danger-text)", background: "transparent", fontWeight: 600, borderRadius: 12, padding: "6px 12px" }, // Gefahr: nur rote Schrift, keine Fläche
   linkBtn: {
     background: "transparent",
     border: "none",
