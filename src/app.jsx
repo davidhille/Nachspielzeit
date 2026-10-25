@@ -267,6 +267,14 @@ const hexRgb = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ""); if (!m) re
 const rgbHex = (c) => "#" + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
 const farbMix = (a, b, t) => rgbHex(a.map((v, i) => v * (1 - t) + b[i] * t));
 const farbLum = (c) => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+/* Lesbare Schriftfarbe (weiß oder dunkel) auf einer Fläche, nach Kontrast */
+const textAuf = (hex) => {
+  const c = hexRgb(hex);
+  if (!c) return "#fff";
+  const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  return 1.05 / (L + 0.05) >= (L + 0.05) / 0.065 ? "#fff" : "#1C2B22";
+};
 const sichereTeamfarbe = (hex) => {
   let c = hexRgb(hex);
   if (!c) return CLUB_STD.farbe;
@@ -280,7 +288,7 @@ const istDunkel = () => {
   if (t === "light") return false;
   return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 };
-const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn", "--auswahl", "--trikot", "--trikot-text"];
+const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn", "--auswahl", "--auswahl-text", "--trikot", "--trikot-text"];
 /* Farben: Teamfarbe = Grundfarbe; Kopfzeile, Buttons & Akzent und Auswahl lassen sich einzeln überschreiben (leer = Teamfarbe).
    Zu helle Farben werden abgedunkelt, damit weiße Schrift lesbar bleibt. */
 const berechneFarben = (basis, einzel, dunkel) => {
@@ -300,11 +308,13 @@ const berechneFarben = (basis, einzel, dunkel) => {
     kopfGrad: `linear-gradient(135deg, ${kopf} 0%, ${farbMix(ck, sw, 0.28)} 100%)`,
     kopfBtn: `linear-gradient(135deg, ${farbMix(ck, ws, 0.06)}, ${farbMix(ck, sw, 0.25)})`,
     kopfMeta: farbMix(ck, sw, 0.12),
-    auswahl: hexRgb(e.auswahl) ? sichereTeamfarbe(e.auswahl) : null, // null = aus dem Akzent abgedunkelt (siehe --auswahl in index.html)
+    // Auswahl: jede Farbe erlaubt (auch helles Grau), die Schrift passt sich an; null = aus dem Akzent abgedunkelt (siehe --auswahl in index.html)
+    auswahl: hexRgb(e.auswahl) ? e.auswahl : null,
+    auswahlText: hexRgb(e.auswahl) ? textAuf(e.auswahl) : "#fff",
     auswahlStandard: farbMix(ca, sw, 0.32),
     // Trikot: jede Farbe erlaubt (auch Weiß); die Nummer wird bei hellen Farben dunkel
     trikot: hexRgb(e.trikot) ? e.trikot : null,
-    trikotText: hexRgb(e.trikot) && farbLum(hexRgb(e.trikot)) > 0.6 ? "#1C2B22" : "#fff",
+    trikotText: hexRgb(e.trikot) ? textAuf(e.trikot) : "#fff",
   };
 };
 const wendeTeamfarbeAn = () => {
@@ -324,7 +334,8 @@ const wendeTeamfarbeAn = () => {
       root.setProperty("--header-grad", f.kopfGrad);
       root.setProperty("--header-grad-btn", f.kopfBtn);
     }
-    if (f.auswahl) root.setProperty("--auswahl", f.auswahl); else root.removeProperty("--auswahl");
+    if (f.auswahl) { root.setProperty("--auswahl", f.auswahl); root.setProperty("--auswahl-text", f.auswahlText); }
+    else ["--auswahl", "--auswahl-text"].forEach((v) => root.removeProperty(v));
     if (f.trikot) { root.setProperty("--trikot", f.trikot); root.setProperty("--trikot-text", f.trikotText); }
     else ["--trikot", "--trikot-text"].forEach((v) => root.removeProperty(v));
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -1383,13 +1394,13 @@ function FarbVorschau({ basis, kopf, akzent, auswahl, trikot }) {
       </div>
       <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", gap: 4, padding: 4, border: "1px solid var(--divider)", borderRadius: 12 }}>
-          <span style={{ ...seg, background: aus, color: "#fff" }}>Training</span>
+          <span style={{ ...seg, background: aus, color: f.auswahl ? f.auswahlText : "#fff" }}>Training</span>
           <span style={{ ...seg, color: "var(--muted)" }}>Saison</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ background: f.accent, color: "#fff", borderRadius: 12, padding: "0 18px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 14, fontWeight: 600 }}>Speichern</span>
           <span style={{ color: f.accentText, fontSize: 14, fontWeight: 600 }}>Link-Text</span>
-          <span style={{ background: aus, color: "#fff", border: `1px solid ${aus}`, borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip aktiv</span>
+          <span style={{ background: aus, color: f.auswahl ? f.auswahlText : "#fff", border: `1px solid ${aus}`, borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip aktiv</span>
           <span style={{ border: "1px solid var(--border-strong)", color: "var(--muted)", borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip</span>
           <span style={{ position: "relative", display: "inline-flex", width: 36, height: 36 }}>
             <svg width="36" height="36" viewBox="0 0 24 24" fill={f.trikot || f.accent} stroke="var(--border-strong)" strokeWidth="0.6" strokeLinejoin="round"><path d="M16 3l-2.2 1.8a2.2 2.2 0 0 1-3.6 0L8 3 2 7.5 4.3 11H7v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9h2.7L22 7.5 16 3z" /></svg>
@@ -1562,7 +1573,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           />
           <FarbWahl titel="Kopfzeile" hinweis="Nur der Header der Trainer-App. Leer = Teamfarbe." wert={farbeKopf} onChange={setFarbeKopf} leer="Wie Teamfarbe" onLeer={() => setFarbeKopf("")} />
           <FarbWahl titel="Buttons & Akzent" hinweis="Hauptknöpfe, Links, Fokus und Akzenttext. Leer = Teamfarbe." wert={farbeAkzent} onChange={setFarbeAkzent} leer="Wie Teamfarbe" onLeer={() => setFarbeAkzent("")} />
-          <FarbWahl titel="Auswahl" hinweis="Aktive Umschalter und Filter-Chips. Leer = dunklere Variante der Buttons-Farbe." wert={farbeAuswahl} onChange={setFarbeAuswahl} leer="Automatisch" onLeer={() => setFarbeAuswahl("")} />
+          <FarbWahl titel="Auswahl" hinweis="Aktive Umschalter und Filter-Chips. Auch helle Farben und Grautöne sind möglich, die Schrift passt sich an. Leer = dunklere Variante der Buttons-Farbe." wert={farbeAuswahl} onChange={setFarbeAuswahl} palette={[...FARB_PALETTE, ["#D9D4D3", "Hellgrau"], ["#6B6B6B", "Grau"]]} leer="Automatisch" onLeer={() => setFarbeAuswahl("")} />
           <FarbWahl titel="Trikot" hinweis="Farbe des Trikot-Symbols neben den Spielern, zum Beispiel die echte Trikotfarbe. Auch helle Farben sind möglich. Leer = Buttons-Farbe." wert={farbeTrikot} onChange={setFarbeTrikot} palette={[...FARB_PALETTE, ["#FFFFFF", "Weiß"], ["#F2C21B", "Gelb"]]} leer="Wie Buttons" onLeer={() => setFarbeTrikot("")} />
           <FarbVorschau basis={farbe} kopf={farbeKopf} akzent={farbeAkzent} auswahl={farbeAuswahl} trikot={farbeTrikot} />
         </div>
@@ -12916,7 +12927,7 @@ const styles = {
   // Umschalter: weißer Rahmen, der aktive Reiter ist Vollfläche in --auswahl (Weinrot, wie die Filter-Chips)
   segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--surface) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--surface) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--surface)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
   segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", minHeight: 44, padding: "8px 14px", borderRadius: 8, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
-  segBtnActive: { background: "var(--auswahl)", color: "#fff" },
+  segBtnActive: { background: "var(--auswahl)", color: "var(--auswahl-text)" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
@@ -12940,7 +12951,7 @@ const styles = {
   segmentedBtnActive: {
     background: "var(--auswahl)",
     boxShadow: "var(--sh-1)",
-    color: "#fff",
+    color: "var(--auswahl-text)",
     fontWeight: 700,
   },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
@@ -13129,7 +13140,7 @@ const styles = {
   // Spieluhr: bewusst groß (40), damit sie auf dem Spielfeld lesbar ist; Ausnahme von der Schriftskala
   uhrZeit: { fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 40, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" },
   chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
-  chipActive: { background: "var(--auswahl)", color: "#fff", border: "1px solid var(--auswahl)" },
+  chipActive: { background: "var(--auswahl)", color: "var(--auswahl-text)", border: "1px solid var(--auswahl)" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
   tag: { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600, background: "var(--track)", color: "var(--accent-text)", whiteSpace: "nowrap" },
   primaryBtn: {
