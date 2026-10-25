@@ -3023,7 +3023,7 @@ function App() {
       {busy && <div style={styles.progressBar} />}
       <div className="nz-sr" role="status" aria-live="polite" aria-atomic="true">{toast && toast.type !== "error" ? toast.message : ""}</div>
       {toast && (
-        <div role={toast.type === "error" ? "alert" : undefined} style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
+        <div className="nz-toast" role={toast.type === "error" ? "alert" : undefined} style={{ ...styles.toast, background: toast.type === "error" ? "#7A1310" : "var(--accent)" }}>
           <span>
             {toast.type === "error" ? "⚠ " : ""}
             {toast.message}
