@@ -11572,7 +11572,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
                   <div style={{ padding: "10px 12px 12px" }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{u.titel}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {(u.teamIds || []).includes("alle") && <span style={{ ...tagStyle, background: "var(--success-bg, #E6F2EA)", color: "var(--success-text)" }}>Alle Teams</span>}
+                      {(u.teamIds || []).includes("alle") && <span style={{ ...tagStyle, background: "var(--pos-bg)", color: "var(--pos-text)" }}>Alle Teams</span>}
                       {u.keywords.map((k) => (
                         <span key={k} style={tagStyle}>{k}</span>
                       ))}
