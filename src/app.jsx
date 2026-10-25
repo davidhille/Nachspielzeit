@@ -1164,7 +1164,7 @@ function UebungenAdmin({ teams }) {
                   {u.bild_url && <img src={u.bild_url} alt={u.titel} style={{ maxWidth: "100%", borderRadius: 12 }} />}
                   {u.beschreibung ? <FormatierterText text={u.beschreibung} /> : <div style={{ fontSize: 13, color: "var(--muted)" }}>Kein Ablauf hinterlegt.</div>}
                   <div>
-                    <button style={styles.secondaryBtn} onClick={() => setBearbeite(u)}>
+                    <button style={styles.rowBtn} onClick={() => setBearbeite(u)}>
                       Bearbeiten
                     </button>
                   </div>
@@ -1287,13 +1287,13 @@ function ZugaengeVerwaltung({ teams }) {
                   <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
                   <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, letterSpacing: "0.02em", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
                 </div>
-                <button style={styles.secondaryBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
+                <button style={styles.rowBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
                   {offen[c.code] ? "Verbergen" : "Anzeigen"}
                 </button>
-                <button style={styles.secondaryBtnOutline} onClick={() => umschalten(c)}>
+                <button style={styles.rowBtnOutline} onClick={() => umschalten(c)}>
                   {c.active ? "Sperren" : "Entsperren"}
                 </button>
-                <button style={styles.secondaryBtnOutline} onClick={() => loeschen(c)}>
+                <button style={styles.rowBtnOutline} onClick={() => loeschen(c)}>
                   Löschen
                 </button>
               </div>
@@ -1431,7 +1431,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Wappen
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
             <img src={logoUrl || CLUB_STD.logo} alt="Wappen" style={{ height: 56, maxWidth: 120, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
-            <label style={{ ...styles.secondaryBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
+            <label style={{ ...styles.rowBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
               {logoBusy ? "Lädt …" : "Wappen hochladen"}
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { logoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
             </label>
@@ -1463,7 +1463,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Mannschaftsbild
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
             {fotoUrl ? <img src={fotoUrl} alt="Mannschaftsbild" style={{ height: 64, borderRadius: 8, objectFit: "cover" }} /> : <span style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)" }}>Noch kein Bild</span>}
-            <label style={{ ...styles.secondaryBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
+            <label style={{ ...styles.rowBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
               {fotoBusy ? "Lädt …" : fotoUrl ? "Bild ersetzen" : "Bild hochladen"}
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { fotoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
             </label>
@@ -1659,10 +1659,10 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
               <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{t.id}.nachspielzeit.app</div>
             </div>
             {t.id !== aktuellesTeam && (
-              <button style={styles.secondaryBtnOutline} onClick={() => onSelect(t.id)}>Öffnen</button>
+              <button style={styles.rowBtnOutline} onClick={() => onSelect(t.id)}>Öffnen</button>
             )}
             {!fehler && t.id !== "u8" && (
-              <button style={styles.secondaryBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
+              <button style={styles.rowBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
             )}
           </div>
         ))}
@@ -1756,16 +1756,16 @@ function FehlerAnsicht() {
       {!fehler && zeilen !== null && (
         <>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-            <button style={{ ...styles.secondaryBtn, width: "auto", height: 44, padding: "0 16px" }} onClick={laden}>Neu laden</button>
+            <button style={{ ...styles.rowBtn, width: "auto", height: 44, padding: "0 16px" }} onClick={laden}>Neu laden</button>
             <button
-              style={{ ...styles.secondaryBtn, width: "auto", height: 44, padding: "0 16px" }}
+              style={{ ...styles.rowBtn, width: "auto", height: 44, padding: "0 16px" }}
               disabled={!zeilen.length}
               onClick={() => confirmAnd("Einträge älter als 30 Tage löschen?", () => loesche(`created_at=lt.${encodeURIComponent(new Date(Date.now() - 30 * 86400000).toISOString())}`, "Alte Einträge gelöscht"))}
             >
               Älter als 30 Tage löschen
             </button>
             <button
-              style={{ ...styles.secondaryBtn, ...styles.dangerBtn, width: "auto", height: 44, padding: "0 16px" }}
+              style={{ ...styles.rowBtn, ...styles.dangerBtn, width: "auto", height: 44, padding: "0 16px" }}
               disabled={!zeilen.length}
               onClick={() => confirmAnd(`Alle ${zeilen.length} Einträge löschen?`, () => loesche("id=gt.0", "Alle Einträge gelöscht"))}
             >
@@ -2133,7 +2133,7 @@ class FehlerGrenze extends React.Component {
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           <button style={styles.primaryBtn} onClick={() => window.location.reload()}>Neu laden</button>
           {this.props.onUebersicht && (
-            <button style={styles.secondaryBtn} onClick={() => { this.setState({ fehler: null }); this.props.onUebersicht(); }}>Zur Übersicht</button>
+            <button style={styles.rowBtn} onClick={() => { this.setState({ fehler: null }); this.props.onUebersicht(); }}>Zur Übersicht</button>
           )}
         </div>
       </div>
@@ -3054,11 +3054,11 @@ function App() {
           >
             <p id="confirm-message" style={styles.modalText}>{confirmState.message}</p>
             <div style={styles.modalActions}>
-              <button style={styles.secondaryBtnOutline} onClick={() => setConfirmState(null)}>
+              <button style={styles.rowBtnOutline} onClick={() => setConfirmState(null)}>
                 Abbrechen
               </button>
               <button
-                style={{ ...styles.secondaryBtn, background: "#9B2226" }}
+                style={{ ...styles.rowBtn, background: "#9B2226" }}
                 onClick={() => {
                   confirmState.onConfirm();
                   setConfirmState(null);
@@ -6399,7 +6399,7 @@ function KartenLinkBox({ token, altTokens = [], onAltOff, onCreate, onRevoke, on
       <input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="Link-Name, z. B. Saison 26" style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 2, minWidth: 160 }} />
       <input value={linkCode} onChange={(e) => setLinkCode(e.target.value)} placeholder="Code (leer = zufällig)" maxLength={12} style={{ ...styles.textarea, marginTop: 0, fontSize: 13, flex: 1, minWidth: 120 }} />
       <button style={styles.linkBtn} onClick={() => setLinkCode(zufallsCode())} disabled={busy}>Würfeln</button>
-      <button style={token ? styles.linkBtn : styles.secondaryBtn} onClick={namenSetzen} disabled={busy || !linkName.trim()}>{token ? "Link ändern" : "Link erzeugen"}</button>
+      <button style={token ? styles.linkBtn : styles.rowBtn} onClick={namenSetzen} disabled={busy || !linkName.trim()}>{token ? "Link ändern" : "Link erzeugen"}</button>
     </div>
   );
   return (
@@ -7144,10 +7144,10 @@ function ImageCropModal({ file, aspect, onCancel, onConfirm }) {
           disabled={!imgEl}
         />
         <div style={styles.modalActions}>
-          <button style={styles.secondaryBtnOutline} onClick={onCancel} disabled={saving}>
+          <button style={styles.rowBtnOutline} onClick={onCancel} disabled={saving}>
             Abbrechen
           </button>
-          <button style={styles.secondaryBtn} onClick={handleConfirm} disabled={!imgEl || saving}>
+          <button style={styles.rowBtn} onClick={handleConfirm} disabled={!imgEl || saving}>
             {saving ? "Speichert …" : "Übernehmen"}
           </button>
         </div>
@@ -7171,7 +7171,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         Mannschaft
       </div>
     )}
-    <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))", boxShadow: "var(--sh-glow)" } : undefined}>
+    <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))" } : undefined}>
     <div
       className={titleAbove ? undefined : "team-hero"}
       onClick={() => photoUrl && setLightboxOpen(true)}
@@ -8125,7 +8125,6 @@ function PlayerCard({ player, stats, teamName = TEAM_NAME }) {
         borderRadius: 24,
         padding: 3,
         background: `linear-gradient(135deg, var(--gold), var(--gold-2))`,
-        boxShadow: "var(--sh-glow)",
       }}
     >
       <div
@@ -9880,7 +9879,7 @@ function SpieltagNotizen({ value, onSave, label = "Notizen", placeholder = "Beob
     <div style={{ marginBottom: 14 }}>
       <FormatTextarea label={label} value={text} onChange={setText} rows={rows} placeholder={placeholder} />
       {dirty && (
-        <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={() => onSave(text)}>
+        <button style={{ ...styles.rowBtn, marginTop: 8 }} onClick={() => onSave(text)}>
           Speichern
         </button>
       )}
@@ -10807,7 +10806,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
                       onChange={(e) => setFormMenge(e.target.value)}
                       placeholder={bestand !== null ? String(bestand) : "0"}
                     />
-                    <button style={styles.secondaryBtn} onClick={() => speichern(key)}>
+                    <button style={styles.rowBtn} onClick={() => speichern(key)}>
                       Speichern
                     </button>
                   </div>
@@ -10880,7 +10879,7 @@ function MaterialBereich({ material, onSaveBestand, onDeleteMaterialEintrag }) {
             if (e.key === "Enter" && neuesMaterial.trim()) materialHinzufuegen();
           }}
         />
-        <button style={styles.secondaryBtn} onClick={materialHinzufuegen} disabled={!neuesMaterial.trim()}>
+        <button style={styles.rowBtn} onClick={materialHinzufuegen} disabled={!neuesMaterial.trim()}>
           Hinzufügen
         </button>
       </div>
@@ -10968,7 +10967,7 @@ function SpielerBereich({
           }}
         />
         <button
-          style={styles.secondaryBtn}
+          style={styles.rowBtn}
           onClick={() => {
             if (name.trim()) {
               onAdd(name.trim());
@@ -11256,7 +11255,7 @@ function TrainingsplanBereich({
             onChange={(e) => setWochen(Number(e.target.value) || 1)}
           />
         </div>
-        <button style={{ ...styles.secondaryBtn, marginTop: 10 }} onClick={generieren}>
+        <button style={{ ...styles.rowBtn, marginTop: 10 }} onClick={generieren}>
           Termine generieren
         </button>
       </div>
@@ -11547,7 +11546,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
         <EmptyState text="Noch keine Übungen angelegt." />
       ) : (
         <>
-          <UebungFilterLeiste karte aktion={<button style={styles.secondaryBtn} onClick={() => setEdit("neu")}>+ Übung</button>} uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
+          <UebungFilterLeiste karte aktion={<button style={styles.rowBtn} onClick={() => setEdit("neu")}>+ Übung</button>} uebungen={uebungen} suche={suche} setSuche={setSuche} filter={filter} setFilter={setFilter} />
           <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600, marginBottom: 10 }}>
             {gefiltert.length} {gefiltert.length === 1 ? "Übung" : "Übungen"}
             {filter.length > 0 ? ` · Filter: ${filter.join(", ")}` : ""}
@@ -11676,7 +11675,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
                 setzeBild(f);
               }}
             />
-            <button style={styles.secondaryBtn} onClick={() => fileRef.current && fileRef.current.click()}>
+            <button style={styles.rowBtn} onClick={() => fileRef.current && fileRef.current.click()}>
               {vorschau ? "Bild ändern" : "Bild hochladen"}
             </button>
             <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
@@ -11711,7 +11710,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
             onChange={(e) => setNeuesKeyword(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") addKeyword(neuesKeyword); }}
           />
-          <button style={styles.secondaryBtn} onClick={() => addKeyword(neuesKeyword)}>Hinzufügen</button>
+          <button style={styles.rowBtn} onClick={() => addKeyword(neuesKeyword)}>Hinzufügen</button>
         </div>
         {vorschlaege.length > 0 && (
           <>
@@ -11729,7 +11728,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
         )}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button style={{ ...styles.primaryBtn, opacity: titel.trim() && !gesperrt ? 1 : 0.5 }} disabled={!titel.trim() || gesperrt} onClick={speichern}>Speichern</button>
-          <button style={styles.secondaryBtn} onClick={onCancel}>Abbrechen</button>
+          <button style={styles.rowBtn} onClick={onCancel}>Abbrechen</button>
           {onRemove && (
             <button style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4 }} onClick={onRemove}>
               <TrashIcon size={14} /> Löschen
@@ -11794,7 +11793,7 @@ function TerminBoards({ termin }) {
         </div>
       ))}
       {!tb.fehlt && (!waehlen ? (
-        <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Taktik-Board hinzufügen</button>
+        <button style={styles.rowBtn} onClick={() => setWaehlen(true)}>+ Taktik-Board hinzufügen</button>
       ) : (
         <div style={{ ...styles.card, background: "var(--bg)" }}>
           <KartenTitel aktion={<button style={styles.linkBtn} onClick={() => setWaehlen(false)}>Fertig</button>}>Board hinzufügen</KartenTitel>
@@ -11899,7 +11898,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
           ))}
 
           {!mitUebungen ? null : !waehlen ? (
-            <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
+            <button style={styles.rowBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
           ) : (
             <div style={{ ...styles.card, background: "var(--bg)" }}>
               <div style={{ ...styles.h3, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -11994,7 +11993,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                 }}
               />
               <button
-                style={styles.secondaryBtn}
+                style={styles.rowBtn}
                 onClick={() => {
                   if (name.trim()) {
                     onAddGegner(name.trim());
@@ -12062,7 +12061,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
             onChange={(e) => setNeuerOrt(e.target.value)}
           />
           <button
-            style={styles.secondaryBtn}
+            style={styles.rowBtn}
             onClick={() => {
               onAddSpieltag(neuesDatum, neueZeit, neuerTyp, neuerOrt.trim());
               setNeueZeit("");
@@ -12160,7 +12159,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                           ))}
                         </select>
                         <button
-                          style={styles.secondaryBtn}
+                          style={styles.rowBtn}
                           onClick={() => {
                             if (!neuerGegnerId) return;
                             onToggleGegnerZuordnung(s.id, neuerGegnerId, false);
@@ -12231,7 +12230,7 @@ function EmptyState({ text, nach }) {
       <div style={{ fontWeight: 600, color: "var(--text)" }}>{kopf}</div>
       {rest && <div style={{ marginTop: 4, fontSize: 13 }}>{rest}</div>}
       {nach && gehe && NAV_ZIELE[nach] && (
-        <button type="button" style={{ ...styles.secondaryBtn, width: "auto", height: 44, padding: "0 18px", marginTop: 12 }} onClick={() => gehe(nach)}>
+        <button type="button" style={{ ...styles.rowBtn, width: "auto", height: 44, padding: "0 18px", marginTop: 12 }} onClick={() => gehe(nach)}>
           {NAV_ZIELE[nach]}
         </button>
       )}
@@ -12640,7 +12639,7 @@ const styles = {
     paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
     marginTop: 16,
   },
-  secondaryBtn: {
+  rowBtn: {
     background: "var(--accent)",
     color: "#fff",
     border: "none",
@@ -12777,7 +12776,7 @@ const styles = {
   },
   modalText: { fontSize: 14, color: "var(--text)", margin: "0 0 18px 0", lineHeight: 1.5 },
   modalActions: { display: "flex", justifyContent: "flex-end", gap: 10 },
-  secondaryBtnOutline: {
+  rowBtnOutline: {
     background: "transparent",
     color: "var(--text-2)",
     border: "1px solid var(--border-strong)",

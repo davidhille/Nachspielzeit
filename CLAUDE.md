@@ -46,7 +46,7 @@
 - Prüfung: `cd /opt/node-tools && node -e "…"` parst `src/app.jsx` mit acorn + acorn-jsx und gibt `ACORN_OK` aus. Einfacher: `cd tools && npm run alles` (Syntax, Lint, Design-Check, Build-Prüfung, Tests). Der Design-Check (`npm run design`) meldet `outline: none`, undefinierte Tokens, Hex-Fallbacks in `var()`, Radien außerhalb 8/12/16/999 und Schatten ohne `--sh-`-Token (Taktik-Editor ausgenommen). Bewusste Ausnahmen stehen in `tools/design-ausnahmen.json`; neue nur mit Begründung per `npm run design -- --ausnahmen-schreiben` aufnehmen.
 - Aktionen mit `wrapAction(fn, successMsg, undo)` (liefert true/false) und `showToast`. Globale Helfer: `confirmAnd`, `meldung`, `frageAnd` (nutzen `TkDialog`).
 - Kontexte: `FeatureCtx`, `TrainingBoardCtx`, `NavCtx` (setTab).
-- `styles`-Objekt: `card`, `primaryBtn`/`secondaryBtn`, `linkBtn`, `dangerBtn`, `iconBtn`, `segNav`/`segBtn`, `chip`, `playerNameBtn`, `fieldRow`, `range`, `empty`. Neue Stile dort ergänzen, nicht inline duplizieren.
+- `styles`-Objekt: `card`, `primaryBtn`/`rowBtn`, `linkBtn`, `dangerBtn`, `iconBtn`, `segNav`/`segBtn`, `chip`, `playerNameBtn`, `fieldRow`, `range`, `empty`. Neue Stile dort ergänzen, nicht inline duplizieren.
 - Hilfsklassen: `.nz-tabelle` (fixierte erste Spalte), `.nz-sr` (nur für Screenreader, z. B. verstecktes h1), `.nz-nur-maus` (bei Touch ausgeblendet).
 - Zahlen in Tabellen mit `tabular-nums`.
 

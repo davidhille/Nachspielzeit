@@ -13,7 +13,7 @@ Gilt für Trainer-App und Admin. Die Regeln stehen in `CLAUDE.md`, der Design-Ch
 | Status | `--pos-bg/-text`, `--neg-bg`, `--win-bg`, `--loss-bg`, `--draw-bg`, `--warn-bg/-text`, `--info-bg/-text` |
 | Sonstige Töne | `--gold`, `--gold-2`, `--tan-*`, `--lav-*` |
 | Kopfzeile | `--header-grad` (Trainer), `--header-grad-admin` (Admin), Text darauf: `--on-header`, `--on-header-soft` |
-| Schatten | `--sh-1` Karten, `--sh-2` Überlagerungen, `--sh-3` Dialoge; `--sh-glow`, `--sh-glow-sm` roter Schein (nur Wrapped, Play-Knöpfe) |
+| Schatten | `--sh-1` Karten, `--sh-2` Überlagerungen, `--sh-3` Dialoge; `--sh-glow-sm` roter Schein (nur runde Play-Knöpfe) |
 | Radien | 8 (Felder, Chips), 12 (Karten-Inhalte, Knöpfe), 16 (Karten), 999 (Pillen, runde Knöpfe), 50 % (Kreise) |
 | Schrift | Fließtext Inter 13/14, Auszeichnung 12, Überschriften Space Grotesk 16/20. Mindestens 13 px für Fließtext. |
 | Touch | Mindestens 44 × 44 px |
@@ -29,9 +29,9 @@ Neue Stile im `styles`-Objekt (`src/app.jsx`) ergänzen, nicht inline dupliziere
 | Baustein | Zweck | Varianten / Zustände | Hinweise |
 |---|---|---|---|
 | `styles.primaryBtn` | Hauptaktion einer Ansicht (Speichern) | Volle Breite, 44 px hoch | Pro Ansicht höchstens eine |
-| `styles.secondaryBtn` | Weitere Aktion in Zeilen (Hinzufügen) | Höhe 44, Breite nach Inhalt | **Sieht heute wie primaryBtn aus** (Akzentfläche). Name und Optik passen nicht zusammen, siehe offene Punkte |
+| `styles.rowBtn` | Weitere Aktion in Zeilen (Hinzufügen) | Höhe 44, Breite nach Inhalt | Zeilenknopf, bewusst mit Akzentfläche (früher `secondaryBtn`, umbenannt, weil der Name eine zurückgenommene Optik versprach) |
 | `styles.linkBtn` | Textaktion, z. B. "Alle anzeigen" | Transparent, 44 px Tippfläche | |
-| `styles.dangerBtn` | Löschen, Zurücksetzen | **Teilstil**, immer mit Grundknopf kombinieren: `{ ...styles.secondaryBtn, ...styles.dangerBtn }` | Löschen über `confirmAnd` bestätigen |
+| `styles.dangerBtn` | Löschen, Zurücksetzen | **Teilstil**, immer mit Grundknopf kombinieren: `{ ...styles.rowBtn, ...styles.dangerBtn }` | Löschen über `confirmAnd` bestätigen |
 | `styles.iconBtn` (+ `iconBtnLavender`, `iconBtnDanger`) | Runde Icon-Aktion in Karten | 44 px, Kreis, braucht `aria-label` | |
 | `styles.chip` / `chipActive` | Filter, Mehrfachauswahl | Umschalter mit `aria-pressed` | |
 | `styles.segNav` / `segBtn` | Umschalten zwischen Ansichten | Ein aktives Segment | |
@@ -56,6 +56,4 @@ Neue Stile im `styles`-Objekt (`src/app.jsx`) ergänzen, nicht inline dupliziere
 
 ## 4. Offene Punkte
 
-- `secondaryBtn` hat dieselbe Optik wie `primaryBtn`. Entweder umbenennen (z. B. `rowBtn`) oder optisch zurücknehmen (Rahmen statt Fläche). Optikänderung nur mit Mockup und Freigabe.
-- Roter Schein (`--sh-glow`) steht noch an der Wrapped-Kachel. Entscheidung offen.
 - Kartenfarben (`KARTEN_FARBE`) und Avatar-Palette haben keine Dunkelmodus-Prüfung.

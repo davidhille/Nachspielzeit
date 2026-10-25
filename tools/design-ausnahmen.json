@@ -1,6 +1,6 @@
 [
   "outline-none|src/app.jsx|style={{ ...styles.textarea, marginTop: 6, minHeight: rows * 20 + 16, overflowY: \"auto\", resize: \"vertical\", outline: \"none\", lineHeight: \"20px\", wordBreak: \"break-word\" }}",
-  "radius|src/app.jsx|<div style={titleAbove ? { padding: 3, borderRadius: 21, background: \"linear-gradient(135deg, var(--gold), var(--gold-2))\", boxShadow: \"var(--sh-glow)\" } : undefined}>",
+  "radius|src/app.jsx|<div style={titleAbove ? { padding: 3, borderRadius: 21, background: \"linear-gradient(135deg, var(--gold), var(--gold-2))\" } : undefined}>",
   "radius|src/app.jsx|<div style={{ aspectRatio: \"750 / 1130\", borderRadius: 24, background: url ? \"transparent\" : \"var(--surface-2)\" }}>",
   "radius|src/app.jsx|<div style={{ position: \"relative\", width: breit ? 230 : 104, flex: \"none\", aspectRatio: \"1 / 1\", borderRadius: breit ? 18 : 14, overflow: \"hidden\", background: cover ? \"#222\" : \"linear-gradient(135deg,#C4271F,#8E1416)\" }}>",
   "radius|src/app.jsx|<span key={i} className=\"eq-balken\" style={{ width: 3, height: \"100%\", background: farbe, borderRadius: 2, transformOrigin: \"bottom\", animation: aktiv ? `eqTanz ${0.7 + i * 0.13}s ease-in-out ${i * 0.1}s infinite alternate` : \"none\", transform: aktiv ? undefined : \"scaleY(0.25)\" }} />",
@@ -11,7 +11,6 @@
   "schatten|index.html|.nav-bottom { display: grid; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--surface); border-top: 1px solid var(--divider); box-shadow: 0 -2px 10px rgba(28,20,20,0.06); padding-bottom: env(safe-area-inset-bottom); }",
   "schatten|src/app.jsx|<button onClick={umschalten} aria-label={laeuft ? \"Pause\" : \"Abspielen\"} style={{ width: 64, height: 64, borderRadius: 999, border: \"none\", background: ROT, color: \"#fff\", cursor: \"pointer\", boxShadow: \"var(--sh-glow-sm)\", display: \"flex\", alignItems: \"center\", justifyContent: \"center\", padding: 0 }}>",
   "schatten|src/app.jsx|<div id=\"nsz-wechsler\" style={{ position: \"fixed\", right: pos.right, top: pos.top, zIndex: 40, minWidth: 210, background: \"var(--surface)\", color: \"var(--text)\", border: \"1px solid var(--border)\", borderRadius: 12, boxShadow: \"var(--sh-3)\", padding: 6 }}>",
-  "schatten|src/app.jsx|<div style={titleAbove ? { padding: 3, borderRadius: 21, background: \"linear-gradient(135deg, var(--gold), var(--gold-2))\", boxShadow: \"var(--sh-glow)\" } : undefined}>",
   "schatten|src/app.jsx|boxShadow: \"0 4px 10px -6px rgba(196,39,31,0.5)\",",
   "schatten|src/app.jsx|{url && <img src={url} alt={spieltagLabel(tag, tag.nummer)} style={{ width: \"100%\", height: \"100%\", display: \"block\", borderRadius: 16, boxShadow: \"0 6px 16px rgba(0,0,0,0.12)\" }} />}"
 ]
