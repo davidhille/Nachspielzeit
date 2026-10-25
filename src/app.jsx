@@ -6138,11 +6138,13 @@ function SongPlayer({ songs, cover, team, token, textStart = false }) {
 /* Bilanz pro Gegner auf der Elternseite: Saison (Standard) oder Gesamt über alle Saisons */
 function GegnerBilanzSeite({ saison, gesamt, saisonLabel }) {
   const [umfang, setUmfang] = useState("saison");
-  const liste = umfang === "gesamt" && gesamt ? gesamt : saison;
+  // „Gesamt“ nur anbieten, wenn es sich von der Saison unterscheidet (also mehr als eine Saison vorliegt)
+  const mehrere = !!gesamt && JSON.stringify(gesamt) !== JSON.stringify(saison);
+  const liste = umfang === "gesamt" && mehrere ? gesamt : saison;
   return (
     <div style={{ marginTop: 18 }}>
       <div style={styles.subheading}>Bilanz pro Gegner</div>
-      {gesamt && (
+      {mehrere && (
         <div role="group" aria-label="Zeitraum" style={{ ...styles.segNav, marginTop: 6, marginBottom: 8 }}>
           {[["saison", saisonLabel ? `Saison ${saisonLabel}` : "Saison"], ["gesamt", "Gesamt"]].map(([k, t]) => (
             <button key={k} aria-pressed={umfang === k} onClick={() => setUmfang(k)} style={{ ...styles.segBtn, ...(umfang === k ? styles.segBtnActive : {}) }}>{t}</button>
@@ -8911,8 +8913,11 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
 function GegnerBilanzTabelle({ spieltage, gegner, month }) {
   const [umfang, setUmfang] = useState("saison"); // "saison" (Standard) oder "gesamt"
   const saison = seasonKeyOf(month);
+  // „Gesamt“ nur anbieten, wenn Spieltage aus mehr als einer Saison vorliegen
+  const mehrereSaisons = useMemo(() => new Set(spieltage.map((s) => seasonKeyOf(s.date.slice(0, 7)))).size > 1, [spieltage]);
+  const umfangWirksam = mehrereSaisons ? umfang : "saison";
   const bilanzen = useMemo(() => {
-    const alleSpiele = (umfang === "saison" ? spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison) : spieltage).flatMap((s) => s.spiele);
+    const alleSpiele = (umfangWirksam === "saison" ? spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison) : spieltage).flatMap((s) => s.spiele);
     const map = {};
     alleSpiele.forEach((sp) => {
       if (!sp.opponentId) return;
@@ -8931,18 +8936,20 @@ function GegnerBilanzTabelle({ spieltage, gegner, month }) {
       .filter((g) => map[g.id])
       .map((g) => ({ id: g.id, name: g.name, ...map[g.id] }))
       .sort((a, b) => b.spiele - a.spiele);
-  }, [spieltage, gegner, umfang, saison]);
+  }, [spieltage, gegner, umfangWirksam, saison]);
 
   return (
     <div style={{ marginTop: 8 }}>
       <KartenTitel block>Bilanz pro Gegner</KartenTitel>
-      <div role="group" aria-label="Zeitraum" style={{ ...styles.segNav, marginBottom: 8 }}>
-        {[["saison", `Saison ${saison.replace("-", "/")}`], ["gesamt", "Gesamt"]].map(([k, t]) => (
-          <button key={k} aria-pressed={umfang === k} onClick={() => setUmfang(k)} style={{ ...styles.segBtn, ...(umfang === k ? styles.segBtnActive : {}) }}>{t}</button>
-        ))}
-      </div>
+      {mehrereSaisons && (
+        <div role="group" aria-label="Zeitraum" style={{ ...styles.segNav, marginBottom: 8 }}>
+          {[["saison", `Saison ${saison.replace("-", "/")}`], ["gesamt", "Gesamt"]].map(([k, t]) => (
+            <button key={k} aria-pressed={umfang === k} onClick={() => setUmfang(k)} style={{ ...styles.segBtn, ...(umfang === k ? styles.segBtnActive : {}) }}>{t}</button>
+          ))}
+        </div>
+      )}
       {bilanzen.length === 0 ? (
-        <EmptyState text={umfang === "saison" ? "Noch keine Spiele gegen hinterlegte Gegner in dieser Saison." : "Noch keine Spiele gegen hinterlegte Gegner erfasst."} />
+        <EmptyState text={umfangWirksam === "saison" ? "Noch keine Spiele gegen hinterlegte Gegner in dieser Saison." : "Noch keine Spiele gegen hinterlegte Gegner erfasst."} />
       ) : (
         <div className="nz-tabelle" style={styles.tableWrap}>
           <table style={styles.table}>
