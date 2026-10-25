@@ -4886,7 +4886,7 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
   const liste = boards.slice().sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
   return (
     <div style={styles.card}>
-      <KartenTitel aktion={<TkBtn icon="plus" label="Neues Board" size={38} onClick={neu} />}>Taktik-Boards</KartenTitel>
+      <KartenTitel aktion={<TkBtn icon="plus" label="Neues Board" size={44} onClick={neu} />}>Taktik-Boards</KartenTitel>
       {liste.length === 0 && <EmptyState text="Noch kein Board angelegt. Mit „Neues Board“ geht es los." />}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
         {liste.map((b) => {
@@ -4901,14 +4901,14 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
                 </div>
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                <button onClick={() => setOffenId(b.id)} style={{ flex: 1, minWidth: 0, border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "inherit" }}>
+                <button onClick={() => setOffenId(b.id)} style={{ flex: 1, minWidth: 0, minHeight: 44, border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "inherit" }}>
                   <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</div>
                   <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
                     {(TK_FELDER[d.feld] || TK_FELDER.f5).label} · {d.ausr === "hoch" ? "hoch" : "quer"} · {d.schritte.length} {d.schritte.length === 1 ? "Schritt" : "Schritte"}
                   </div>
                 </button>
-                <TkBtn icon="kopieren" titel="Duplizieren" size={38} onClick={() => onDuplicate(b)} />
-                <TkBtn icon="loeschen" titel="Löschen" size={38} gefahr onClick={() => confirmAnd(`Board „${b.name}“ löschen?`, () => onDelete(b.id))} />
+                <TkBtn icon="kopieren" titel="Duplizieren" size={44} onClick={() => onDuplicate(b)} />
+                <TkBtn icon="loeschen" titel="Löschen" size={44} gefahr onClick={() => confirmAnd(`Board „${b.name}“ löschen?`, () => onDelete(b.id))} />
               </div>
             </div>
           );
