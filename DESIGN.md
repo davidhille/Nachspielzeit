@@ -7,9 +7,9 @@ Gilt für Trainer-App und Admin. Die Regeln stehen in `CLAUDE.md`, der Design-Ch
 | Bereich | Wert |
 |---|---|
 | Tokens | Alle in `index.html` (`:root`, dazu Dunkel für `prefers-color-scheme` und `data-theme="dark"`). Neue Tokens immer in **allen drei** Blöcken anlegen. |
-| Flächen | `--bg`, `--surface`, `--surface-2`, `--divider`, `--border`, `--border-strong` |
+| Flächen | `--bg`, `--surface`, `--surface-2`, `--divider`, `--border`, `--border-strong`, `--track` (neutraler Grau-Ton für Umschalter-Track, Tags, Leer-Symbole) |
 | Text | `--text`, `--text-2`, `--muted`, `--muted-2`, `--accent-text`, `--danger-text`, `--success-text`, `--loss-text` |
-| Akzent | `--accent` (Teamfarbe, wird per `wendeTeamfarbeAn` überschrieben), `--accent-soft`, `--focus` |
+| Akzent | `--accent` (Teamfarbe, wird per `wendeTeamfarbeAn` überschrieben), `--focus`. Kein blasses Akzent-Rosa mehr: Auswahl = Vollfläche (`--accent`) oder weißer Reiter, Hintergründe neutral über `--track` |
 | Status | `--pos-bg/-text`, `--neg-bg`, `--win-bg`, `--loss-bg`, `--draw-bg`, `--warn-bg/-text`, `--info-bg/-text` |
 | Sonstige Töne | `--gold`, `--gold-2`, `--tan-*`, `--lav-*` |
 | Kopfzeile | `--header-grad` (Trainer), `--header-grad-admin` (Admin), Text darauf: `--on-header`, `--on-header-soft` |
@@ -34,7 +34,7 @@ Neue Stile im `styles`-Objekt (`src/app.jsx`) ergänzen, nicht inline dupliziere
 | `styles.dangerBtn` | Löschen, Zurücksetzen | **Teilstil**, immer mit Grundknopf kombinieren: `{ ...styles.rowBtn, ...styles.dangerBtn }` | Löschen über `confirmAnd` bestätigen |
 | `styles.iconBtn` (+ `iconBtnLavender`, `iconBtnDanger`) | Runde Icon-Aktion in Karten | 44 px, Kreis, braucht `aria-label` | |
 | `styles.chip` / `chipActive` | Filter, Mehrfachauswahl | Umschalter mit `aria-pressed` | |
-| `styles.segNav` / `segBtn` | Umschalten zwischen Ansichten | Ein aktives Segment | |
+| `styles.segNav` / `segBtn` / `segBtnActive` | Umschalten zwischen Ansichten | Grauer Track (`--track`), aktiver Reiter weiß mit `--sh-1`, fett | `aria-pressed`. Filter-Chips (`chip`) bleiben Vollfläche in `--accent`, so sind Ansicht wählen und Filtern unterscheidbar |
 | `styles.card` | Inhaltsblock | Radius 16, Schatten `--sh-1` | Titel mit `KartenTitel` |
 | `KartenTitel` | Einklappbarer Kartentitel | `block`, `aktion`, `zuStart` | Zustand pro Titel gemerkt (`NZ_ZU`) |
 | `EmptyState` | Leerzustand: Icon, Überschrift, Hinweis, Weiter-Link | Text "Satz. Hinweis." wird geteilt | Nutzt `NavCtx` für den Sprung |
