@@ -11,7 +11,7 @@ Web-App zur Spielerbewertung für Jugendmannschaften (SV Heimstetten). App: Quel
 | Hosting | Cloudflare Workers (`wrangler.toml`), Deployment per `git push origin main` |
 | Backup | täglich per GitHub Actions in ein privates Repo (siehe unten) |
 
-Adressen: Trainer-App `u8.nachspielzeit.app` (Team aus dem Hostnamen oder `?team=`), Administration `admin.nachspielzeit.app`. Nach einem Push einmal hart neu laden.
+Adressen: Trainer-App `u8.nachspielzeit.app` (Team aus dem Hostnamen oder `?team=`), Administration `admin.nachspielzeit.app`. Admin-Codes (ohne Team) sehen in der Trainer-App ein Team-Menü (Wechsel per `?team=`, Administration per `?admin=1`, derselbe Host, damit der Zugangscode erhalten bleibt); die Administration hat „Zur Trainer-App“. Die Administration ist als eigene App erkennbar: `manifest-admin.json`, `icon-admin-*.png`, `apple-touch-icon-admin.png` und dunkle Kopfzeile (`--header-grad-admin`), umgeschaltet im Kopf von `index.html` bei `admin.*` bzw. `?admin=1`. Nach einem Push einmal hart neu laden.
 
 ## Entwickeln
 - Projektregeln (Design, Barrierefreiheit, Vorgehen) stehen in `CLAUDE.md`.
