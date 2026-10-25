@@ -6345,7 +6345,7 @@ function TapSync({ titel, url, text, onFertig, onAbbruch }) {
         {zeile(idx + 1, { fontSize: 14, color: "var(--muted)" })}
         {zeile(idx + 2, { fontSize: 13, color: "var(--muted)", opacity: 0.6 })}
       </div>
-      <button onPointerDown={(e) => { e.preventDefault(); tap(); }} style={{ width: "100%", padding: "22px 0", fontSize: 20, fontWeight: 700, borderRadius: 12, border: "none", background: "var(--accent, #B71C1C)", color: "#fff", cursor: "pointer", touchAction: "manipulation", userSelect: "none" }}>
+      <button onPointerDown={(e) => { e.preventDefault(); tap(); }} style={{ width: "100%", padding: "22px 0", fontSize: 20, fontWeight: 700, borderRadius: 12, border: "none", background: "var(--accent)", color: "#fff", cursor: "pointer", touchAction: "manipulation", userSelect: "none" }}>
         {laeuft ? "TAP – Zeile beginnt jetzt" : idx > 0 ? "Pausiert – unten „Start / Weiter“" : "Erst Song starten ▶ (Button unten)"}
       </button>
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
@@ -7992,7 +7992,7 @@ function TrainerNotizen({ trainings, players, month, onOpenPlayer }) {
                     Spielerprofil öffnen →
                   </button>
                   {g.notizen.map((n) => (
-                    <div key={n.id} style={{ borderTop: "1px solid var(--border, #eadede)", paddingTop: 8 }}>
+                    <div key={n.id} style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
                       <div style={{ ...styles.mutedTag, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
                         {formatTerminLabel(n.date)}
                         {n.karte && n.karte !== "keine" && (
@@ -11429,7 +11429,7 @@ function BildLightbox({ url, alt, onClose }) {
 
 function UebungBild({ url, size = 64, titel = "", zoom = false }) {
   const [offen, setOffen] = useState(false);
-  const box = { width: size, height: size, borderRadius: 12, flexShrink: 0, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center" };
+  const box = { width: size, height: size, borderRadius: 12, flexShrink: 0, overflow: "hidden", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center" };
   if (!url) {
     return (
       <div style={box} aria-hidden="true">
@@ -11510,7 +11510,7 @@ function UebungFilterLeiste({ uebungen, suche, setSuche, filter, setFilter, kart
   );
 }
 
-const tagStyle = { background: "var(--surface-2, #F2EAE9)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600 };
+const tagStyle = { background: "var(--surface-2)", color: "var(--muted)", borderRadius: 999, padding: "3px 9px", fontSize: 13, fontWeight: 600 };
 
 function UebungenBereich({ uebungen, onSave, onRemove }) {
   const [suche, setSuche] = useState("");
@@ -11562,7 +11562,7 @@ function UebungenBereich({ uebungen, onSave, onRemove }) {
                   onClick={() => setEdit(u)}
                   style={{ ...styles.card, padding: 0, overflow: "hidden", textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit", display: "flex", flexDirection: "column", justifyContent: "flex-start", alignItems: "stretch" }}
                 >
-                  <div style={{ height: 110, flex: "none", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden" }}>
+                  <div style={{ height: 110, flex: "none", background: "var(--surface-2)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden" }}>
                     {u.bildUrl ? (
                       <img src={u.bildUrl} alt={u.titel} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
                     ) : (
@@ -11661,7 +11661,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
       <div style={styles.card}>
         <div style={{ ...styles.label, marginBottom: 6 }}>Bild</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 120, height: 90, borderRadius: 12, overflow: "hidden", background: "var(--surface-2, #F2EAE9)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div style={{ width: 120, height: 90, borderRadius: 12, overflow: "hidden", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {vorschau ? <FormVorschau url={vorschau} /> : <UebungBild url={null} size={64} />}
           </div>
           <div>
@@ -11796,7 +11796,7 @@ function TerminBoards({ termin }) {
       {!tb.fehlt && (!waehlen ? (
         <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Taktik-Board hinzufügen</button>
       ) : (
-        <div style={{ ...styles.card, background: "var(--bg, #F7F4F3)" }}>
+        <div style={{ ...styles.card, background: "var(--bg)" }}>
           <KartenTitel aktion={<button style={styles.linkBtn} onClick={() => setWaehlen(false)}>Fertig</button>}>Board hinzufügen</KartenTitel>
           {tb.boards.length === 0 ? (
             <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch kein Board angelegt – das geht im Tab „Taktik“.</div>
@@ -11901,7 +11901,7 @@ function TerminUebungen({ termin, uebungen, eintraege, onAdd, onRemove, onMove, 
           {!mitUebungen ? null : !waehlen ? (
             <button style={styles.secondaryBtn} onClick={() => setWaehlen(true)}>+ Übung aus Bibliothek hinzufügen</button>
           ) : (
-            <div style={{ ...styles.card, background: "var(--bg, #F7F4F3)" }}>
+            <div style={{ ...styles.card, background: "var(--bg)" }}>
               <div style={{ ...styles.h3, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <span>Übung hinzufügen</span>
                 <button style={styles.linkBtn} onClick={() => setWaehlen(false)}>Fertig</button>
@@ -12343,7 +12343,7 @@ const styles = {
     width: "100%",
     marginTop: 4,
   },
-  header: { background: "var(--header-grad)", color: "#F8FAF8", padding: "20px 20px 0 20px" },
+  header: { background: "var(--header-grad)", color: "var(--on-header)", padding: "20px 20px 0 20px" },
   headerTop: { display: "flex", alignItems: "center", gap: 12, paddingBottom: 16 },
   logoutBtn: {
     display: "flex",
@@ -12353,7 +12353,7 @@ const styles = {
     background: "rgba(255,255,255,0.14)",
     border: "1px solid rgba(255,255,255,0.22)",
     borderRadius: 999,
-    color: "#F8E9E8",
+    color: "var(--on-header-soft)",
     fontSize: 13,
     fontWeight: 600,
     padding: "6px 14px",
@@ -12362,7 +12362,7 @@ const styles = {
   },
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 8, padding: 3 },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1, letterSpacing: "-0.01em" },
-  subtitle: { fontSize: 13, color: "#F8E9E8", marginTop: 2 },
+  subtitle: { fontSize: 13, color: "var(--on-header-soft)", marginTop: 2 },
   nav: {
     display: "flex",
     gap: 4,
@@ -12372,7 +12372,7 @@ const styles = {
   navBtn: {
     background: "transparent",
     border: "none",
-    color: "#F8E9E8",
+    color: "var(--on-header-soft)",
     padding: "10px 14px",
     fontSize: 14,
     fontWeight: 500,
@@ -12381,7 +12381,7 @@ const styles = {
     whiteSpace: "nowrap",
     minHeight: 44,
   },
-  navBtnActive: { color: "#F8FAF8", borderBottom: "2px solid #FFFFFF" },
+  navBtnActive: { color: "var(--on-header)", borderBottom: "2px solid var(--on-header)" },
   subNav: {
     display: "flex",
     gap: 20,
@@ -12712,7 +12712,7 @@ const styles = {
     left: 0,
     right: 0,
     height: 3,
-    background: "linear-gradient(90deg, transparent, #AE1E1D, transparent)",
+    background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
     backgroundSize: "200% 100%",
     animation: "progressSlide 1.1s linear infinite",
     zIndex: 70,
