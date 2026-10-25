@@ -10085,7 +10085,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
             )}
             <button
               style={{ ...styles.linkBtn, ...styles.dangerBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
-              onClick={onRemoveSpieltag}
+              onClick={() => confirmAnd("Diesen Spieltag in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.", onRemoveSpieltag)}
             >
               <TrashIcon size={14} /> Entfernen
             </button>
@@ -12097,7 +12097,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                       aria-label="Spieltag entfernen"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onRemoveSpieltag(s.id);
+                        confirmAnd(`Spieltag ${formatTerminLabel(s.date)} in den Papierkorb verschieben?`, () => onRemoveSpieltag(s.id));
                       }}
                       style={{ ...styles.linkBtn, ...styles.dangerBtn, padding: 0 }}
                     >
