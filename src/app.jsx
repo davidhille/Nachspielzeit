@@ -7266,7 +7266,7 @@ function KennzahlenKopf({ month, trainings, termine }) {
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
           </div>
           <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginTop: 4, color: "var(--text)" }}>{c.wert}</div>
-          <div style={{ fontSize: 12, color: c.ton || "var(--muted)", fontWeight: c.ton ? 600 : 400 }}>{c.sub}</div>
+          <div style={{ fontSize: 13, color: c.ton || "var(--muted)", fontWeight: c.ton ? 600 : 400 }}>{c.sub}</div>
         </div>
       ))}
     </div>
@@ -7455,12 +7455,12 @@ function TermineLeiste({ termine, spieltage, onOpen }) {
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{info.label}</div>
                 {eintrag.startZeit && eintrag.endZeit && (
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                  <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
                     {eintrag.startZeit}–{eintrag.endZeit}
                   </div>
                 )}
                 {eintrag.zeit && (
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{eintrag.zeit} Uhr</div>
+                  <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{eintrag.zeit} Uhr</div>
                 )}
               </div>
             );
@@ -10105,7 +10105,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                         {sp.ourGoals}:{sp.theirGoals}
                       </div>
                       {sp.scorers.length > 0 && (
-                        <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.4 }}>
+                        <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.4 }}>
                           ⚽{" "}
                           {sp.scorers.map((sc, i) => (
                             <React.Fragment key={sc.id}>
