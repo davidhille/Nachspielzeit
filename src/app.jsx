@@ -12821,10 +12821,10 @@ const styles = {
     borderBottom: "2px solid transparent",
     marginBottom: -1,
   },
-  // Umschalter: grauer Track, der aktive Reiter liegt weiß mit feinem Schatten darauf (Bedienelement-Rahmen für Kontrast)
-  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--track) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--track) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--track)", border: "1px solid var(--border)", borderRadius: 12, overflowX: "auto" },
+  // Umschalter: weißer Rahmen, der aktive Reiter ist Vollfläche in --accent (wie die Filter-Chips)
+  segNav: { display: "flex", gap: 4, padding: 4, marginBottom: 16, background: "linear-gradient(90deg, var(--surface) 30%, transparent) 0 0 / 36px 100% no-repeat local, linear-gradient(270deg, var(--surface) 30%, transparent) 100% 0 / 36px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.22), transparent) 0 0 / 12px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.22), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--surface)", border: "1px solid var(--divider)", borderRadius: 12, overflowX: "auto" },
   segBtn: { flex: "1 1 auto", border: "none", background: "transparent", color: "var(--muted)", minHeight: 44, padding: "8px 14px", borderRadius: 8, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" },
-  segBtnActive: { background: "var(--surface)", color: "var(--text)", fontWeight: 700, boxShadow: "var(--sh-1)" },
+  segBtnActive: { background: "var(--accent)", color: "#fff" },
   subNavBtnActive: { color: "var(--accent)", borderBottom: "2px solid var(--accent)" },
   segmentedControl: {
     display: "flex",
@@ -12846,9 +12846,9 @@ const styles = {
     cursor: "pointer",
   },
   segmentedBtnActive: {
-    background: "var(--surface)",
+    background: "var(--accent)",
     boxShadow: "var(--sh-1)",
-    color: "var(--text)",
+    color: "#fff",
     fontWeight: 700,
   },
   main: { padding: "20px", maxWidth: 760, margin: "0 auto" },
