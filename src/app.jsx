@@ -1808,6 +1808,42 @@ function FehlerAnsicht() {
   );
 }
 
+const SQL_TORFOLGE = `-- Nachspielzeit: Torprotokoll pro Spiel (wiederholbar)
+alter table public.spiele add column if not exists torfolge jsonb;
+notify pgrst, 'reload schema';`;
+
+/* Spiel schreiben; das Torprotokoll (Spalte spiele.torfolge) ist optional. Fehlt die Spalte noch, wird das Spiel ohne Protokoll
+   gespeichert und gemeldet, statt das Speichern scheitern zu lassen. */
+async function schreibeSpiel(schreibe, zeile, torfolge, loeschen = false) {
+  if (!torfolge && !loeschen) return schreibe(zeile);
+  try {
+    return await schreibe({ ...zeile, torfolge: torfolge || null });
+  } catch (e) {
+    if (!/torfolge/i.test(String((e && e.message) || e))) throw e;
+    // verzögert, damit die Meldung nicht von "Spiel gespeichert" überschrieben wird
+    setTimeout(() => meldung("Das Torprotokoll wurde nicht gespeichert: Es fehlt ein Datenbank-Update (Administration → Hinweis).", "error"), 2500);
+    return schreibe(zeile);
+  }
+}
+
+/* Hinweis nur für Admin: erscheint, solange die Spalte spiele.torfolge fehlt */
+function TorfolgeHinweis() {
+  const [fehlt, setFehlt] = useState(false);
+  useEffect(() => {
+    nszFetch(REST + "spiele?select=torfolge&limit=1", { headers: dbHeaders() })
+      .then((r) => setFehlt(!r.ok))
+      .catch(() => {});
+  }, []);
+  if (!fehlt) return null;
+  return (
+    <div style={{ ...styles.editBanner, marginBottom: 12, flexDirection: "column", alignItems: "stretch" }}>
+      <div style={{ fontWeight: 700 }}>Datenbank-Update: Torprotokoll</div>
+      <div style={{ fontSize: 13 }}>Für das Torprotokoll (Reihenfolge der Tore) fehlt noch eine Spalte. Einmal in Supabase (SQL Editor) ausführen, danach die Seiten neu laden:</div>
+      <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TORFOLGE}</pre>
+    </div>
+  );
+}
+
 function AdminApp() {
   const [tabWahl, setTabState] = useState(() => {
     const h = window.location.hash.replace("#", "");
@@ -2036,6 +2072,7 @@ notify pgrst, 'reload schema';`;
           </section>
         )}
 
+        <TorfolgeHinweis />
         {tab === "import" && <SpielerImport key={team} />}
         {tab === "einstellungen" && <TeamEinstellungen key={team} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
         {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
@@ -2421,6 +2458,7 @@ function App() {
             opponentId: sp.opponent_id,
             ourGoals: sp.our_goals,
             theirGoals: sp.their_goals,
+            torfolge: Array.isArray(sp.torfolge) ? sp.torfolge : null,
             scorers: torRaw
               .filter((t) => t.spiel_id === sp.id)
               .map((t) => ({ id: t.id, playerId: t.player_id, tore: t.tore })),
@@ -2847,13 +2885,13 @@ function App() {
             onRemoveSpieltag={removeSpieltag}
             onAddSpiel={(spieltagId, spiel) =>
               wrapAction(async () => {
-                await dbInsert("spiele", {
+                await schreibeSpiel((z) => dbInsert("spiele", z), {
                   id: spiel.id,
                   spieltag_id: spieltagId,
                   opponent_id: spiel.opponentId,
                   our_goals: spiel.ourGoals,
                   their_goals: spiel.theirGoals,
-                });
+                }, spiel.torfolge);
                 if (spiel.scorers.length > 0) {
                   await dbInsert(
                     "torschuetzen",
@@ -2864,11 +2902,11 @@ function App() {
             }
             onUpdateSpiel={(spieltagId, spiel) =>
               wrapAction(async () => {
-                await dbUpdate("spiele", spiel.id, {
+                await schreibeSpiel((z) => dbUpdate("spiele", spiel.id, z), {
                   opponent_id: spiel.opponentId,
                   our_goals: spiel.ourGoals,
                   their_goals: spiel.theirGoals,
-                });
+                }, spiel.torfolge, spiel.hatteFolge);
                 await dbDeleteWhere("torschuetzen", `spiel_id=eq.${spiel.id}`);
                 if (spiel.scorers.length > 0) {
                   await dbInsert(
@@ -10009,6 +10047,7 @@ function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck }) {
           </li>
         ))}
       </ol>
+      {!mitStand && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Das Protokoll passt nicht zum Ergebnis und wird nicht gespeichert.</div>}
       <button style={{ ...styles.linkBtn, marginTop: 4, paddingLeft: 0 }} onClick={onZurueck}>↶ Letztes Tor zurücknehmen</button>
     </div>
   );
@@ -10072,6 +10111,14 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setOurGoals((g) => Number(g) + 1);
     setFolge((f) => [...f, { typ: "eigen" }]);
   };
+  const gegnerPlus = () => {
+    setTheirGoals((g) => Number(g) + 1);
+    setFolge((f) => [...f, { typ: "gegner" }]);
+  };
+  const gegnerMinus = () => {
+    setTheirGoals((g) => Math.max(0, Number(g) - 1));
+    entferneLetzten((e) => e.typ === "gegner");
+  };
   const eigenMinus = () => {
     setEigen((e) => Math.max(0, e - 1));
     setOurGoals((g) => Math.max(0, Number(g) - 1));
@@ -10082,6 +10129,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     if (!l) return;
     if (l.typ === "wir") dec(l.playerId);
     else if (l.typ === "eigen") eigenMinus();
+    else if (l.typ === "gegner") gegnerMinus();
   };
   const inc = (playerId) => {
     setTally((t) => ({ ...t, [playerId]: (t[playerId] || 0) + 1 }));
@@ -10124,7 +10172,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     sp.scorers.forEach((sc) => (t[sc.playerId] = sc.tore));
     setTally(t);
     setEigen(Math.max(0, (Number(sp.ourGoals) || 0) - sp.scorers.reduce((a, sc) => a + (Number(sc.tore) || 0), 0)));
-    setFolge([]);
+    setFolge(Array.isArray(sp.torfolge) ? sp.torfolge : []);
   };
 
   const startNewForOpponent = (gegnerId) => {
@@ -10171,6 +10219,9 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
       ourGoals: Number(ourGoals) || 0,
       theirGoals: Number(theirGoals) || 0,
       scorers: Object.entries(tally).map(([playerId, tore]) => ({ id: uid(), playerId, tore })),
+      // Protokoll nur speichern, wenn es zum Ergebnis passt; ein altes, nun unstimmiges Protokoll wird entfernt
+      torfolge: stimmig ? folge : null,
+      hatteFolge: !!(editingId && spieltag.spiele.find((x) => x.id === editingId)?.torfolge),
     };
     if (editingId) onUpdateSpiel(spiel);
     else onAddSpiel(spiel);
@@ -10364,6 +10415,16 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           ))}
                         </div>
                       )}
+                      {torfolgePasst(sp.torfolge, sp.ourGoals, sp.theirGoals) && (
+                        <ol aria-label="Torfolge" style={{ listStyle: "none", margin: "6px 0 0", padding: 0, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+                          {torfolgeStand(sp.torfolge).map((e, i) => (
+                            <li key={i}>
+                              <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{e.wir}:{e.gegner}</span>{" "}
+                              {e.typ === "wir" ? spielerName(e.playerId) : e.typ === "eigen" ? "Eigentor Gegner" : "Gegner"}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
                     </div>
                   );
                 })}
@@ -10504,6 +10565,18 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           <button style={styles.stepBtn} onClick={eigenMinus} disabled={eigen === 0} aria-label="Eigentor des Gegners abziehen">−</button>
                           <span style={styles.stepCount} aria-live="polite">{eigen}</span>
                           <button style={styles.stepBtn} onClick={eigenPlus} aria-label="Eigentor des Gegners hinzufügen">+</button>
+                        </div>
+                      </div>
+                      <div style={{ ...styles.scorerTile, ...(Number(theirGoals) > 0 ? { borderColor: "var(--border-strong)" } : {}) }}>
+                        <button style={styles.scorerName} onClick={gegnerPlus}>
+                          Tor Gegner
+                        </button>
+                        <div style={styles.scorerStepper}>
+                          <button style={styles.stepBtn} onClick={gegnerMinus} disabled={Number(theirGoals) === 0} aria-label="Tor des Gegners abziehen">
+                            −
+                          </button>
+                          <span style={styles.stepCount} aria-live="polite">{Number(theirGoals) || 0}</span>
+                          <button style={styles.stepBtn} onClick={gegnerPlus} aria-label="Tor des Gegners hinzufügen">+</button>
                         </div>
                       </div>
                       {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}

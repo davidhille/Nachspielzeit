@@ -207,7 +207,8 @@ CREATE TABLE public.spiele (
     opponent_id text,
     our_goals integer DEFAULT 0 NOT NULL,
     their_goals integer DEFAULT 0 NOT NULL,
-    team_id text DEFAULT 'u8'::text NOT NULL
+    team_id text DEFAULT 'u8'::text NOT NULL,
+    torfolge jsonb
 );
 
 
