@@ -5760,7 +5760,7 @@ function SongPlayer({ songs, cover, team }) {
         onEnded={ende}
       />
       <div style={{ display: "flex", gap: breit ? 24 : 14, alignItems: "center" }}>
-      <div style={{ position: "relative", width: breit ? 230 : 104, flex: "none", aspectRatio: "1 / 1", borderRadius: breit ? 18 : 14, overflow: "hidden", boxShadow: "0 10px 24px rgba(142,20,22,0.25)", background: cover ? "#222" : "linear-gradient(135deg,#C4271F,#8E1416)" }}>
+      <div style={{ position: "relative", width: breit ? 230 : 104, flex: "none", aspectRatio: "1 / 1", borderRadius: breit ? 18 : 14, overflow: "hidden", boxShadow: "var(--sh-glow)", background: cover ? "#222" : "linear-gradient(135deg,#C4271F,#8E1416)" }}>
         {cover ? (
           <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : (
@@ -5799,7 +5799,7 @@ function SongPlayer({ songs, cover, team }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: breit ? "flex-start" : "center", gap: 6, marginTop: 4 }}>
         <button style={toggleFarbe(shuffle)} onClick={() => setShuffle((v) => !v)} aria-pressed={shuffle} title="Zufall" disabled={songs.length < 2}><PIcon name="shuffle" size={20} /></button>
         <button style={iconBtn} onClick={zurueck} aria-label="Zurück" title="Zurück"><PIcon name="prev" size={24} /></button>
-        <button onClick={umschalten} aria-label={laeuft ? "Pause" : "Abspielen"} style={{ width: 64, height: 64, borderRadius: 999, border: "none", background: ROT, color: "#fff", cursor: "pointer", boxShadow: "0 6px 14px rgba(196,39,31,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+        <button onClick={umschalten} aria-label={laeuft ? "Pause" : "Abspielen"} style={{ width: 64, height: 64, borderRadius: 999, border: "none", background: ROT, color: "#fff", cursor: "pointer", boxShadow: "var(--sh-glow-sm)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
           <PIcon name={laeuft ? "pause" : "play"} size={30} />
         </button>
         <button style={iconBtn} onClick={() => weiter(1)} aria-label="Weiter" title="Weiter" disabled={songs.length < 2}><PIcon name="next" size={24} /></button>
@@ -5841,7 +5841,7 @@ function SongPlayer({ songs, cover, team }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: breit ? "flex-start" : "center", gap: 6, marginTop: 4 }}>
         <button style={toggleFarbe(shuffle)} onClick={() => setShuffle((v) => !v)} aria-pressed={shuffle} title="Zufall" disabled={songs.length < 2}><PIcon name="shuffle" size={20} /></button>
         <button style={iconBtn} onClick={zurueck} aria-label="Zurück" title="Zurück"><PIcon name="prev" size={24} /></button>
-        <button onClick={umschalten} aria-label={laeuft ? "Pause" : "Abspielen"} style={{ width: 64, height: 64, borderRadius: 999, border: "none", background: ROT, color: "#fff", cursor: "pointer", boxShadow: "0 6px 14px rgba(196,39,31,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+        <button onClick={umschalten} aria-label={laeuft ? "Pause" : "Abspielen"} style={{ width: 64, height: 64, borderRadius: 999, border: "none", background: ROT, color: "#fff", cursor: "pointer", boxShadow: "var(--sh-glow-sm)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
           <PIcon name={laeuft ? "pause" : "play"} size={30} />
         </button>
         <button style={iconBtn} onClick={() => weiter(1)} aria-label="Weiter" title="Weiter" disabled={songs.length < 2}><PIcon name="next" size={24} /></button>
@@ -7171,7 +7171,7 @@ function TeamHero({ photoUrl, teamName, seasonLabel, subtitle, onUploadFoto, hei
         Mannschaft
       </div>
     )}
-    <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))", boxShadow: "0 12px 26px rgba(142,20,22,0.35)" } : undefined}>
+    <div style={titleAbove ? { padding: 3, borderRadius: 21, background: "linear-gradient(135deg, var(--gold), var(--gold-2))", boxShadow: "var(--sh-glow)" } : undefined}>
     <div
       className={titleAbove ? undefined : "team-hero"}
       onClick={() => photoUrl && setLightboxOpen(true)}
@@ -8125,7 +8125,7 @@ function PlayerCard({ player, stats, teamName = TEAM_NAME }) {
         borderRadius: 24,
         padding: 3,
         background: `linear-gradient(135deg, var(--gold), var(--gold-2))`,
-        boxShadow: "0 12px 26px rgba(142,20,22,0.35)",
+        boxShadow: "var(--sh-glow)",
       }}
     >
       <div
