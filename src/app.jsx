@@ -1977,6 +1977,10 @@ notify pgrst, 'reload schema';`;
               </select>
             </div>
           </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          <a href={trainerUrl(imAdminBereich ? (teams.find((t) => !t.archived) || teams[0] || { id: "u8" }).id : team)} style={{ ...styles.logoutBtn, textDecoration: "none" }}>
+            Zur Trainer-App
+          </a>
           <button
             style={styles.logoutBtn}
             onClick={() => {
@@ -1987,6 +1991,7 @@ notify pgrst, 'reload schema';`;
             <LogoutIcon size={13} />
             Abmelden
           </button>
+          </div>
         </div>
         <nav style={styles.nav}>
           {tabListe.map(([key, label]) => (
@@ -4919,6 +4924,81 @@ function TaktikTab({ boards, fehlt, players, onSave, onDelete, onDuplicate }) {
 }
 
 
+/* ---------- Wechsel zwischen Teams, Administration und Trainer-App (nur Admin-Codes) ---------- */
+
+/* Links bleiben auf demselben Host, weil der Zugangscode im localStorage pro Host liegt (kein erneutes Anmelden).
+   Nur von admin.nachspielzeit.app geht es auf den Trainer-Host (u8.…), dort ist eine neue Anmeldung nötig. */
+const trainerUrl = (teamId) => {
+  const q = "?team=" + encodeURIComponent(teamId);
+  return /^admin\./i.test(window.location.hostname) ? "https://" + window.location.hostname.replace(/^admin\./i, "u8.") + "/" + q : "/" + q;
+};
+
+function TeamWechsler() {
+  const istAdmin = !!Sitzung.info && !Sitzung.info.team_id;
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null); // Menü liegt fest im Fenster, weil die Kopfzeile abschneidet (overflow: hidden)
+  const [teams, setTeams] = useState(null);
+  const knopfRef = useRef(null);
+  const boxRef = useRef(null);
+  useEffect(() => {
+    if (!istAdmin) return;
+    let weg = false;
+    dbSelect("teams")
+      .then((rows) => !weg && setTeams(rows.filter((t) => !t.archived || t.id === Sitzung.team).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))))
+      .catch(() => !weg && setTeams([]));
+    return () => { weg = true; };
+  }, [istAdmin]);
+  useEffect(() => {
+    if (!offen) return;
+    const taste = (e) => { if (e.key === "Escape") { setOffen(false); knopfRef.current && knopfRef.current.focus(); } };
+    const daneben = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOffen(false); };
+    const zu = () => setOffen(false);
+    document.addEventListener("keydown", taste);
+    document.addEventListener("mousedown", daneben);
+    window.addEventListener("scroll", zu, true);
+    window.addEventListener("resize", zu);
+    return () => { document.removeEventListener("keydown", taste); document.removeEventListener("mousedown", daneben); window.removeEventListener("scroll", zu, true); window.removeEventListener("resize", zu); };
+  }, [offen]);
+  const umschalten = () => {
+    if (!offen && knopfRef.current) {
+      const r = knopfRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    }
+    setOffen((o) => !o);
+  };
+  if (!istAdmin) return null;
+  const liste = teams && teams.length > 0 ? teams : [{ id: Sitzung.team, name: Sitzung.team.toUpperCase() }];
+  const aktuell = liste.find((t) => t.id === Sitzung.team) || { name: Sitzung.team.toUpperCase() };
+  const eintrag = { display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "0 12px", borderRadius: 8, color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 500 };
+  return (
+    <div ref={boxRef} style={{ position: "relative", flexShrink: 0 }}>
+      <button ref={knopfRef} type="button" style={styles.logoutBtn} aria-expanded={offen} aria-controls="nsz-wechsler" onClick={umschalten}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 7h13" /><path d="m16 3 4 4-4 4" /><path d="M17 17H4" /><path d="m8 13-4 4 4 4" /></svg>
+        <span className="nz-sr">Team wechseln, aktuell </span>{aktuell.name}
+      </button>
+      {offen && pos && (
+        <div id="nsz-wechsler" style={{ position: "fixed", right: pos.right, top: pos.top, zIndex: 40, minWidth: 210, background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--sh-3)", padding: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", padding: "8px 12px 4px" }}>Team wechseln</div>
+          {liste.map((t) => {
+            const istJetzt = t.id === Sitzung.team;
+            return (
+              <a key={t.id} href={"/?team=" + encodeURIComponent(t.id)} aria-current={istJetzt ? "true" : undefined} style={{ ...eintrag, fontWeight: istJetzt ? 700 : 500 }}>
+                <span style={{ width: 16, color: "var(--accent-text)" }} aria-hidden="true">{istJetzt ? "✓" : ""}</span>
+                {t.name}
+              </a>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--border)", margin: "6px 0" }} />
+          <a href="/?admin=1" style={eintrag}>
+            <span style={{ width: 16 }} aria-hidden="true" />
+            Administration
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Header ---------- */
 
 function Header({ tab, setTab }) {
@@ -4980,6 +5060,7 @@ function Header({ tab, setTab }) {
           <div style={styles.title}>Nachspielzeit</div>
           <div style={styles.subtitle}>{CLUB.name} · Saison {aktuelleSaisonLabel()}</div>
         </div>
+        <TeamWechsler />
         <button
           style={styles.logoutBtn}
           onClick={() => {
