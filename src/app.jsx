@@ -5442,18 +5442,23 @@ function berechneKartenPlus(spieltage, gegner, players, teamName, songs, cover, 
   const torschuetzen = Object.entries(tore)
     .map(([id, t]) => ({ name: sName(id), tore: t }))
     .sort((a, b) => b.tore - a.tore);
-  const gmap = {};
-  spieltage.flatMap((s) => s.spiele).forEach((sp) => {
-    if (!sp.opponentId) return;
-    const b = (gmap[sp.opponentId] = gmap[sp.opponentId] || { name: gName(sp.opponentId), spiele: 0, siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0 });
-    b.spiele++;
-    b.toreFuer += sp.ourGoals;
-    b.toreGegen += sp.theirGoals;
-    if (sp.ourGoals > sp.theirGoals) b.siege++;
-    else if (sp.ourGoals < sp.theirGoals) b.niederlagen++;
-    else b.unentschieden++;
-  });
-  const gegnerBilanz = Object.values(gmap).sort((a, b) => b.spiele - a.spiele || a.name.localeCompare(b.name, "de"));
+  // Bilanz je Gegner: gilt für die aktuelle Saison, dazu eine Gesamtbilanz über alle Saisons
+  const bilanzJeGegner = (tage) => {
+    const gmap = {};
+    tage.flatMap((s) => s.spiele).forEach((sp) => {
+      if (!sp.opponentId) return;
+      const b = (gmap[sp.opponentId] = gmap[sp.opponentId] || { name: gName(sp.opponentId), spiele: 0, siege: 0, unentschieden: 0, niederlagen: 0, toreFuer: 0, toreGegen: 0 });
+      b.spiele++;
+      b.toreFuer += sp.ourGoals;
+      b.toreGegen += sp.theirGoals;
+      if (sp.ourGoals > sp.theirGoals) b.siege++;
+      else if (sp.ourGoals < sp.theirGoals) b.niederlagen++;
+      else b.unentschieden++;
+    });
+    return Object.values(gmap).sort((a, b) => b.spiele - a.spiele || a.name.localeCompare(b.name, "de"));
+  };
+  const gegnerBilanz = bilanzJeGegner(spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison));
+  const gegnerBilanzGesamt = bilanzJeGegner(spieltage);
   const mitBilanz = o.bilanz;
   return {
     version: 1,
@@ -5464,6 +5469,7 @@ function berechneKartenPlus(spieltage, gegner, players, teamName, songs, cover, 
     saisonBilanz: mitBilanz && o.saison ? bil : null,
     torschuetzen: mitBilanz && o.torschuetzen ? torschuetzen : [],
     gegnerBilanz: mitBilanz && o.gegner ? gegnerBilanz : [],
+    gegnerBilanzGesamt: mitBilanz && o.gegner ? gegnerBilanzGesamt : [],
     songs: o.songs ? (songs || []).map((x) => ({ titel: x.titel, url: songUrl(x.pfad), text: x.text || "" })) : [],
     cover: cover || null,
   };
@@ -5974,6 +5980,54 @@ function SongPlayer({ songs, cover, team, token, textStart = false }) {
   );
 }
 
+/* Bilanz pro Gegner auf der Elternseite: Saison (Standard) oder Gesamt über alle Saisons */
+function GegnerBilanzSeite({ saison, gesamt, saisonLabel }) {
+  const [umfang, setUmfang] = useState("saison");
+  const liste = umfang === "gesamt" && gesamt ? gesamt : saison;
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={styles.subheading}>Bilanz pro Gegner</div>
+      {gesamt && (
+        <div role="group" aria-label="Zeitraum" style={{ ...styles.segNav, marginTop: 6, marginBottom: 8 }}>
+          {[["saison", saisonLabel ? `Saison ${saisonLabel}` : "Saison"], ["gesamt", "Gesamt"]].map(([k, t]) => (
+            <button key={k} aria-pressed={umfang === k} onClick={() => setUmfang(k)} style={{ ...styles.segBtn, ...(umfang === k ? styles.segBtnActive : {}) }}>{t}</button>
+          ))}
+        </div>
+      )}
+      {liste.length === 0 ? (
+        <div style={styles.hint}>Noch keine Spiele in dieser Saison.</div>
+      ) : (
+        <div className="nz-tabelle" style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Gegner</th>
+                {["Spiele", "S", "U", "N", "Tore", "Diff."].map((h) => <th key={h} style={{ ...styles.th, textAlign: "right" }}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {liste.map((g) => {
+                const d = g.toreFuer - g.toreGegen;
+                return (
+                  <tr key={g.name}>
+                    <td style={styles.tdName}>{g.name}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{g.spiele}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{g.siege}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{g.unentschieden}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{g.niederlagen}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{g.toreFuer}:{g.toreGegen}</td>
+                    <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KartenSeitePlus({ token }) {
   const [karten, setKarten] = useState(undefined);
   const [plus, setPlus] = useState(undefined);
@@ -6036,7 +6090,7 @@ function KartenSeitePlus({ token }) {
       </div>
     );
   }
-  const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
+  const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || ((plus.gegnerBilanz && plus.gegnerBilanz.length > 0) || (plus.gegnerBilanzGesamt && plus.gegnerBilanzGesamt.length > 0)));
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3Plain, marginTop: 28 }}>{t}</h3>;
@@ -6115,36 +6169,8 @@ function KartenSeitePlus({ token }) {
                   </div>
                 </div>
               )}
-              {plus.gegnerBilanz.length > 0 && (
-                <div style={{ marginTop: 18 }}>
-                  <div style={styles.subheading}>Bilanz pro Gegner</div>
-                  <div className="nz-tabelle" style={styles.tableWrap}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Gegner</th>
-                          {["Spiele", "S", "U", "N", "Tore", "Diff."].map((h) => <th key={h} style={{ ...styles.th, textAlign: "right" }}>{h}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {plus.gegnerBilanz.map((g) => {
-                          const d = g.toreFuer - g.toreGegen;
-                          return (
-                            <tr key={g.name}>
-                              <td style={styles.tdName}>{g.name}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.spiele}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.siege}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.unentschieden}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.niederlagen}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.toreFuer}:{g.toreGegen}</td>
-                              <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              {(plus.gegnerBilanz.length > 0 || (plus.gegnerBilanzGesamt || []).length > 0) && (
+                <GegnerBilanzSeite saison={plus.gegnerBilanz} gesamt={plus.gegnerBilanzGesamt} saisonLabel={karten.saison} />
               )}
             </section>
             ))}
@@ -6215,7 +6241,7 @@ function KartenSeiteVorschau({ token }) {
   const stand = karten.stand ? new Date(karten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   const b = plus && plus.saisonBilanz;
   const be = (plus && plus.bereiche) || { bilanz: true, spieltage: true, karten: true, songs: true };
-  const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
+  const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || ((plus.gegnerBilanz && plus.gegnerBilanz.length > 0) || (plus.gegnerBilanzGesamt && plus.gegnerBilanzGesamt.length > 0)));
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
   const kopf = (t) => <h3 style={{ ...styles.h3Plain, marginTop: 28 }}>{t}</h3>;
@@ -6295,36 +6321,8 @@ function KartenSeiteVorschau({ token }) {
                   </div>
                 </div>
               )}
-              {plus.gegnerBilanz.length > 0 && (
-                <div style={{ marginTop: 18 }}>
-                  <div style={styles.subheading}>Bilanz pro Gegner</div>
-                  <div className="nz-tabelle" style={styles.tableWrap}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Gegner</th>
-                          {["Spiele", "S", "U", "N", "Tore", "Diff."].map((h) => <th key={h} style={{ ...styles.th, textAlign: "right" }}>{h}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {plus.gegnerBilanz.map((g) => {
-                          const d = g.toreFuer - g.toreGegen;
-                          return (
-                            <tr key={g.name}>
-                              <td style={styles.tdName}>{g.name}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.spiele}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.siege}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.unentschieden}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.niederlagen}</td>
-                              <td style={{ ...styles.td, textAlign: "right" }}>{g.toreFuer}:{g.toreGegen}</td>
-                              <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              {(plus.gegnerBilanz.length > 0 || (plus.gegnerBilanzGesamt || []).length > 0) && (
+                <GegnerBilanzSeite saison={plus.gegnerBilanz} gesamt={plus.gegnerBilanzGesamt} saisonLabel={karten.saison} />
               )}
             </section>
             ))}
@@ -7936,7 +7934,7 @@ function Dashboard({
       {uebersichtTab === "saison" && (
         <>
           <SaisonBilanz spieltage={spieltage} players={players} month={month} onOpenPlayer={onSelectPlayer} />
-          <GegnerBilanzTabelle spieltage={spieltage} gegner={gegner} />
+          <GegnerBilanzTabelle spieltage={spieltage} gegner={gegner} month={month} />
           <SpieltagAnwesenheit spieltage={spieltage} players={players} month={month} onOpenPlayer={onSelectPlayer} />
           <SpieltagNotizenUebersicht spieltage={spieltage} month={month} />
         </>
@@ -8744,9 +8742,11 @@ function SaisonBilanz({ spieltage, players, month, onOpenPlayer }) {
   );
 }
 
-function GegnerBilanzTabelle({ spieltage, gegner }) {
+function GegnerBilanzTabelle({ spieltage, gegner, month }) {
+  const [umfang, setUmfang] = useState("saison"); // "saison" (Standard) oder "gesamt"
+  const saison = seasonKeyOf(month);
   const bilanzen = useMemo(() => {
-    const alleSpiele = spieltage.flatMap((s) => s.spiele);
+    const alleSpiele = (umfang === "saison" ? spieltage.filter((s) => seasonKeyOf(s.date.slice(0, 7)) === saison) : spieltage).flatMap((s) => s.spiele);
     const map = {};
     alleSpiele.forEach((sp) => {
       if (!sp.opponentId) return;
@@ -8765,13 +8765,18 @@ function GegnerBilanzTabelle({ spieltage, gegner }) {
       .filter((g) => map[g.id])
       .map((g) => ({ id: g.id, name: g.name, ...map[g.id] }))
       .sort((a, b) => b.spiele - a.spiele);
-  }, [spieltage, gegner]);
+  }, [spieltage, gegner, umfang, saison]);
 
   return (
     <div style={{ marginTop: 8 }}>
       <KartenTitel block>Bilanz pro Gegner</KartenTitel>
+      <div role="group" aria-label="Zeitraum" style={{ ...styles.segNav, marginBottom: 8 }}>
+        {[["saison", `Saison ${saison.replace("-", "/")}`], ["gesamt", "Gesamt"]].map(([k, t]) => (
+          <button key={k} aria-pressed={umfang === k} onClick={() => setUmfang(k)} style={{ ...styles.segBtn, ...(umfang === k ? styles.segBtnActive : {}) }}>{t}</button>
+        ))}
+      </div>
       {bilanzen.length === 0 ? (
-        <EmptyState text="Noch keine Spiele gegen hinterlegte Gegner erfasst." />
+        <EmptyState text={umfang === "saison" ? "Noch keine Spiele gegen hinterlegte Gegner in dieser Saison." : "Noch keine Spiele gegen hinterlegte Gegner erfasst."} />
       ) : (
         <div className="nz-tabelle" style={styles.tableWrap}>
           <table style={styles.table}>
