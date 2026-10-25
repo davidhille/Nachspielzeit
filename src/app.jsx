@@ -5250,6 +5250,13 @@ async function loescheSongDatei(pfad) {
 function kartenLinkUrlVorschau(token) {
   return `${window.location.origin}/${token}?seite=vorschau`;
 }
+/* Einzel-Song-Link: stabile ID = Dateiname im Speicher (ohne Endung), bleibt bei Umbenennen/Umsortieren gleich */
+function songId(url) {
+  return String(url || "").split("/").pop().replace(/\.[a-z0-9]{2,4}$/i, "");
+}
+function songLinkUrl(token, song) {
+  return `${window.location.origin}/${token}?song=${encodeURIComponent(songId(song.url))}`;
+}
 function berechneKartenSnapshot(players, trainings, spieltage, teamName, voll = false) {
   const heute = todayISO();
   const saison = seasonKeyOf(heute.slice(0, 7));
@@ -5583,6 +5590,7 @@ const PLAYER_ICON = {
   repeat1: <><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /><path d="M11 10h1v4" /></>,
   list: <><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></>,
   text: <><path d="M4 6h16" /><path d="M4 11h16" /><path d="M4 16h10" /></>,
+  share: <><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="m8.3 10.8 7.4-4.4" /><path d="m8.3 13.2 7.4 4.4" /></>,
   download: <><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></>,
 };
 function PIcon({ name, size = 22 }) {
@@ -5602,7 +5610,7 @@ function parseLrc(text) {
   });
   return zeilen.length >= 2 ? zeilen.sort((a, b) => a.t - b.t) : null;
 }
-function SongPlayer({ songs, cover, team }) {
+function SongPlayer({ songs, cover, team, token, textStart = false }) {
   const ROT = CLUB.farbe;
   const [aktiv, setAktiv] = useState(0);
   const [laeuft, setLaeuft] = useState(false);
@@ -5611,7 +5619,8 @@ function SongPlayer({ songs, cover, team }) {
   const [shuffle, setShuffle] = useState(false);
   const [wiederholen, setWiederholen] = useState("aus"); // aus | alle | eins
   const [offen, setOffen] = useState(false);
-  const [textOffen, setTextOffen] = useState(false);
+  const [textOffen, setTextOffen] = useState(!!textStart);
+  const [kopiert, setKopiert] = useState(false);
   const [dauern, setDauern] = useState({});
   const [breit, setBreit] = useState(() => typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(min-width: 900px)").matches : false);
   useEffect(() => {
@@ -5623,6 +5632,7 @@ function SongPlayer({ songs, cover, team }) {
   }, []);
   const ref = useRef(null);
   const start = useRef(false);
+  const ersterLauf = useRef(true);
   const song = songs[aktiv] || songs[0];
   const lrc = useMemo(() => parseLrc(song.text), [song.text]);
   const lrcBox = useRef(null);
@@ -5633,7 +5643,8 @@ function SongPlayer({ songs, cover, team }) {
     if (start.current && ref.current) ref.current.play().catch(() => setLaeuft(false));
     setZeit(0);
     setDauer(0);
-    setTextOffen(false);
+    if (!ersterLauf.current) setTextOffen(false); // beim ersten Aufbau bleibt der Text offen, falls textStart gesetzt ist
+    ersterLauf.current = false;
   }, [aktiv]);
   useEffect(() => {
     if (lrc && (breit || !offen)) setTextOffen(true);
@@ -5725,6 +5736,27 @@ function SongPlayer({ songs, cover, team }) {
     } catch (e) {}
   }); // eslint-disable-line
 
+  // Teilen: auf dem Handy das Teilen-Menü (WhatsApp), sonst Link in die Zwischenablage
+  const teilen = async (x) => {
+    if (!token) return;
+    const url = songLinkUrl(token, x);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: x.titel, text: `${x.titel} – Mannschaftssong`, url });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setKopiert("ok");
+      setTimeout(() => setKopiert(false), 2500);
+    } catch (e) {
+      setKopiert(url); // Kopieren nicht erlaubt: Link sichtbar anzeigen, damit man ihn markieren kann
+    }
+  };
+
   const speichern = async (x) => {
     try {
       const res = await fetch(x.url);
@@ -5743,7 +5775,7 @@ function SongPlayer({ songs, cover, team }) {
   };
 
   const iconBtn = { background: "none", border: "none", cursor: "pointer", padding: 10, fontFamily: "inherit", lineHeight: 0, color: "inherit", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" };
-  const pille = (an) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${an ? ROT : "var(--border)"}`, background: an ? "rgba(196,39,31,0.10)" : "transparent", color: an ? ROT : "inherit" });
+  const pille = (an) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", minHeight: 44, borderRadius: 999, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${an ? ROT : "var(--border)"}`, background: an ? "rgba(196,39,31,0.10)" : "transparent", color: an ? ROT : "inherit" });
   const toggleFarbe = (an) => ({ ...iconBtn, color: an ? ROT : "var(--muted)" });
 
   return (
@@ -5814,6 +5846,8 @@ function SongPlayer({ songs, cover, team }) {
         )}
         {song.text ? <button onClick={() => { if (!textOffen && !breit) setOffen(false); setTextOffen((o) => !o); }} aria-expanded={textOffen} style={pille(textOffen)}><PIcon name="text" size={16} /> Text</button> : null}
         <button onClick={() => speichern(song)} style={pille(false)}><PIcon name="download" size={16} /> Speichern</button>
+        {token && <button onClick={() => teilen(song)} style={pille(false)}><PIcon name="share" size={16} /> {kopiert === "ok" ? "Link kopiert" : "Teilen"}</button>}
+        {kopiert && kopiert !== "ok" && <input readOnly value={kopiert} onFocus={(e) => e.target.select()} aria-label="Link zum Kopieren" style={{ ...styles.input, width: "100%", marginTop: 0 }} />}
       </div>
           </>
         )}
@@ -5856,6 +5890,8 @@ function SongPlayer({ songs, cover, team }) {
         )}
         {song.text ? <button onClick={() => { if (!textOffen && !breit) setOffen(false); setTextOffen((o) => !o); }} aria-expanded={textOffen} style={pille(textOffen)}><PIcon name="text" size={16} /> Text</button> : null}
         <button onClick={() => speichern(song)} style={pille(false)}><PIcon name="download" size={16} /> Speichern</button>
+        {token && <button onClick={() => teilen(song)} style={pille(false)}><PIcon name="share" size={16} /> {kopiert === "ok" ? "Link kopiert" : "Teilen"}</button>}
+        {kopiert && kopiert !== "ok" && <input readOnly value={kopiert} onFocus={(e) => e.target.select()} aria-label="Link zum Kopieren" style={{ ...styles.input, width: "100%", marginTop: 0 }} />}
       </div>
         </>
       )}
@@ -5934,6 +5970,32 @@ function KartenSeitePlus({ token }) {
   const stand = karten.stand ? new Date(karten.stand).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   const b = plus && plus.saisonBilanz;
   const be = (plus && plus.bereiche) || { bilanz: true, spieltage: true, karten: true, songs: true };
+  // Einzel-Song-Link (?song=<ID>): nur dieser Song mit Player und Text, keine übrigen Bereiche der Elternseite
+  const einzelId = new URLSearchParams(window.location.search).get("song");
+  const einzelSong = einzelId && plus && be.songs && plus.songs ? plus.songs.find((x) => songId(x.url) === einzelId) : null;
+  if (einzelSong) {
+    return (
+      <div style={styles.app}>
+      <header className="app-header" style={{ ...styles.header, paddingBottom: 16 }}>
+        <div style={{ ...styles.headerTop, maxWidth: 1100, margin: "0 auto" }}>
+          <img src={CLUB.logo} alt={CLUB.name} style={styles.crestImg} />
+          <div style={{ flex: 1 }}>
+            <div style={styles.title}>{CLUB.titel}</div>
+            <div style={styles.subtitle}>
+              <div>{CLUB.name} {karten.team || "U8"}</div>
+              <div>Saison {karten.saison}{stand ? ` · Stand ${stand}` : ""}</div>
+            </div>
+          </div>
+        </div>
+      </header>
+        <main style={{ maxWidth: 560, margin: "0 auto", padding: "0 16px 32px" }}>
+          <section style={{ ...styles.card, marginTop: 16 }}>
+            <SongPlayer songs={[einzelSong]} cover={plus.cover} team={karten.team} token={token} textStart />
+          </section>
+        </main>
+      </div>
+    );
+  }
   const bilanzHat = !!plus && !!(b || (plus.torschuetzen && plus.torschuetzen.length > 0) || (plus.gegnerBilanz && plus.gegnerBilanz.length > 0));
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "var(--muted)", fontWeight: 600 };
   const td = { textAlign: "right", padding: "8px 8px", fontVariantNumeric: "tabular-nums", fontSize: 14 };
@@ -6068,7 +6130,7 @@ function KartenSeitePlus({ token }) {
         ))}
         {plus && be.songs && plus.songs && plus.songs.length > 0 && panel("songs", (
           <section style={{ ...styles.card, marginTop: 16 }}>
-            <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} />
+            <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} token={token} />
           </section>
         ))}
       </main>
@@ -6248,7 +6310,7 @@ function KartenSeiteVorschau({ token }) {
         ))}
         {plus && be.songs && plus.songs && plus.songs.length > 0 && panel("songs", (
           <section style={{ ...styles.card, marginTop: 16 }}>
-            <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} />
+            <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} token={token} />
           </section>
         ))}
       </main>
