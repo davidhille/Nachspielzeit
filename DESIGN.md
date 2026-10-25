@@ -15,7 +15,7 @@ Gilt für Trainer-App und Admin. Die Regeln stehen in `CLAUDE.md`, der Design-Ch
 | Kopfzeile | `--header-grad` (Trainer), `--header-grad-admin` (Admin), Text darauf: `--on-header`, `--on-header-soft` |
 | Schatten | `--sh-1` Karten, `--sh-2` Überlagerungen, `--sh-3` Dialoge; `--sh-glow-sm` roter Schein (nur runde Play-Knöpfe) |
 | Radien | 8 (Felder, Chips), 12 (Karten-Inhalte, Knöpfe), 16 (Karten), 999 (Pillen, runde Knöpfe), 50 % (Kreise) |
-| Schrift | Fließtext Inter 13/14, Auszeichnung 12, Überschriften Space Grotesk 16/20. Mindestens 13 px für Fließtext. |
+| Schrift | Fließtext Inter 13/14, Auszeichnung 12, Überschriften Space Grotesk 16/20. Mindestens 13 px für Fließtext. Ausnahme: die Spieluhr (`styles.uhrZeit`, 40 px), damit sie auf dem Spielfeld lesbar ist. |
 | Touch | Mindestens 44 × 44 px |
 | Fokus | Globales `:focus-visible` in `index.html`; nie `outline: none` ohne Ersatz-Rahmen |
 | Zahlen | `tabular-nums` in Tabellen |

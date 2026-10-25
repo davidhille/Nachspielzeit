@@ -388,7 +388,16 @@ const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.
 const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
 const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
 let EINST = { backupTage: 7, papierkorbTage: 30 };
-let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "" } };
+let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "", spielzeiten: [10, 12, 15, 20], spielzeit: 12 } };
+/* Spielzeiten je Team (Minuten): Auswahl im Spiel und Standard für neue Spieltage. Ohne Eintrag 10 / 12 / 15 / 20 und 12. */
+const SPIELZEITEN_STD = [10, 12, 15, 20];
+function spielzeitenAusConfig(std) {
+  const roh = std && Array.isArray(std.spielzeiten) ? std.spielzeiten : [];
+  const liste = [...new Set(roh.map(Number).filter((n) => n >= 1 && n <= 90))].sort((a, b) => a - b);
+  const auswahl = liste.length ? liste : SPIELZEITEN_STD;
+  const vorgabe = Number(std && std.spielzeit);
+  return { spielzeiten: auswahl, spielzeit: vorgabe >= 1 && vorgabe <= 90 ? vorgabe : auswahl.includes(12) ? 12 : auswahl[0] };
+}
 const setzeEinstellungen = (cfg) => {
   cfg = cfg || {};
   EINST = {
@@ -403,7 +412,11 @@ const setzeEinstellungen = (cfg) => {
       bis: tr.bis || "17:45",
       wochen: Math.max(1, Math.min(52, Number(tr.wochen) || 8)),
     },
-    spieltag: { zeit: (cfg.spieltag_std && cfg.spieltag_std.zeit) || "", ort: (cfg.spieltag_std && cfg.spieltag_std.ort) || "" },
+    spieltag: {
+      zeit: (cfg.spieltag_std && cfg.spieltag_std.zeit) || "",
+      ort: (cfg.spieltag_std && cfg.spieltag_std.ort) || "",
+      ...spielzeitenAusConfig(cfg.spieltag_std),
+    },
   };
   const st = Number(cfg.saison_start), en = Number(cfg.saison_ende);
   SAISON = st >= 1 && st <= 12 && en >= 1 && en <= 12 && en < st ? { start: st, ende: en } : { start: 9, ende: 7 };
@@ -1325,6 +1338,9 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [trWochen, setTrWochen] = useState(String(trs.wochen || 8));
   const [stZeit, setStZeit] = useState((cfg.spieltag_std && cfg.spieltag_std.zeit) || "");
   const [stOrt, setStOrt] = useState((cfg.spieltag_std && cfg.spieltag_std.ort) || "");
+  const sz0 = spielzeitenAusConfig(cfg.spieltag_std);
+  const [szListe, setSzListe] = useState(sz0.spielzeiten.join(", "));
+  const [szStd, setSzStd] = useState(String(sz0.spielzeit));
   const [startTab, setStartTab] = useState(cfg.start_tab || "letzte");
   const [backupTage, setBackupTage] = useState(String(cfg.backup_tage === undefined ? 7 : cfg.backup_tage));
   const [papierTage, setPapierTage] = useState(String(cfg.papierkorb_tage === undefined || cfg.papierkorb_tage === null ? 30 : cfg.papierkorb_tage));
@@ -1382,7 +1398,11 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (wertung === "ergebnisse") delete neuCfg.spieltag_wertung; else neuCfg.spieltag_wertung = wertung;
       const trNeu = { tage: [...trTage].sort(), von: trVon || "16:30", bis: trBis || "17:45", wochen: Math.max(1, Math.min(52, parseInt(trWochen, 10) || 8)) };
       if (JSON.stringify(trNeu) === JSON.stringify({ tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }) || trNeu.tage.length === 0) delete neuCfg.training_std; else neuCfg.training_std = trNeu;
-      if (stZeit || stOrt.trim()) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim() }; else delete neuCfg.spieltag_std;
+      const szNeu = spielzeitenAusConfig({ spielzeiten: szListe.split(/[^0-9]+/).filter(Boolean), spielzeit: szStd });
+      const szIstStd = JSON.stringify(szNeu) === JSON.stringify(spielzeitenAusConfig(null));
+      if (stZeit || stOrt.trim() || !szIstStd) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim(), ...(szIstStd ? {} : { spielzeiten: szNeu.spielzeiten, spielzeit: szNeu.spielzeit }) }; else delete neuCfg.spieltag_std;
+      setSzListe(szNeu.spielzeiten.join(", "));
+      setSzStd(String(szNeu.spielzeit));
       if (startTab === "letzte") delete neuCfg.start_tab; else neuCfg.start_tab = startTab;
       const bt = Math.max(0, Math.min(365, parseInt(backupTage, 10) || 0));
       if (bt === 7) delete neuCfg.backup_tage; else neuCfg.backup_tage = bt;
@@ -1506,6 +1526,13 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             Uhrzeit <input type="time" style={{ ...styles.input, width: "auto" }} value={stZeit} onChange={(e) => setStZeit(e.target.value)} />
             Ort <input style={{ ...styles.input, flex: 1, minWidth: 160 }} value={stOrt} placeholder="z. B. Sportanlage Heimstetten" onChange={(e) => setStOrt(e.target.value)} />
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap", fontWeight: 400 }}>
+            <label htmlFor="sz-liste">Spielzeiten (Min.)</label>
+            <input id="sz-liste" style={{ ...styles.input, width: 150 }} value={szListe} placeholder="10, 12, 15, 20" onChange={(e) => setSzListe(e.target.value)} />
+            <label htmlFor="sz-std">Standard</label>
+            <input id="sz-std" type="number" min="1" max="90" style={{ ...styles.input, width: 70 }} value={szStd} onChange={(e) => setSzStd(e.target.value)} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Spielzeit im Spiel (mit Komma trennen) und Vorgabe für neue Spieltage. „Andere …“ bleibt immer möglich. Standard: 10, 12, 15, 20 und 12.</div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Backup-Erinnerung nach … Tagen
@@ -2461,7 +2488,7 @@ function App() {
         fotoUrl: s.foto_url || null,
         zeit: s.zeit || null,
         typ: s.typ || "spieltag",
-        spielzeitMin: Number(s.spielzeit_min) || lokaleSpielzeit(s.id) || 12,
+        spielzeitMin: Number(s.spielzeit_min) || lokaleSpielzeit(s.id) || null, // null = Standard des Teams
         ort: s.ort || "",
         deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
@@ -10170,7 +10197,9 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const [folge, setFolge] = useState([]); // Torprotokoll: { typ: "wir" | "eigen" | "gegner", playerId? } in Reihenfolge
   const [gesperrt, setGesperrt] = useState(false); // Taschen-Sperre
   const letzteAktion = useRef(Date.now());
-  const uhr = useSpielUhr(spieltag.id, spieltag.spielzeitMin);
+  const spielzeitMin = spieltag.spielzeitMin || STANDARDS.spieltag.spielzeit;
+  const [zeitWahl, setZeitWahl] = useState(false); // Auswahl der Spielzeit offen
+  const uhr = useSpielUhr(spieltag.id, spielzeitMin);
   const marke = () => (uhr.gestartet ? { sek: uhr.sek() } : {}); // Spielzeit des Tors, wenn die Uhr benutzt wird
   const [editingId, setEditingId] = useState(null);
   const [newOpponentId, setNewOpponentId] = useState(null);
@@ -10253,7 +10282,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
       }));
     });
   };
-  const spielzeitAndere = () => frageAnd("Spielzeit in Minuten", String(spieltag.spielzeitMin), (v) => {
+  const spielzeitAndere = () => frageAnd("Spielzeit in Minuten", String(spielzeitMin), (v) => {
     const n = parseInt(String(v), 10);
     if (n >= 1 && n <= 90) onUpdateSpielzeit(n);
   });
@@ -10547,7 +10576,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           {torfolgeStand(sp.torfolge).map((e, i) => (
                             <li key={i}>
                               <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{e.wir}:{e.gegner}</span>{" "}
-                              {typeof e.sek === "number" && <>{spielminute(e.sek, spieltag.spielzeitMin)}{" "}</>}
+                              {typeof e.sek === "number" && <>{spielminute(e.sek, spielzeitMin)}{" "}</>}
                               {e.typ === "wir" ? spielerName(e.playerId) : e.typ === "eigen" ? "Eigentor Gegner" : "Gegner"}
                             </li>
                           ))}
@@ -10613,7 +10642,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                   {gesperrt && (
                     <SperreAbdeckung
                       onFrei={() => { letzteAktion.current = Date.now(); setGesperrt(false); }}
-                      uhr={!editingId && uhr.gestartet ? <div role="timer" aria-label="Restzeit" style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: uhr.nachspielzeit ? "var(--danger-text)" : "var(--text)" }}>{uhr.text}</div> : null}
+                      uhr={!editingId && uhr.gestartet ? <div role="timer" aria-label="Restzeit" style={{ ...styles.uhrZeit, color: uhr.nachspielzeit ? "var(--danger-text)" : "var(--text)" }}>{uhr.text}</div> : null}
                     />
                   )}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -10631,24 +10660,26 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                   </div>
 
                   {!editingId && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        <div role="timer" aria-label="Restzeit" style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 72, color: uhr.nachspielzeit ? "var(--danger-text)" : "var(--text)" }}>{uhr.text}</div>
-                        <button style={styles.rowBtn} onClick={uhr.laeuft ? uhr.pause : uhr.start}>
-                          {uhr.laeuft ? "Pause" : uhr.gestartet ? "Weiter" : "Start"}
-                        </button>
-                        {uhr.gestartet && (
-                          <button style={styles.linkBtn} onClick={() => confirmAnd("Spieluhr auf Anfang zurücksetzen?", uhr.zuruecksetzen)}>Zurücksetzen</button>
-                        )}
+                    <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, textAlign: "center", background: uhr.nachspielzeit ? "var(--neg-bg)" : "var(--surface)" }}>
+                      <div role="timer" aria-label="Restzeit" style={{ ...styles.uhrZeit, color: uhr.nachspielzeit ? "var(--danger-text)" : "var(--text)" }}>{uhr.text}</div>
+                      <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                        von {spielzeitMin} Min.
+                        <button style={{ ...styles.linkBtn, display: "inline", padding: "0 6px" }} aria-expanded={zeitWahl} onClick={() => setZeitWahl((o) => !o)}>{zeitWahl ? "fertig" : "ändern"}</button>
                       </div>
-                      <div role="group" aria-label="Spielzeit in Minuten" style={styles.chipGroup}>
-                        {[10, 12, 15, 20].map((m) => (
-                          <button key={m} onClick={(e) => { onUpdateSpielzeit(m); e.currentTarget.blur(); }} aria-pressed={spieltag.spielzeitMin === m} style={{ ...styles.chip, ...(spieltag.spielzeitMin === m ? styles.chipActive : {}) }}>{m} Min.</button>
-                        ))}
-                        <button onClick={spielzeitAndere} aria-pressed={![10, 12, 15, 20].includes(spieltag.spielzeitMin)} style={{ ...styles.chip, ...(![10, 12, 15, 20].includes(spieltag.spielzeitMin) ? styles.chipActive : {}) }}>
-                          {![10, 12, 15, 20].includes(spieltag.spielzeitMin) ? `${spieltag.spielzeitMin} Min.` : "Andere …"}
-                        </button>
-                      </div>
+                      {zeitWahl && (
+                        <div role="group" aria-label="Spielzeit in Minuten" style={{ ...styles.chipGroup, justifyContent: "center", marginTop: 6 }}>
+                          {[...new Set([...STANDARDS.spieltag.spielzeiten, spielzeitMin])].sort((a, b) => a - b).map((m) => (
+                            <button key={m} onClick={(e) => { onUpdateSpielzeit(m); setZeitWahl(false); e.currentTarget.blur(); }} aria-pressed={spielzeitMin === m} style={{ ...styles.chip, ...(spielzeitMin === m ? styles.chipActive : {}) }}>{m} Min.</button>
+                          ))}
+                          <button onClick={() => { setZeitWahl(false); spielzeitAndere(); }} style={styles.chip}>Andere …</button>
+                        </div>
+                      )}
+                      <button style={{ ...styles.rowBtn, width: "100%", marginTop: 10 }} onClick={uhr.laeuft ? uhr.pause : uhr.start}>
+                        {uhr.laeuft ? "Pause" : uhr.gestartet ? "Weiter" : "Start"}
+                      </button>
+                      {uhr.gestartet && (
+                        <button style={{ ...styles.linkBtn, marginTop: 4 }} onClick={() => confirmAnd("Spieluhr auf Anfang zurücksetzen?", uhr.zuruecksetzen)}>Zurücksetzen</button>
+                      )}
                     </div>
                   )}
 
@@ -10736,7 +10767,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       </div>
                       {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
                     </div>
-                    <TorProtokoll eintraege={torStand} mitStand={stimmig} spielerName={spielerName} onZurueck={letztesZurueck} spielzeitMin={spieltag.spielzeitMin} mitMinuten={uhr.gestartet || folge.some((e) => typeof e.sek === "number")} onMinute={minuteAendern} />
+                    <TorProtokoll eintraege={torStand} mitStand={stimmig} spielerName={spielerName} onZurueck={letztesZurueck} spielzeitMin={spielzeitMin} mitMinuten={uhr.gestartet || folge.some((e) => typeof e.sek === "number")} onMinute={minuteAendern} />
                   </div>
 
                   <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center" }}>
@@ -13022,6 +13053,8 @@ const styles = {
   range: { flex: 1, accentColor: "var(--accent)", minWidth: 100, height: 44, margin: 0 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
+  // Spieluhr: bewusst groß (40), damit sie auf dem Spielfeld lesbar ist; Ausnahme von der Schriftskala
+  uhrZeit: { fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 40, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" },
   chip: { border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--muted)", minHeight: 44, padding: "10px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" },
   chipActive: { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" },
   chipRemove: { background: "transparent", border: "none", color: "var(--danger-text)", marginLeft: 6, cursor: "pointer", fontSize: 14, lineHeight: 1 },
