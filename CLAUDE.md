@@ -22,9 +22,10 @@
 - Löschen: Soft-Delete/Papierkorb bevorzugen.
 - Der Server entscheidet, der Client filtert nur: Zugriffsschutz liegt in RLS (`nsz_code_ok`, `nsz_is_admin`), der Teamfilter im Client ist Komfort.
 - Sonderfall `uebungen`: nutzt `team_ids[]` statt `team_id` (`'alle'` = für alle Teams lesbar, Prüfung über `nsz_code_ok_arr`). Schema und Wiederherstellung: `supabase/`.
-- Entwicklungsdateien (README, CLAUDE.md, supabase/) stehen in `.assetsignore` und werden nicht ausgeliefert.
+- Entwicklungsdateien (README, CLAUDE.md, DESIGN.md, supabase/) stehen in `.assetsignore` und werden nicht ausgeliefert.
 
 ## Design-Regeln
+- Bausteinkatalog und Tokens: `DESIGN.md` (neue Bausteine dort eintragen).
 - Tokens nutzen (`--accent`, `--surface`, `--muted` …), keine festen Hex-Werte, damit der Dunkelmodus stimmt.
 - Radien nur 8 / 12 / 16 / 999. Schrift in 12, 13, 14, 16, 20. Schatten nur `--sh-1/2/3`.
 - Touch-Ziele mindestens 44 px, Fließtext mindestens 13 px.

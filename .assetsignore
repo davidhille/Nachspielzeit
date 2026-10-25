@@ -5,6 +5,7 @@ node_modules
 supabase
 README.md
 CLAUDE.md
+DESIGN.md
 .claude
 wrangler.toml
 package.json
