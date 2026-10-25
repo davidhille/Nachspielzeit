@@ -60,6 +60,15 @@
     if (_m && _m[1].toLowerCase() === "admin") document.title = "Nachspielzeit — Administration";
     else if (_m && _m[1].toLowerCase() !== "www") document.title = "Nachspielzeit — SV Heimstetten " + _m[1].toUpperCase();
   } catch (e) {}
+  // Administration als eigene App erkennbar: eigener Name, eigenes Symbol, dunkle Statusleiste (gleiche Regel wie IS_ADMIN_HOST in der App)
+  try {
+    if (/^admin\./i.test(location.hostname) || /[?&]admin=1\b/.test(location.search)) {
+      document.querySelector('link[rel="manifest"]').setAttribute("href", "manifest-admin.json");
+      document.querySelector('link[rel="apple-touch-icon"]').setAttribute("href", "apple-touch-icon-admin.png");
+      document.querySelector('meta[name="theme-color"]').setAttribute("content", "#262A34");
+      document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute("content", "Admin");
+    }
+  } catch (e) {}
 </script>
 <style>
   @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/inter-latin-400-normal.woff2") format("woff2"); }
@@ -115,6 +124,7 @@
     --tan-bg: #F3ECE3; --tan-text: #8A5A16;
     --lav-bg: #EFEAF3; --lav-text: #5B4FA8;
     --header-grad: linear-gradient(135deg, #C4271F 0%, #8E1416 100%);
+    --header-grad-admin: linear-gradient(135deg, #3A3F4B 0%, #1E2128 100%); /* Administration: dunkel statt Vereinsrot */
     --sh-1: 0 1px 2px rgba(28,20,20,0.05);
     --sh-2: 0 4px 12px rgba(28,20,20,0.08), 0 1px 3px rgba(28,20,20,0.05);
     --sh-3: 0 18px 40px rgba(0,0,0,0.28);
@@ -217,6 +227,6 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="app.cbdd32619c.js"></script>
+<script src="app.f212711cfa.js"></script>
 </body>
 </html>

@@ -299,7 +299,8 @@ const wendeTeamfarbeAn = () => {
     root.setProperty("--header-grad", `linear-gradient(135deg, ${hex} 0%, ${farbMix(c, schwarz, 0.28)} 100%)`);
     root.setProperty("--header-grad-btn", `linear-gradient(135deg, ${farbMix(c, weiss, 0.06)}, ${farbMix(c, schwarz, 0.25)})`);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", akzent);
+    // In der Administration bleibt die Statusleiste dunkel (siehe index.html), sie folgt nicht der Teamfarbe
+    if (meta && !/^admin\./i.test(window.location.hostname) && !/[?&]admin=1\b/.test(window.location.search)) meta.setAttribute("content", akzent);
   } catch (e) {}
 };
 try {
@@ -1955,7 +1956,7 @@ notify pgrst, 'reload schema';`;
 
   return (
     <div style={styles.app}>
-      <header className="app-header" style={styles.header}>
+      <header className="app-header" style={{ ...styles.header, background: "var(--header-grad-admin)" }}>
         <div style={styles.headerTop}>
           <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
           <div style={{ flex: 1 }}>
