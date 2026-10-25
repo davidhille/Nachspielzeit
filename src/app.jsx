@@ -11018,7 +11018,12 @@ function SpielerBereich({
                     style={{ ...styles.iconBtn, ...styles.iconBtnDanger }}
                     title="Entfernen"
                     aria-label="Entfernen"
-                    onClick={() => onRemove(p.id)}
+                    onClick={() =>
+                      confirmAnd(
+                        `${p.name} in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`,
+                        () => onRemove(p.id)
+                      )
+                    }
                   >
                     <TrashIcon size={15} />
                   </button>
@@ -12008,7 +12013,11 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
                   {g.name}
                   <button
                     aria-label={`${g.name} entfernen`}
-                    onClick={() => onRemoveGegner(g.id)}
+                    onClick={() =>
+                      confirmAnd(`Gegner "${g.name}" in den Papierkorb verschieben? Du kannst ihn dort jederzeit wiederherstellen.`, () =>
+                        onRemoveGegner(g.id)
+                      )
+                    }
                     style={{ border: "none", background: "transparent", color: "inherit", display: "inline-flex", padding: 0, cursor: "pointer" }}
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M6 6l12 12M18 6L6 18" /></svg>
