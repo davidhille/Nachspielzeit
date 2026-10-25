@@ -10157,6 +10157,23 @@ function useSpielUhr(spieltagId, spielzeitMin) {
   };
 }
 
+/* Torschützen-Kachel: die ganze Kachel antippen = +1; das − erscheint erst, wenn es ein Tor gibt */
+function TorKachel({ name, anzahl, onPlus, onMinus, minusLabel, gegner = false }) {
+  const aktiv = anzahl > 0;
+  return (
+    <div style={{ ...styles.scorerTile, ...(aktiv && !gegner ? styles.scorerTileActive : {}), ...(aktiv && gegner ? { borderColor: "var(--border-strong)" } : {}) }}>
+      <button style={styles.scorerName} onClick={onPlus}>
+        <span>{name}</span>
+        <span aria-hidden="true" style={{ ...styles.scorerBadge, ...(aktiv ? styles.scorerBadgeAktiv : {}) }}>{anzahl}</span>
+      </button>
+      <span className="nz-sr" aria-live="polite">{anzahl} {anzahl === 1 ? "Tor" : "Tore"}</span>
+      {aktiv && (
+        <button style={styles.scorerMinus} onClick={onMinus} aria-label={minusLabel}>−</button>
+      )}
+    </div>
+  );
+}
+
 /* Protokoll der Tore im Spielformular: Reihenfolge und (wenn stimmig) Spielstand; letztes Tor zurücknehmen */
 function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck, spielzeitMin, mitMinuten, onMinute }) {
   if (eintraege.length === 0) return null;
@@ -10724,47 +10741,11 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       </div>
                     ) : null}
                     <div style={styles.scorerGrid}>
-                      {torschuetzenOptionen.map((p) => {
-                        const count = tally[p.id] || 0;
-                        return (
-                          <div key={p.id} style={{ ...styles.scorerTile, ...(count > 0 ? styles.scorerTileActive : {}) }}>
-                            <button style={styles.scorerName} onClick={() => inc(p.id)}>
-                              {p.name}
-                            </button>
-                            <div style={styles.scorerStepper}>
-                              <button style={styles.stepBtn} onClick={() => dec(p.id)} disabled={count === 0} aria-label={`Tor von ${p.name} abziehen`}>
-                                −
-                              </button>
-                              <span style={styles.stepCount} aria-live="polite">{count}</span>
-                              <button style={styles.stepBtn} onClick={() => inc(p.id)} aria-label={`Tor für ${p.name} hinzufügen`}>
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div style={{ ...styles.scorerTile, ...(eigen > 0 ? styles.scorerTileActive : {}) }}>
-                        <button style={styles.scorerName} onClick={eigenPlus}>
-                          Eigentor Gegner
-                        </button>
-                        <div style={styles.scorerStepper}>
-                          <button style={styles.stepBtn} onClick={eigenMinus} disabled={eigen === 0} aria-label="Eigentor des Gegners abziehen">−</button>
-                          <span style={styles.stepCount} aria-live="polite">{eigen}</span>
-                          <button style={styles.stepBtn} onClick={eigenPlus} aria-label="Eigentor des Gegners hinzufügen">+</button>
-                        </div>
-                      </div>
-                      <div style={{ ...styles.scorerTile, ...(Number(theirGoals) > 0 ? { borderColor: "var(--border-strong)" } : {}) }}>
-                        <button style={styles.scorerName} onClick={gegnerPlus}>
-                          Tor Gegner
-                        </button>
-                        <div style={styles.scorerStepper}>
-                          <button style={styles.stepBtn} onClick={gegnerMinus} disabled={Number(theirGoals) === 0} aria-label="Tor des Gegners abziehen">
-                            −
-                          </button>
-                          <span style={styles.stepCount} aria-live="polite">{Number(theirGoals) || 0}</span>
-                          <button style={styles.stepBtn} onClick={gegnerPlus} aria-label="Tor des Gegners hinzufügen">+</button>
-                        </div>
-                      </div>
+                      {torschuetzenOptionen.map((p) => (
+                        <TorKachel key={p.id} name={p.name} anzahl={tally[p.id] || 0} onPlus={() => inc(p.id)} onMinus={() => dec(p.id)} minusLabel={`Tor von ${p.name} abziehen`} />
+                      ))}
+                      <TorKachel name="Eigentor Gegner" anzahl={eigen} onPlus={eigenPlus} onMinus={eigenMinus} minusLabel="Eigentor des Gegners abziehen" />
+                      <TorKachel name="Tor Gegner" anzahl={Number(theirGoals) || 0} onPlus={gegnerPlus} onMinus={gegnerMinus} minusLabel="Tor des Gegners abziehen" gegner />
                       {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
                     </div>
                     <TorProtokoll eintraege={torStand} mitStand={stimmig} spielerName={spielerName} onZurueck={letztesZurueck} spielzeitMin={spielzeitMin} mitMinuten={uhr.gestartet || folge.some((e) => typeof e.sek === "number")} onMinute={minuteAendern} />
@@ -13179,12 +13160,13 @@ const styles = {
     boxShadow: "var(--sh-1)",
   },
   scorerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginTop: 8 },
-  scorerTile: { border: "1px solid var(--border)", borderRadius: 12, padding: "8px 10px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 6, boxShadow: "var(--sh-1)" },
+  scorerTile: { border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface)", display: "flex", alignItems: "center", minHeight: 48, boxShadow: "var(--sh-1)" },
   scorerTileActive: { border: "1px solid var(--accent)", background: "var(--accent-soft)" },
-  scorerName: { background: "transparent", border: "none", padding: 0, minHeight: 44, textAlign: "left", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" },
-  scorerStepper: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 },
+  scorerName: { flex: 1, minWidth: 0, minHeight: 48, padding: "0 8px 0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, background: "transparent", border: "none", textAlign: "left", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" },
+  scorerBadge: { minWidth: 30, height: 30, borderRadius: 999, border: "1px solid var(--border-strong)", color: "var(--muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 },
+  scorerBadgeAktiv: { background: "var(--accent)", borderColor: "var(--accent)", color: "#fff" },
+  scorerMinus: { width: 44, height: 44, flexShrink: 0, marginRight: 2, borderRadius: 8, border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--accent-text)", fontSize: 20, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
   stepBtn: { width: 44, height: 44, borderRadius: 8, border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--accent-text)", fontSize: 20, fontWeight: 700, cursor: "pointer", lineHeight: 1 },
-  stepCount: { fontSize: 14, fontWeight: 700, minWidth: 16, textAlign: "center", fontVariantNumeric: "tabular-nums" },
   editBanner: { background: "var(--warn-bg)", color: "var(--warn-text)", borderRadius: 8, padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 },
   seasonHint: {
     background: "var(--info-bg)",
