@@ -5,9 +5,10 @@
   "scripts": {
     "pruefen": "node pruefen.js",
     "test": "node --test test/rechenlogik.test.js test/sitzung.test.js test/db.test.js",
+    "design": "node design-pruefen.js",
     "bauen": "node bauen.js",
     "bauen-pruefen": "node bauen.js --pruefen",
-    "alles": "node pruefen.js && node bauen.js --pruefen && node --test test/rechenlogik.test.js test/sitzung.test.js test/db.test.js"
+    "alles": "node pruefen.js && node design-pruefen.js && node bauen.js --pruefen && node --test test/rechenlogik.test.js test/sitzung.test.js test/db.test.js"
   },
   "devDependencies": {
     "acorn": "8.18.0",
