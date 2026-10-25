@@ -288,7 +288,7 @@ const istDunkel = () => {
   if (t === "light") return false;
   return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 };
-const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn", "--auswahl", "--auswahl-text", "--chip", "--chip-text", "--trikot", "--trikot-text"];
+const TEAMFARBEN_VARS = ["--accent", "--accent-text", "--focus", "--header-grad", "--header-grad-btn", "--auswahl", "--auswahl-text", "--chip", "--chip-text", "--trikot", "--trikot-text", "--regler"];
 /* Farben: Teamfarbe = Grundfarbe; Kopfzeile, Buttons & Akzent und Auswahl lassen sich einzeln überschreiben (leer = Teamfarbe).
    Zu helle Farben werden abgedunkelt, damit weiße Schrift lesbar bleibt. */
 const berechneFarben = (basis, einzel, dunkel) => {
@@ -317,6 +317,8 @@ const berechneFarben = (basis, einzel, dunkel) => {
     // Trikot: jede Farbe erlaubt (auch Weiß); die Nummer wird bei hellen Farben dunkel
     trikot: hexRgb(e.trikot) ? e.trikot : null,
     trikotText: hexRgb(e.trikot) ? textAuf(e.trikot) : "#fff",
+    // Regler: jede Farbe erlaubt; null = wie Buttons & Akzent
+    regler: hexRgb(e.regler) ? e.regler : null,
   };
 };
 const wendeTeamfarbeAn = () => {
@@ -342,6 +344,8 @@ const wendeTeamfarbeAn = () => {
     else ["--chip", "--chip-text"].forEach((v) => root.removeProperty(v));
     if (f.trikot) { root.setProperty("--trikot", f.trikot); root.setProperty("--trikot-text", f.trikotText); }
     else ["--trikot", "--trikot-text"].forEach((v) => root.removeProperty(v));
+    if (f.regler) root.setProperty("--regler", f.regler);
+    else root.removeProperty("--regler");
     const meta = document.querySelector('meta[name="theme-color"]');
     // In der Administration bleibt die Statusleiste dunkel (siehe index.html), sie folgt nicht der Teamfarbe
     if (meta && !f.kopfStd && !/^admin\./i.test(window.location.hostname) && !/[?&]admin=1\b/.test(window.location.search)) meta.setAttribute("content", f.kopfMeta);
@@ -353,7 +357,7 @@ try {
 const setzeClub = (name, logo, farbe, titel, einzel) => {
   const f = farbe ? sichereTeamfarbe(farbe) : CLUB_STD.farbe;
   CLUB = { name: (name && String(name).trim()) || CLUB_STD.name, logo: logo || CLUB_STD.logo, farbe: f, titel: (titel && String(titel).trim()) || CLUB_STD.titel };
-  const e = { kopf: (einzel && einzel.kopf) || "", akzent: (einzel && einzel.akzent) || "", auswahl: (einzel && einzel.auswahl) || "", chip: (einzel && einzel.chip) || "", trikot: (einzel && einzel.trikot) || "" };
+  const e = { kopf: (einzel && einzel.kopf) || "", akzent: (einzel && einzel.akzent) || "", auswahl: (einzel && einzel.auswahl) || "", chip: (einzel && einzel.chip) || "", trikot: (einzel && einzel.trikot) || "", regler: (einzel && einzel.regler) || "" };
   if (letzteFarben.basis !== f || JSON.stringify(letzteFarben.einzel) !== JSON.stringify(e)) {
     letzteFarben = { basis: f, einzel: e };
     wendeTeamfarbeAn();
@@ -1385,9 +1389,9 @@ function FarbWahl({ titel, hinweis, wert, onChange, leer, onLeer, palette = FARB
 }
 
 /* Vorschau der Farben im Admin: Kopfzeile, Umschalter, Button, Link und Chips mit den gewählten Farben (noch nicht gespeichert) */
-function FarbVorschau({ basis, kopf, akzent, auswahl, chip, trikot }) {
+function FarbVorschau({ basis, kopf, akzent, auswahl, chip, trikot, regler }) {
   const b = sichereTeamfarbe(basis || CLUB_STD.farbe);
-  const f = berechneFarben(b, { kopf, akzent, auswahl, chip, trikot }, istDunkel());
+  const f = berechneFarben(b, { kopf, akzent, auswahl, chip, trikot, regler }, istDunkel());
   const aus = f.auswahl || f.auswahlStandard;
   const chipFarbe = f.chip || aus;
   const chipText = f.chip ? f.chipText : f.auswahl ? f.auswahlText : "#fff";
@@ -1408,6 +1412,12 @@ function FarbVorschau({ basis, kopf, akzent, auswahl, chip, trikot }) {
           <span style={{ color: f.accentText, fontSize: 14, fontWeight: 600 }}>Link-Text</span>
           <span style={{ background: chipFarbe, color: chipText, border: `1px solid ${chipFarbe}`, borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip aktiv</span>
           <span style={{ border: "1px solid var(--border-strong)", color: "var(--muted)", borderRadius: 8, padding: "0 14px", minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13 }}>Chip</span>
+          <span aria-hidden="true" style={{ flexBasis: "100%", height: 44, display: "flex", alignItems: "center" }}>
+            <span style={{ position: "relative", flex: 1, height: 6, borderRadius: 999, background: "var(--track)" }}>
+              <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "55%", borderRadius: 999, background: f.regler || f.accent }} />
+              <span style={{ position: "absolute", left: "55%", top: "50%", width: 20, height: 20, marginLeft: -10, marginTop: -10, borderRadius: 999, background: f.regler || f.accent, border: "2px solid var(--surface)" }} />
+            </span>
+          </span>
           <span style={{ position: "relative", display: "inline-flex", width: 36, height: 36 }}>
             <svg width="36" height="36" viewBox="0 0 24 24" fill={f.trikot || f.accent} stroke="var(--border-strong)" strokeWidth="0.6" strokeLinejoin="round"><path d="M16 3l-2.2 1.8a2.2 2.2 0 0 1-3.6 0L8 3 2 7.5 4.3 11H7v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9h2.7L22 7.5 16 3z" /></svg>
             <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 6, fontSize: 15, fontWeight: 700, color: f.trikot ? f.trikotText : "#fff", lineHeight: 1 }}>7</span>
@@ -1432,6 +1442,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [farbeAuswahl, setFarbeAuswahl] = useState(cfg.farbe_auswahl || "");
   const [farbeChip, setFarbeChip] = useState(cfg.farbe_chip || "");
   const [farbeTrikot, setFarbeTrikot] = useState(cfg.farbe_trikot || "");
+  const [farbeRegler, setFarbeRegler] = useState(cfg.farbe_regler || "");
   const [titel, setTitel] = useState(cfg.eltern_titel || "");
   const [fotoUrl, setFotoUrl] = useState(cfg.team_photo_url || "");
   const [fotoBusy, setFotoBusy] = useState(false);
@@ -1499,6 +1510,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (farbeAuswahl) neuCfg.farbe_auswahl = farbeAuswahl; else delete neuCfg.farbe_auswahl;
       if (farbeChip) neuCfg.farbe_chip = farbeChip; else delete neuCfg.farbe_chip;
       if (farbeTrikot) neuCfg.farbe_trikot = farbeTrikot; else delete neuCfg.farbe_trikot;
+      if (farbeRegler) neuCfg.farbe_regler = farbeRegler; else delete neuCfg.farbe_regler;
       if (titel.trim()) neuCfg.eltern_titel = titel.trim(); else delete neuCfg.eltern_titel;
       if (fotoUrl) neuCfg.team_photo_url = fotoUrl;
       const sS = Number(saisonStart), sE = Number(saisonEnde);
@@ -1584,7 +1596,8 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           <FarbWahl titel="Umschalter" hinweis="Aktiver Reiter bei Umschaltern wie „Training | Saison“. Auch helle Farben und Grautöne sind möglich, die Schrift passt sich an. Leer = dunklere Variante der Buttons-Farbe." wert={farbeAuswahl} onChange={setFarbeAuswahl} palette={[...FARB_PALETTE, ["#D9D4D3", "Hellgrau"], ["#6B6B6B", "Grau"]]} leer="Automatisch" onLeer={() => setFarbeAuswahl("")} />
           <FarbWahl titel="Filter-Chips" hinweis="Aktive Chips zum Filtern und Auswählen. Leer = wie die Umschalter." wert={farbeChip} onChange={setFarbeChip} palette={[...FARB_PALETTE, ["#D9D4D3", "Hellgrau"], ["#6B6B6B", "Grau"]]} leer="Wie Umschalter" onLeer={() => setFarbeChip("")} />
           <FarbWahl titel="Trikot" hinweis="Farbe des Trikot-Symbols neben den Spielern, zum Beispiel die echte Trikotfarbe. Auch helle Farben sind möglich. Leer = Buttons-Farbe." wert={farbeTrikot} onChange={setFarbeTrikot} palette={[...FARB_PALETTE, ["#FFFFFF", "Weiß"], ["#F2C21B", "Gelb"]]} leer="Wie Buttons" onLeer={() => setFarbeTrikot("")} />
-          <FarbVorschau basis={farbe} kopf={farbeKopf} akzent={farbeAkzent} auswahl={farbeAuswahl} chip={farbeChip} trikot={farbeTrikot} />
+          <FarbWahl titel="Regler" hinweis="Schieberegler, zum Beispiel bei der Bewertung. Leer = Buttons-Farbe." wert={farbeRegler} onChange={setFarbeRegler} leer="Wie Buttons" onLeer={() => setFarbeRegler("")} />
+          <FarbVorschau basis={farbe} kopf={farbeKopf} akzent={farbeAkzent} auswahl={farbeAuswahl} chip={farbeChip} trikot={farbeTrikot} regler={farbeRegler} />
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Titel der Eltern-Seite
@@ -2711,7 +2724,7 @@ function App() {
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   setzeEinstellungen(teamInfo?.config);
   TEAM_NAME = (teamInfo && teamInfo.name) || Sitzung.team.toUpperCase();
-  setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel, { kopf: teamInfo?.config?.farbe_kopf, akzent: teamInfo?.config?.farbe_akzent, auswahl: teamInfo?.config?.farbe_auswahl, chip: teamInfo?.config?.farbe_chip, trikot: teamInfo?.config?.farbe_trikot });
+  setzeClub(teamInfo?.config?.verein_name, teamInfo?.config?.verein_logo_url, teamInfo?.config?.verein_farbe, teamInfo?.config?.eltern_titel, { kopf: teamInfo?.config?.farbe_kopf, akzent: teamInfo?.config?.farbe_akzent, auswahl: teamInfo?.config?.farbe_auswahl, chip: teamInfo?.config?.farbe_chip, trikot: teamInfo?.config?.farbe_trikot, regler: teamInfo?.config?.farbe_regler });
   const kartenToken = (teamInfo && teamInfo.config && teamInfo.config.share_token) || null;
   const kartenAlt = (teamInfo && teamInfo.config && teamInfo.config.share_alt) || []; // ältere Links, die vorerst weiter funktionieren
   const kartenAltKey = kartenAlt.join(",");
@@ -13150,7 +13163,7 @@ const styles = {
     color: "var(--text)",
   },
   label: { fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 130 },
-  range: { flex: 1, accentColor: "var(--accent)", minWidth: 100, height: 44, margin: 0 },
+  range: { flex: 1, accentColor: "var(--regler)", minWidth: 100, height: 44, margin: 0 },
   rangeValue: { fontSize: 13, fontWeight: 600, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" },
   chipGroup: { display: "flex", gap: 6, flexWrap: "wrap" },
   // Spieluhr: bewusst groß (40), damit sie auf dem Spielfeld lesbar ist; Ausnahme von der Schriftskala
