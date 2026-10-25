@@ -65,3 +65,21 @@ test("Karten zählen, unbekannte Karten werden ignoriert", () => {
   const z = A.kartenZaehlen([{ karte: "gelb" }, { karte: "gelb" }, { karte: "rot" }, { karte: "keine" }, { karte: "xyz" }]);
   assert.deepEqual({ ...z }, { gelb: 2, blau: 0, rot: 1 });
 });
+
+test("Torprotokoll: Spielstand nach jedem Tor", () => {
+  const B = ladeAusApp(["torfolgeStand", "torfolgePasst"]);
+  const f = [{ typ: "wir", playerId: "a" }, { typ: "gegner" }, { typ: "eigen" }, { typ: "wir", playerId: "b" }];
+  const st = B.torfolgeStand(f).map((e) => `${e.wir}:${e.gegner}`);
+  assert.deepEqual(st, ["1:0", "1:1", "2:1", "3:1"]);
+  assert.deepEqual(B.torfolgeStand([]), []);
+});
+
+test("Torprotokoll passt nur zum stimmigen Ergebnis", () => {
+  const B = ladeAusApp(["torfolgeStand", "torfolgePasst"]);
+  const f = [{ typ: "wir", playerId: "a" }, { typ: "gegner" }, { typ: "eigen" }];
+  assert.equal(B.torfolgePasst(f, 2, 1), true);
+  assert.equal(B.torfolgePasst(f, "2", "1"), true);
+  assert.equal(B.torfolgePasst(f, 3, 1), false);
+  assert.equal(B.torfolgePasst(f, 2, 0), false);
+  assert.equal(B.torfolgePasst([], 0, 0), false);
+});

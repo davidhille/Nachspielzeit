@@ -60,3 +60,23 @@ function kartenZaehlen(eintraege) {
   eintraege.forEach((t) => { if (z[t.karte] !== undefined) z[t.karte]++; });
   return z;
 }
+
+/* Torprotokoll eines Spiels: Einträge in Reihenfolge, je { typ: "wir" | "eigen" | "gegner", playerId? }.
+   "eigen" = Eigentor des Gegners (zählt für uns). torfolgeStand ergänzt den Spielstand nach jedem Tor (wir/gegner). */
+function torfolgeStand(folge) {
+  let wir = 0;
+  let gegner = 0;
+  return (folge || []).map((e) => {
+    if (e.typ === "gegner") gegner++;
+    else wir++;
+    return { ...e, wir, gegner };
+  });
+}
+
+/* Das Protokoll gilt nur, wenn es zum Ergebnis passt: Anzahl unserer Tore (inkl. Eigentore) und der Gegner-Tore stimmen. */
+function torfolgePasst(folge, ourGoals, theirGoals) {
+  const l = folge || [];
+  if (l.length === 0) return false;
+  const gegner = l.filter((e) => e.typ === "gegner").length;
+  return l.length - gegner === (Number(ourGoals) || 0) && gegner === (Number(theirGoals) || 0);
+}

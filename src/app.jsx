@@ -9951,12 +9951,78 @@ function SpieltagNotizen({ value, onSave, label = "Notizen", placeholder = "Beob
   );
 }
 
+function LockIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+/* Taschen-Sperre: deckt das Spielformular ab, damit ein Handy in der Jackentasche nichts eintippt.
+   Entsperren: 1 Sekunde gedrückt halten (Maus, Touch, Enter/Leertaste). */
+const SPERRE_HALTEN_MS = 1000;
+const SPERRE_AUTO_MS = 20000; // Automatisch sperren nach so langer Ruhe (nur beim Erfassen eines neuen Spiels)
+function SperreAbdeckung({ onFrei }) {
+  const [haelt, setHaelt] = useState(false);
+  const timer = useRef(null);
+  const stopp = () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    setHaelt(false);
+  };
+  const start = () => {
+    if (timer.current) return;
+    setHaelt(true);
+    timer.current = setTimeout(() => { timer.current = null; setHaelt(false); onFrei(); }, SPERRE_HALTEN_MS);
+  };
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 5, borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--surface) 85%, transparent)", backdropFilter: "blur(2px)" }}>
+      <button
+        onPointerDown={start} onPointerUp={stopp} onPointerLeave={stopp} onPointerCancel={stopp}
+        onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); start(); } }}
+        onKeyUp={stopp} onBlur={stopp} onContextMenu={(e) => e.preventDefault()}
+        aria-label="Gesperrt. Zum Entsperren eine Sekunde gedrückt halten."
+        style={{ position: "relative", overflow: "hidden", minHeight: 56, padding: "0 22px", borderRadius: 999, border: "2px solid var(--accent)", background: "var(--surface)", color: "var(--accent-text)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
+      >
+        <span aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: haelt ? "100%" : "0%", background: "var(--accent-soft)", transition: haelt ? `width ${SPERRE_HALTEN_MS}ms linear` : "none" }} />
+        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8 }}><LockIcon size={18} /> Gesperrt · 1 s halten</span>
+      </button>
+    </div>
+  );
+}
+
+/* Protokoll der Tore im Spielformular: Reihenfolge und (wenn stimmig) Spielstand; letztes Tor zurücknehmen */
+function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck }) {
+  if (eintraege.length === 0) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <span style={styles.label}>Protokoll</span>
+      <ol aria-label="Torfolge" style={{ listStyle: "none", margin: "6px 0 0", padding: 0, display: "grid", gap: 4 }}>
+        {eintraege.map((e, i) => (
+          <li key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 14 }}>
+            <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 40 }}>{mitStand ? `${e.wir}:${e.gegner}` : `${i + 1}.`}</span>
+            <span style={{ color: e.typ === "gegner" ? "var(--muted)" : "inherit" }}>
+              {e.typ === "wir" ? spielerName(e.playerId) : e.typ === "eigen" ? "Eigentor Gegner" : "Gegner"}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <button style={{ ...styles.linkBtn, marginTop: 4, paddingLeft: 0 }} onClick={onZurueck}>↶ Letztes Tor zurücknehmen</button>
+    </div>
+  );
+}
+
 function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
   const [tally, setTally] = useState({});
   const [eigen, setEigen] = useState(0); // Eigentore des Gegners (zählen für uns, ohne Torschützen)
+  const [folge, setFolge] = useState([]); // Torprotokoll: { typ: "wir" | "eigen" | "gegner", playerId? } in Reihenfolge
+  const [gesperrt, setGesperrt] = useState(false); // Taschen-Sperre
+  const letzteAktion = useRef(Date.now());
   const [editingId, setEditingId] = useState(null);
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
@@ -9997,11 +10063,33 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     }
   };
 
+  const entferneLetzten = (passt) => setFolge((f) => {
+    const i = f.map(passt).lastIndexOf(true);
+    return i < 0 ? f : f.filter((_, k) => k !== i);
+  });
+  const eigenPlus = () => {
+    setEigen((e) => e + 1);
+    setOurGoals((g) => Number(g) + 1);
+    setFolge((f) => [...f, { typ: "eigen" }]);
+  };
+  const eigenMinus = () => {
+    setEigen((e) => Math.max(0, e - 1));
+    setOurGoals((g) => Math.max(0, Number(g) - 1));
+    entferneLetzten((e) => e.typ === "eigen");
+  };
+  const letztesZurueck = () => {
+    const l = folge[folge.length - 1];
+    if (!l) return;
+    if (l.typ === "wir") dec(l.playerId);
+    else if (l.typ === "eigen") eigenMinus();
+  };
   const inc = (playerId) => {
     setTally((t) => ({ ...t, [playerId]: (t[playerId] || 0) + 1 }));
     setOurGoals((g) => Number(g) + 1);
+    setFolge((f) => [...f, { typ: "wir", playerId }]);
   };
   const dec = (playerId) => {
+    entferneLetzten((e) => e.typ === "wir" && e.playerId === playerId);
     setTally((t) => {
       const current = (t[playerId] || 0) - 1;
       const next = { ...t };
@@ -10021,6 +10109,8 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setTheirGoals(0);
     setTally({});
     setEigen(0);
+    setFolge([]);
+    setGesperrt(false);
   };
 
   const startEditSpiel = (sp) => {
@@ -10034,6 +10124,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     sp.scorers.forEach((sc) => (t[sc.playerId] = sc.tore));
     setTally(t);
     setEigen(Math.max(0, (Number(sp.ourGoals) || 0) - sp.scorers.reduce((a, sc) => a + (Number(sc.tore) || 0), 0)));
+    setFolge([]);
   };
 
   const startNewForOpponent = (gegnerId) => {
@@ -10045,6 +10136,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setTheirGoals(0);
     setTally({});
     setEigen(0);
+    setFolge([]);
   };
 
   const startNewFree = () => {
@@ -10056,6 +10148,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setTheirGoals(0);
     setTally({});
     setEigen(0);
+    setFolge([]);
   };
 
   const zugeordnet = Object.values(tally).reduce((a, b) => a + b, 0);
@@ -10101,6 +10194,17 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
 
   const editorOpen = Boolean(editingId || newOpponentId || addingFree);
   const editorOpponentFixed = Boolean(editingId || newOpponentId);
+
+  // Automatische Sperre: nur beim Erfassen eines neuen Spiels, nach SPERRE_AUTO_MS ohne Eingabe
+  const erfasstLive = editorOpen && !editingId;
+  useEffect(() => {
+    if (!erfasstLive || gesperrt) return;
+    letzteAktion.current = Date.now();
+    const iv = setInterval(() => { if (Date.now() - letzteAktion.current >= SPERRE_AUTO_MS) setGesperrt(true); }, 1000);
+    return () => clearInterval(iv);
+  }, [erfasstLive, gesperrt]);
+  const torStand = torfolgeStand(folge);
+  const stimmig = torfolgePasst(folge, ourGoals, theirGoals);
 
   const datumFormatiert = new Date(spieltag.date + "T00:00:00").toLocaleDateString("de-DE", {
     day: "2-digit",
@@ -10316,14 +10420,20 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
               </div>
 
               {editorOpen && (
-                <div style={styles.basisGrid}>
+                <div style={{ ...styles.basisGrid, position: "relative" }} onPointerDownCapture={() => { letzteAktion.current = Date.now(); }} onKeyDownCapture={() => { letzteAktion.current = Date.now(); }}>
+                  {gesperrt && <SperreAbdeckung onFrei={() => { letzteAktion.current = Date.now(); setGesperrt(false); }} />}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>
                       {editorOpponentFixed ? `vs. ${gegnerName(opponentId)}` : "Neues Spiel"}
                     </span>
-                    <button style={styles.linkBtn} onClick={resetForm}>
-                      Abbrechen
-                    </button>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <button style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setGesperrt(true)}>
+                        <LockIcon /> Sperren
+                      </button>
+                      <button style={styles.linkBtn} onClick={resetForm}>
+                        Abbrechen
+                      </button>
+                    </span>
                   </div>
 
                   {!editorOpponentFixed && (
@@ -10387,17 +10497,18 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                         );
                       })}
                       <div style={{ ...styles.scorerTile, ...(eigen > 0 ? styles.scorerTileActive : {}) }}>
-                        <button style={styles.scorerName} onClick={() => { setEigen((e) => e + 1); setOurGoals((g) => Number(g) + 1); }}>
+                        <button style={styles.scorerName} onClick={eigenPlus}>
                           Eigentor Gegner
                         </button>
                         <div style={styles.scorerStepper}>
-                          <button style={styles.stepBtn} onClick={() => { setEigen((e) => Math.max(0, e - 1)); setOurGoals((g) => Math.max(0, Number(g) - 1)); }} disabled={eigen === 0} aria-label="Eigentor des Gegners abziehen">−</button>
+                          <button style={styles.stepBtn} onClick={eigenMinus} disabled={eigen === 0} aria-label="Eigentor des Gegners abziehen">−</button>
                           <span style={styles.stepCount} aria-live="polite">{eigen}</span>
-                          <button style={styles.stepBtn} onClick={() => { setEigen((e) => e + 1); setOurGoals((g) => Number(g) + 1); }} aria-label="Eigentor des Gegners hinzufügen">+</button>
+                          <button style={styles.stepBtn} onClick={eigenPlus} aria-label="Eigentor des Gegners hinzufügen">+</button>
                         </div>
                       </div>
                       {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
                     </div>
+                    <TorProtokoll eintraege={torStand} mitStand={stimmig} spielerName={spielerName} onZurueck={letztesZurueck} />
                   </div>
 
                   <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center" }}>
