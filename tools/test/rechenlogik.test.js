@@ -83,3 +83,14 @@ test("Torprotokoll passt nur zum stimmigen Ergebnis", () => {
   assert.equal(B.torfolgePasst(f, 2, 0), false);
   assert.equal(B.torfolgePasst([], 0, 0), false);
 });
+
+test("Spielminute: 1. Minute ab 0:00, Nachspielzeit als 12+n", () => {
+  const B = ladeAusApp(["spielminute"]);
+  assert.equal(B.spielminute(0, 12), "1'");
+  assert.equal(B.spielminute(59, 12), "1'");
+  assert.equal(B.spielminute(60, 12), "2'");
+  assert.equal(B.spielminute(11 * 60 + 59, 12), "12'");
+  assert.equal(B.spielminute(12 * 60 + 5, 12), "12+1'");
+  assert.equal(B.spielminute(14 * 60, 12), "12+3'");
+  assert.equal(B.spielminute(undefined, undefined), "1'");
+});

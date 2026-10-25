@@ -80,3 +80,11 @@ function torfolgePasst(folge, ourGoals, theirGoals) {
   const gegner = l.filter((e) => e.typ === "gegner").length;
   return l.length - gegner === (Number(ourGoals) || 0) && gegner === (Number(theirGoals) || 0);
 }
+
+/* Spielminute eines Tors aus den gespielten Sekunden: 0:00–0:59 = 1., danach "12+2'" in der Nachspielzeit.
+   spielzeitMin = geplante Spielzeit des Spieltags. */
+function spielminute(sek, spielzeitMin) {
+  const gesamt = Math.max(1, Number(spielzeitMin) || 12);
+  const m = Math.floor(Math.max(0, Number(sek) || 0) / 60) + 1;
+  return m > gesamt ? `${gesamt}+${m - gesamt}'` : `${m}'`;
+}

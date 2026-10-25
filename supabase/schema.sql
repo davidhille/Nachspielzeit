@@ -247,6 +247,7 @@ CREATE TABLE public.spieltage (
     zeit text,
     typ text DEFAULT 'spieltag'::text,
     ort text,
+    spielzeit_min integer,
     team_id text DEFAULT 'u8'::text NOT NULL
 );
 

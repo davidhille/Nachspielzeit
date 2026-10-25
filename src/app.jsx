@@ -1812,6 +1812,15 @@ const SQL_TORFOLGE = `-- Nachspielzeit: Torprotokoll pro Spiel (wiederholbar)
 alter table public.spiele add column if not exists torfolge jsonb;
 notify pgrst, 'reload schema';`;
 
+const SQL_SPIELZEIT = `-- Nachspielzeit: Spielzeit pro Spieltag in Minuten (wiederholbar)
+alter table public.spieltage add column if not exists spielzeit_min integer;
+notify pgrst, 'reload schema';`;
+
+/* Spielzeit pro Spieltag: Ersatzwert auf diesem Gerät, solange die Spalte spieltage.spielzeit_min fehlt */
+function lokaleSpielzeit(spieltagId) {
+  try { return Number(localStorage.getItem(`nsz-spielzeit-${spieltagId}`)) || 0; } catch { return 0; }
+}
+
 /* Spiel schreiben; das Torprotokoll (Spalte spiele.torfolge) ist optional. Fehlt die Spalte noch, wird das Spiel ohne Protokoll
    gespeichert und gemeldet, statt das Speichern scheitern zu lassen. */
 async function schreibeSpiel(schreibe, zeile, torfolge, loeschen = false) {
@@ -1826,20 +1835,25 @@ async function schreibeSpiel(schreibe, zeile, torfolge, loeschen = false) {
   }
 }
 
-/* Hinweis nur für Admin: erscheint, solange die Spalte spiele.torfolge fehlt */
-function TorfolgeHinweis() {
-  const [fehlt, setFehlt] = useState(false);
+/* Hinweis nur für Admin: erscheint, solange eine optionale Spalte fehlt (spiele.torfolge, spieltage.spielzeit_min) */
+function DatenbankHinweis() {
+  const [fehlend, setFehlend] = useState([]);
   useEffect(() => {
-    nszFetch(REST + "spiele?select=torfolge&limit=1", { headers: dbHeaders() })
-      .then((r) => setFehlt(!r.ok))
-      .catch(() => {});
+    const pruefe = (pfad, sql, titel) =>
+      nszFetch(REST + pfad, { headers: dbHeaders() })
+        .then((r) => (r.ok ? null : { sql, titel }))
+        .catch(() => null);
+    Promise.all([
+      pruefe("spiele?select=torfolge&limit=1", SQL_TORFOLGE, "Torprotokoll"),
+      pruefe("spieltage?select=spielzeit_min&limit=1", SQL_SPIELZEIT, "Spielzeit pro Spieltag"),
+    ]).then((l) => setFehlend(l.filter(Boolean)));
   }, []);
-  if (!fehlt) return null;
+  if (fehlend.length === 0) return null;
   return (
     <div style={{ ...styles.editBanner, marginBottom: 12, flexDirection: "column", alignItems: "stretch" }}>
-      <div style={{ fontWeight: 700 }}>Datenbank-Update: Torprotokoll</div>
-      <div style={{ fontSize: 13 }}>Für das Torprotokoll (Reihenfolge der Tore) fehlt noch eine Spalte. Einmal in Supabase (SQL Editor) ausführen, danach die Seiten neu laden:</div>
-      <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{SQL_TORFOLGE}</pre>
+      <div style={{ fontWeight: 700 }}>Datenbank-Update: {fehlend.map((f) => f.titel).join(", ")}</div>
+      <div style={{ fontSize: 13 }}>Dafür fehlt noch eine Spalte. Einmal in Supabase (SQL Editor) ausführen, danach die Seiten neu laden:</div>
+      <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{fehlend.map((f) => f.sql).join("\n\n")}</pre>
     </div>
   );
 }
@@ -2072,7 +2086,7 @@ notify pgrst, 'reload schema';`;
           </section>
         )}
 
-        <TorfolgeHinweis />
+        <DatenbankHinweis />
         {tab === "import" && <SpielerImport key={team} />}
         {tab === "einstellungen" && <TeamEinstellungen key={team} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
         {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
@@ -2447,6 +2461,7 @@ function App() {
         fotoUrl: s.foto_url || null,
         zeit: s.zeit || null,
         typ: s.typ || "spieltag",
+        spielzeitMin: Number(s.spielzeit_min) || lokaleSpielzeit(s.id) || 12,
         ort: s.ort || "",
         deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
@@ -2930,6 +2945,17 @@ function App() {
               })
             }
             onUpdateNotizen={(spieltagId, notizen) => wrapAction(() => dbUpdate("spieltage", spieltagId, { notizen }))}
+            onUpdateSpielzeit={(spieltagId, min) =>
+              wrapAction(async () => {
+                try {
+                  await dbUpdate("spieltage", spieltagId, { spielzeit_min: min });
+                } catch (e) {
+                  if (!/spielzeit_min/i.test(String((e && e.message) || e))) throw e;
+                  try { localStorage.setItem(`nsz-spielzeit-${spieltagId}`, String(min)); } catch {}
+                  setTimeout(() => meldung("Spielzeit nur auf diesem Gerät gespeichert: Es fehlt ein Datenbank-Update (Administration → Hinweis).", "error"), 400);
+                }
+              })
+            }
             onUploadFoto={(spieltagId, file) =>
               wrapAction(async () => {
                 const url = await uploadSpieltagFoto(spieltagId, file);
@@ -9210,7 +9236,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto, onOpenPlayer }) {
+function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUpdateSpielzeit, onUploadFoto, onOpenPlayer }) {
   const [openSpieltag, setOpenSpieltag] = useState(zielSpieltagId || null);
   const [subTab, setSubTab] = useState("liste");
   const [uebersichtSort, setUebersichtSort] = useState("spiele");
@@ -9281,6 +9307,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
                 onRemoveSpiel={(spielId) => onRemoveSpiel(s.id, spielId)}
                 onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
                 onUpdateNotizen={(notizen) => onUpdateNotizen(s.id, notizen)}
+                onUpdateSpielzeit={(min) => onUpdateSpielzeit(s.id, min)}
                 onUploadFoto={(file) => onUploadFoto(s.id, file)}
               />
             ))}
@@ -10018,7 +10045,7 @@ function LockIcon({ size = 16 }) {
    Entsperren: 1 Sekunde gedrückt halten (Maus, Touch, Enter/Leertaste). */
 const SPERRE_HALTEN_MS = 1000;
 const SPERRE_AUTO_MS = 20000; // Automatisch sperren nach so langer Ruhe (nur beim Erfassen eines neuen Spiels)
-function SperreAbdeckung({ onFrei }) {
+function SperreAbdeckung({ onFrei, uhr }) {
   const [haelt, setHaelt] = useState(false);
   const timer = useRef(null);
   const stopp = () => {
@@ -10032,7 +10059,8 @@ function SperreAbdeckung({ onFrei }) {
   };
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 5, borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--surface) 85%, transparent)", backdropFilter: "blur(2px)" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 5, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12, alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--surface) 85%, transparent)", backdropFilter: "blur(2px)" }}>
+      {uhr}
       <button
         onPointerDown={start} onPointerUp={stopp} onPointerLeave={stopp} onPointerCancel={stopp}
         onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); start(); } }}
@@ -10047,16 +10075,80 @@ function SperreAbdeckung({ onFrei }) {
   );
 }
 
+/* Spieluhr eines Spieltags: zählt über Zeitstempel (läuft also auch bei gesperrtem Handy richtig weiter) und bleibt beim
+   Neuladen erhalten (nur auf diesem Gerät). Gespeichert wird die gespielte Zeit; angezeigt wird die Restzeit, danach die Nachspielzeit. */
+function useSpielUhr(spieltagId, spielzeitMin) {
+  const key = `nsz-uhr-${spieltagId}`;
+  const [z, setZ] = useState(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem(key) || "null");
+      if (r && typeof r.summeMs === "number") return { summeMs: r.summeMs, startTs: typeof r.startTs === "number" ? r.startTs : null };
+    } catch {}
+    return { summeMs: 0, startTs: null };
+  });
+  const [, setTick] = useState(0);
+  const zRef = useRef(z);
+  const alarm = useRef(false);
+  const gesamt = (Number(spielzeitMin) || 12) * 60;
+  const sek = () => Math.floor((zRef.current.summeMs + (zRef.current.startTs ? Date.now() - zRef.current.startTs : 0)) / 1000);
+  const setze = (n) => {
+    zRef.current = n;
+    setZ(n);
+    try {
+      if (n.summeMs === 0 && !n.startTs) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(n));
+    } catch {}
+  };
+  useEffect(() => {
+    if (!z.startTs) return;
+    alarm.current = sek() >= gesamt; // nach Neuladen in der Nachspielzeit nicht erneut melden
+    let letzte = -1;
+    const iv = setInterval(() => {
+      const s = sek();
+      if (s === letzte) return;
+      letzte = s;
+      setTick((t) => t + 1);
+      if (!alarm.current && s >= gesamt) {
+        alarm.current = true;
+        try { if (navigator.vibrate) navigator.vibrate([400, 200, 400]); } catch {}
+        meldung("Spielzeit um. Die Nachspielzeit läuft.", "info");
+      }
+    }, 250);
+    return () => clearInterval(iv);
+  }, [z.startTs, gesamt]); // eslint-disable-line
+  const rest = gesamt - sek();
+  const mmss = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+  return {
+    sek,
+    laeuft: !!z.startTs,
+    gestartet: z.summeMs > 0 || !!z.startTs,
+    text: rest >= 0 ? mmss(rest) : `+${mmss(-rest)}`,
+    nachspielzeit: rest < 0,
+    start: () => setze({ summeMs: zRef.current.summeMs, startTs: Date.now() }),
+    pause: () => setze({ summeMs: zRef.current.summeMs + (zRef.current.startTs ? Date.now() - zRef.current.startTs : 0), startTs: null }),
+    zuruecksetzen: () => setze({ summeMs: 0, startTs: null }),
+  };
+}
+
 /* Protokoll der Tore im Spielformular: Reihenfolge und (wenn stimmig) Spielstand; letztes Tor zurücknehmen */
-function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck }) {
+function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck, spielzeitMin, mitMinuten, onMinute }) {
   if (eintraege.length === 0) return null;
   return (
     <div style={{ marginTop: 12 }}>
       <span style={styles.label}>Protokoll</span>
       <ol aria-label="Torfolge" style={{ listStyle: "none", margin: "6px 0 0", padding: 0, display: "grid", gap: 4 }}>
         {eintraege.map((e, i) => (
-          <li key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 14 }}>
+          <li key={i} style={{ display: "flex", gap: 10, alignItems: mitMinuten ? "center" : "baseline", fontSize: 14 }}>
             <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 40 }}>{mitStand ? `${e.wir}:${e.gegner}` : `${i + 1}.`}</span>
+            {mitMinuten && (
+              <button
+                onClick={() => onMinute(i)}
+                aria-label={`Spielminute ändern${typeof e.sek === "number" ? `, aktuell ${spielminute(e.sek, spielzeitMin)}` : ""}`}
+                style={{ ...styles.linkBtn, minWidth: 44, padding: "0 6px", fontVariantNumeric: "tabular-nums", color: typeof e.sek === "number" ? "var(--text)" : "var(--muted)" }}
+              >
+                {typeof e.sek === "number" ? spielminute(e.sek, spielzeitMin) : "Min.?"}
+              </button>
+            )}
             <span style={{ color: e.typ === "gegner" ? "var(--muted)" : "inherit" }}>
               {e.typ === "wir" ? spielerName(e.playerId) : e.typ === "eigen" ? "Eigentor Gegner" : "Gegner"}
             </span>
@@ -10069,7 +10161,7 @@ function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck }) {
   );
 }
 
-function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUploadFoto }) {
+function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUpdateSpielzeit, onUploadFoto }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -10078,6 +10170,8 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const [folge, setFolge] = useState([]); // Torprotokoll: { typ: "wir" | "eigen" | "gegner", playerId? } in Reihenfolge
   const [gesperrt, setGesperrt] = useState(false); // Taschen-Sperre
   const letzteAktion = useRef(Date.now());
+  const uhr = useSpielUhr(spieltag.id, spieltag.spielzeitMin);
+  const marke = () => (uhr.gestartet ? { sek: uhr.sek() } : {}); // Spielzeit des Tors, wenn die Uhr benutzt wird
   const [editingId, setEditingId] = useState(null);
   const [newOpponentId, setNewOpponentId] = useState(null);
   const [addingFree, setAddingFree] = useState(false);
@@ -10125,11 +10219,11 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const eigenPlus = () => {
     setEigen((e) => e + 1);
     setOurGoals((g) => Number(g) + 1);
-    setFolge((f) => [...f, { typ: "eigen" }]);
+    setFolge((f) => [...f, { typ: "eigen", ...marke() }]);
   };
   const gegnerPlus = () => {
     setTheirGoals((g) => Number(g) + 1);
-    setFolge((f) => [...f, { typ: "gegner" }]);
+    setFolge((f) => [...f, { typ: "gegner", ...marke() }]);
   };
   const gegnerMinus = () => {
     setTheirGoals((g) => Math.max(0, Number(g) - 1));
@@ -10147,10 +10241,26 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     else if (l.typ === "eigen") eigenMinus();
     else if (l.typ === "gegner") gegnerMinus();
   };
+  const minuteAendern = (i) => {
+    const e = folge[i];
+    const aktuell = e && typeof e.sek === "number" ? String(Math.floor(e.sek / 60) + 1) : "";
+    frageAnd("Spielminute (leer = ohne Minute)", aktuell, (v) => {
+      const n = parseInt(String(v), 10);
+      setFolge((f) => f.map((x, k) => {
+        if (k !== i) return x;
+        const { sek, ...rest } = x; // eslint-disable-line no-unused-vars
+        return n > 0 && n < 100 ? { ...rest, sek: (n - 1) * 60 } : rest;
+      }));
+    });
+  };
+  const spielzeitAndere = () => frageAnd("Spielzeit in Minuten", String(spieltag.spielzeitMin), (v) => {
+    const n = parseInt(String(v), 10);
+    if (n >= 1 && n <= 90) onUpdateSpielzeit(n);
+  });
   const inc = (playerId) => {
     setTally((t) => ({ ...t, [playerId]: (t[playerId] || 0) + 1 }));
     setOurGoals((g) => Number(g) + 1);
-    setFolge((f) => [...f, { typ: "wir", playerId }]);
+    setFolge((f) => [...f, { typ: "wir", playerId, ...marke() }]);
   };
   const dec = (playerId) => {
     entferneLetzten((e) => e.typ === "wir" && e.playerId === playerId);
@@ -10175,6 +10285,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
     setEigen(0);
     setFolge([]);
     setGesperrt(false);
+    uhr.zuruecksetzen();
   };
 
   const startEditSpiel = (sp) => {
@@ -10436,6 +10547,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           {torfolgeStand(sp.torfolge).map((e, i) => (
                             <li key={i}>
                               <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{e.wir}:{e.gegner}</span>{" "}
+                              {typeof e.sek === "number" && <>{spielminute(e.sek, spieltag.spielzeitMin)}{" "}</>}
                               {e.typ === "wir" ? spielerName(e.playerId) : e.typ === "eigen" ? "Eigentor Gegner" : "Gegner"}
                             </li>
                           ))}
@@ -10498,7 +10610,12 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
 
               {editorOpen && (
                 <div style={{ ...styles.basisGrid, position: "relative" }} onPointerDownCapture={() => { letzteAktion.current = Date.now(); }} onKeyDownCapture={() => { letzteAktion.current = Date.now(); }}>
-                  {gesperrt && <SperreAbdeckung onFrei={() => { letzteAktion.current = Date.now(); setGesperrt(false); }} />}
+                  {gesperrt && (
+                    <SperreAbdeckung
+                      onFrei={() => { letzteAktion.current = Date.now(); setGesperrt(false); }}
+                      uhr={!editingId && uhr.gestartet ? <div role="timer" aria-label="Restzeit" style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: uhr.nachspielzeit ? "var(--danger-text)" : "var(--text)" }}>{uhr.text}</div> : null}
+                    />
+                  )}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>
                       {editorOpponentFixed ? `vs. ${gegnerName(opponentId)}` : "Neues Spiel"}
@@ -10512,6 +10629,28 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       </button>
                     </span>
                   </div>
+
+                  {!editingId && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <div role="timer" aria-label="Restzeit" style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 72, color: uhr.nachspielzeit ? "var(--danger-text)" : "var(--text)" }}>{uhr.text}</div>
+                        <button style={styles.rowBtn} onClick={uhr.laeuft ? uhr.pause : uhr.start}>
+                          {uhr.laeuft ? "Pause" : uhr.gestartet ? "Weiter" : "Start"}
+                        </button>
+                        {uhr.gestartet && (
+                          <button style={styles.linkBtn} onClick={() => confirmAnd("Spieluhr auf Anfang zurücksetzen?", uhr.zuruecksetzen)}>Zurücksetzen</button>
+                        )}
+                      </div>
+                      <div role="group" aria-label="Spielzeit in Minuten" style={styles.chipGroup}>
+                        {[10, 12, 15, 20].map((m) => (
+                          <button key={m} onClick={(e) => { onUpdateSpielzeit(m); e.currentTarget.blur(); }} aria-pressed={spieltag.spielzeitMin === m} style={{ ...styles.chip, ...(spieltag.spielzeitMin === m ? styles.chipActive : {}) }}>{m} Min.</button>
+                        ))}
+                        <button onClick={spielzeitAndere} aria-pressed={![10, 12, 15, 20].includes(spieltag.spielzeitMin)} style={{ ...styles.chip, ...(![10, 12, 15, 20].includes(spieltag.spielzeitMin) ? styles.chipActive : {}) }}>
+                          {![10, 12, 15, 20].includes(spieltag.spielzeitMin) ? `${spieltag.spielzeitMin} Min.` : "Andere …"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {!editorOpponentFixed && (
                     <div>
@@ -10597,7 +10736,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       </div>
                       {torschuetzenOptionen.length === 0 && <span style={styles.hint}>Noch keine Spieler angelegt.</span>}
                     </div>
-                    <TorProtokoll eintraege={torStand} mitStand={stimmig} spielerName={spielerName} onZurueck={letztesZurueck} />
+                    <TorProtokoll eintraege={torStand} mitStand={stimmig} spielerName={spielerName} onZurueck={letztesZurueck} spielzeitMin={spieltag.spielzeitMin} mitMinuten={uhr.gestartet || folge.some((e) => typeof e.sek === "number")} onMinute={minuteAendern} />
                   </div>
 
                   <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center" }}>
