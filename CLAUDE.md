@@ -58,4 +58,5 @@
 - U8-Übungsfilter: Bedeutung und Wunschfilter noch nicht geklärt, bei Bedarf nachfragen.
 - Eigentore werden nicht separat gespeichert (bräuchte eine neue DB-Spalte).
 - Saisonwechsel vor der nächsten Saison klären; tägliches Backup gelegentlich prüfen.
+- Mehrere Vereine (später, kein Termin): neue Ebene Verein über Team, Rollen Haupt-Admin / Vereins-Admin / Trainer, Logo und Farbe je Verein, Nachspielzeit-Logo für die Haupt-Administration. Erst umsetzen, wenn ein zweiter Verein konkret ansteht (Datenmodell, Rechte/RLS, Oberfläche in getrennten Commits).
 - Sprint-Zeiten in Sekunden (z. B. "11:89") sind korrekt, kein Fehler.
