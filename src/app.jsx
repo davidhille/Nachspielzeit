@@ -3200,9 +3200,22 @@ function App() {
               return wrapAction(() => dbUpdate("trainingstermine", id, { status: neuerStatus }));
             }}
             onRemoveTermin={(id) => wrapAction(() => dbDelete("trainingstermine", id))}
-            onUpdateZeit={(id, startZeit, endZeit) =>
-              wrapAction(() => dbUpdate("trainingstermine", id, { start_zeit: startZeit, end_zeit: endZeit }), "Uhrzeit aktualisiert")
-            }
+            onUpdateZeit={(id, startZeit, endZeit, datum) => {
+              const t = termine.find((x) => x.id === id);
+              const neuesDatum = datum && t && datum !== t.date ? datum : null;
+              if (neuesDatum) {
+                // Bewertungen hängen am Datum, nicht am Termin: Verschieben nur, wenn nichts daran hängt
+                if (trainings.some((x) => x.date === t.date)) {
+                  meldung("Für diesen Tag gibt es schon Bewertungen. Das Datum lässt sich deshalb nicht mehr ändern.", "error");
+                  return Promise.resolve(false);
+                }
+                if (termine.some((x) => x.id !== id && x.date === neuesDatum)) {
+                  meldung("An diesem Tag gibt es schon einen Termin.", "error");
+                  return Promise.resolve(false);
+                }
+              }
+              return wrapAction(() => dbUpdate("trainingstermine", id, { start_zeit: startZeit, end_zeit: endZeit, ...(neuesDatum ? { date: neuesDatum } : {}) }), neuesDatum ? "Termin verschoben" : "Uhrzeit aktualisiert");
+            }}
             onAddGegner={(name) => wrapAction(() => dbInsert("gegner", { id: uid(), name }))}
             onRemoveGegner={(id) => softDelete("gegner", id, "Gegner")}
             spieltage={spieltage}
@@ -11865,10 +11878,11 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
   const [bearbeiten, setBearbeiten] = useState(false);
   const [vonZeit, setVonZeit] = useState(termin.start_zeit || "");
   const [bisZeit, setBisZeit] = useState(termin.end_zeit || "");
+  const [datum, setDatum] = useState(termin.date);
 
-  const speichern = () => {
-    onUpdateZeit(termin.id, vonZeit || null, bisZeit || null);
-    setBearbeiten(false);
+  const speichern = async () => {
+    const ok = await onUpdateZeit(termin.id, vonZeit || null, bisZeit || null, datum || termin.date);
+    if (ok !== false) setBearbeiten(false);
   };
 
   return (
@@ -11902,14 +11916,15 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
       </div>
 
       {bearbeiten ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <input type="date" aria-label="Datum" style={{ ...styles.input, width: "auto" }} value={datum} onChange={(e) => setDatum(e.target.value)} />
           <ZeitSelect value={vonZeit} onChange={setVonZeit} />
           <span style={{ color: "var(--muted)" }}>bis</span>
           <ZeitSelect value={bisZeit} onChange={setBisZeit} />
           <button style={styles.linkBtn} onClick={speichern}>
             Speichern
           </button>
-          <button style={styles.linkBtn} onClick={() => setBearbeiten(false)}>
+          <button style={styles.linkBtn} onClick={() => { setDatum(termin.date); setBearbeiten(false); }}>
             Abbrechen
           </button>
         </div>
@@ -11919,7 +11934,7 @@ function TerminRow({ termin, onToggleAbsage, onRemoveTermin, onUpdateZeit, uebun
             style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
             onClick={() => setBearbeiten(true)}
           >
-            <EditIcon size={14} /> Uhrzeit
+            <EditIcon size={14} /> Datum & Zeit
           </button>
           <button
             style={{ ...styles.linkBtn, display: "inline-flex", alignItems: "center", gap: 4 }}
