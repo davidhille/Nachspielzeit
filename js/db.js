@@ -124,6 +124,16 @@ async function dbUpdate(table, id, patch, idCol = "id") {
   return res.json();
 }
 
+/* Team-Konfiguration ändern: erst frisch laden, dann nur die gewünschte Änderung anwenden.
+   Nie die ganze Konfiguration aus einer älteren Kopie zurückschreiben (sonst gehen z. B. die Farben verloren). */
+async function dbConfigAendern(teamId, aendere) {
+  const res = await nszFetch(`${REST}teams?id=eq.${encodeURIComponent(teamId)}&select=config`, { headers: dbHeaders() });
+  if (!res.ok) throw new Error(`Laden von "teams" fehlgeschlagen: ${await res.text()}`);
+  const zeilen = await res.json();
+  const frisch = (zeilen[0] && zeilen[0].config) || {};
+  return dbUpdate("teams", teamId, { config: aendere({ ...frisch }) });
+}
+
 async function dbDelete(table, id, idCol = "id") {
   const res = await nszFetch(`${REST}${table}?${idCol}=eq.${id}`, { method: "DELETE", headers: dbHeaders() });
   if (!res.ok) throw new Error(`Löschen in "${table}" fehlgeschlagen: ${await res.text()}`);

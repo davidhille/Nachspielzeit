@@ -1537,7 +1537,13 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
         if (nn !== std) bNeu[k] = nn;
       });
       if (Object.keys(bNeu).length) neuCfg.bewertung = bNeu; else delete neuCfg.bewertung;
-      await dbUpdate("teams", team, { name: name.trim() || team, config: neuCfg });
+      // Nur das ändern, was in diesem Formular geändert wurde – auf Basis der frischen Konfiguration (andere Stellen schreiben sie ebenfalls)
+      const geaendert = [...new Set([...Object.keys(cfg), ...Object.keys(neuCfg)])].filter((k) => JSON.stringify(cfg[k]) !== JSON.stringify(neuCfg[k]));
+      await dbConfigAendern(team, (frisch) => {
+        geaendert.forEach((k) => { if (neuCfg[k] === undefined) delete frisch[k]; else frisch[k] = neuCfg[k]; });
+        return frisch;
+      });
+      if (name.trim() !== (teamRow.name || "")) await dbUpdate("teams", team, { name: name.trim() || team });
       setVorlauf(String(v));
       setStatus("Gespeichert");
       onSaved && onSaved();
@@ -2136,7 +2142,7 @@ function AdminApp() {
     setLetztesBackup(stempel);
     try {
       for (const t of teams.filter((x) => x.created_at !== undefined)) {
-        await dbUpdate("teams", t.id, { config: { ...(t.config || {}), letztes_backup: jetzt.toISOString() } });
+        await dbConfigAendern(t.id, (c) => ({ ...c, letztes_backup: jetzt.toISOString() }));
       }
       ladeTeams();
     } catch (e) {}
@@ -2760,23 +2766,20 @@ function App() {
       // der bisherige Link bleibt vorerst aktiv (schon verschickt) und kann unten abgeschaltet werden
       const alt = kartenToken ? [kartenToken, ...kartenAlt] : kartenAlt;
       await veroeffentlicheAlle(alt, snap, plusNeu);
-      await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), share_token: neu, share_alt: alt } });
+      await dbConfigAendern(Sitzung.team, (c) => ({ ...c, share_token: neu, share_alt: alt }));
     }, "Karten-Link erstellt");
   const kartenAltAbschalten = (tok) =>
     wrapAction(async () => {
       await loescheKarten(tok);
-      await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), share_alt: kartenAlt.filter((x) => x !== tok) } });
+      await dbConfigAendern(Sitzung.team, (c) => ({ ...c, share_alt: kartenAlt.filter((x) => x !== tok) }));
     }, "Alter Link abgeschaltet");
   const kartenLinkSperren = () =>
     wrapAction(async () => {
-      const cfg = { ...(teamInfo?.config || {}) };
-      delete cfg.share_token;
-      delete cfg.share_alt;
-      await dbUpdate("teams", Sitzung.team, { config: cfg });
+      await dbConfigAendern(Sitzung.team, (c) => { delete c.share_token; delete c.share_alt; return c; });
       for (const t of [kartenToken, ...kartenAlt]) if (t) await loescheKarten(t);
     }, "Karten-Link gesperrt");
   const songsSpeichern = async (songs) => {
-    await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), songs } });
+    await dbConfigAendern(Sitzung.team, (c) => ({ ...c, songs }));
   };
   const songHinzufuegen = (files) =>
     wrapAction(async () => {
@@ -2820,7 +2823,7 @@ function App() {
   const kartenVollUmschalten = () =>
     wrapAction(async () => {
       const voll = !teamInfo?.config?.share_voll;
-      await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo?.config || {}), share_voll: voll } });
+      await dbConfigAendern(Sitzung.team, (c) => ({ ...c, share_voll: voll }));
     }, "Karten-Link angepasst");
   const kartenLinkAktualisieren = () =>
     wrapAction(async () => {
@@ -2975,7 +2978,7 @@ function App() {
             onUploadTeamFoto={(file) =>
               wrapAction(async () => {
                 const url = await uploadTeamFoto(file);
-                if (teamInfo) await dbUpdate("teams", Sitzung.team, { config: { ...(teamInfo.config || {}), team_photo_url: url } });
+                if (teamInfo) await dbConfigAendern(Sitzung.team, (c) => ({ ...c, team_photo_url: url }));
                 else await dbUpsert("team_settings", { id: 1, team_photo_url: url }, "id");
               }, "Mannschaftsfoto aktualisiert")
             }

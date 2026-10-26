@@ -21,7 +21,7 @@ function lade(antwort, { team = "u8", code = "c0de" } = {}) {
     localStorage: { getItem: () => code, setItem() {}, removeItem() {} },
     URLSearchParams, fetch: fakeFetch, AbortController, setTimeout, clearTimeout, encodeURIComponent, JSON, String, Error, TypeError, Array,
   });
-  vm.runInContext(quelle("sitzung.js") + "\n" + quelle("db.js") + "\nthis.__a = { Sitzung, dbSelect, dbInsert, dbUpsert, dbUpdate, dbDeleteWhere, dbIdsWhere, ersetzeGruppe, mitTeamId, TEAM_TABLES, nszFetch };", ctx);
+  vm.runInContext(quelle("sitzung.js") + "\n" + quelle("db.js") + "\nthis.__a = { Sitzung, dbSelect, dbInsert, dbUpsert, dbUpdate, dbConfigAendern, dbDeleteWhere, dbIdsWhere, ersetzeGruppe, mitTeamId, TEAM_TABLES, nszFetch };", ctx);
   return { ...ctx.__a, aufrufe };
 }
 
