@@ -8745,9 +8745,9 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
           { value: monatsPunkte.toFixed(2), label: "PKT MONAT" },
           { value: saisonPunkte.toFixed(2), label: "PKT SAISON" },
           { value: basisAktuell.toFixed(2), label: "BASIS" },
-          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAININGS", kurz: "ANWESENHEIT TRAININGS", icon: "schuh", prozent: quoteTraining },
-          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAGE", kurz: "ANWESENHEIT SPIELTAGE", icon: "pokal", prozent: quoteSpieltage },
           { value: toreGesamt, label: "TORE" },
+          { value: quoteSpieltage != null ? quoteSpieltage.toFixed(0) + "%" : "–", label: "ANW. SPIELTAGE", kurz: "ANWESENHEIT SPIELTAGE", icon: "pokal", prozent: quoteSpieltage },
+          { value: quoteTraining != null ? quoteTraining.toFixed(0) + "%" : "–", label: "ANW. TRAININGS", kurz: "ANWESENHEIT TRAININGS", icon: "schuh", prozent: quoteTraining },
         ]}
       />
 
