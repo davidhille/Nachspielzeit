@@ -8465,7 +8465,7 @@ function PlayerCard({ player, stats, teamName = TEAM_NAME }) {
           </div>
         </div>
 
-        <div style={{ position: "relative", display: "flex", justifyContent: "center", marginTop: -8 }}>
+        <div className="pc-avatar" style={{ position: "relative", display: "flex", justifyContent: "center", marginTop: -8 }}>
           <Avatar name={player.name} size={150} photoUrl={player.photo_url} ring="gold" />
         </div>
 
