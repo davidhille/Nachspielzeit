@@ -2245,7 +2245,8 @@ notify pgrst, 'reload schema';`;
 
         <DatenbankHinweis />
         {tab === "import" && <SpielerImport key={team} />}
-        {tab === "einstellungen" && <TeamEinstellungen key={team} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
+        {/* Der Schlüssel wechselt, sobald die Team-Daten da sind: Das Formular übernimmt seine Startwerte nur beim Einbauen und wäre nach einem Reload sonst leer. */}
+        {tab === "einstellungen" && <TeamEinstellungen key={`${team}:${teamRow ? "geladen" : "lade"}`} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
         {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
         {tab === "uebungen" && <UebungenAdmin teams={teams} />}
         {tab === "fehler" && <FehlerAnsicht />}
