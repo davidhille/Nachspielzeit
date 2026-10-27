@@ -11835,13 +11835,13 @@ function TrainingsplanBereich({
               onClick={() => setTerminTab("kommende")}
               aria-pressed={!!(terminTab === "kommende")} style={{ ...styles.segBtn, ...(terminTab === "kommende" ? styles.segBtnActive : {}) }}
             >
-              Kommende Termine{kommende.length > 0 ? ` (${kommende.length})` : ""}
+              Kommende{kommende.length > 0 ? ` (${kommende.length})` : ""}
             </button>
             <button
               onClick={() => setTerminTab("vergangene")}
               aria-pressed={!!(terminTab === "vergangene")} style={{ ...styles.segBtn, ...(terminTab === "vergangene" ? styles.segBtnActive : {}) }}
             >
-              Vergangene Termine{vergangene.length > 0 ? ` (${vergangene.length})` : ""}
+              Vergangene{vergangene.length > 0 ? ` (${vergangene.length})` : ""}
             </button>
           </div>
 
@@ -12223,7 +12223,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
       <h3 style={styles.h3}>{start ? "Übung bearbeiten" : "Neue Übung"}</h3>
       <div style={styles.card}>
         <div style={{ ...styles.label, marginBottom: 6 }}>Bild</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
           <div style={{ width: 120, height: 90, borderRadius: 12, overflow: "hidden", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {vorschau ? <FormVorschau url={vorschau} /> : <UebungBild url={null} size={64} />}
           </div>
