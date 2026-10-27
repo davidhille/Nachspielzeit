@@ -12243,7 +12243,7 @@ function UebungForm({ start, alleKeywords, onSave, onCancel, onRemove, gesperrt 
               {vorschau ? "Bild ändern" : "Bild hochladen"}
             </button>
             <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
-              Foto, Skizze oder Screenshot – oder einfach einen Screenshot mit Strg/Cmd+V einfügen. Wird automatisch verkleinert.
+              Foto, Skizze oder Screenshot – Strg/Cmd+V fügt ihn direkt ein.
             </div>
           </div>
         </div>
