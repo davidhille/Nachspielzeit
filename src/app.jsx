@@ -13028,6 +13028,7 @@ const styles = {
     padding: "10px 12px",
     fontSize: 14,
     flex: 1,
+    minWidth: 0, // erlaubt dem Feld zu schrumpfen, damit der Button in der Zeile Platz behält
     color: "var(--text)",
     fontFamily: "'Inter', system-ui, sans-serif",
   },
@@ -13223,6 +13224,8 @@ const styles = {
     fontWeight: 600,
     cursor: "pointer",
     boxShadow: "var(--sh-1)",
+    flexShrink: 0, // Button behält seine Breite, das Eingabefeld gibt nach
+    whiteSpace: "nowrap",
   },
   dangerBtn: { color: "var(--danger-text)", background: "transparent", fontWeight: 600, borderRadius: 12, padding: "6px 12px" }, // Gefahr: nur rote Schrift, keine Fläche
   linkBtn: {
