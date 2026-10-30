@@ -997,7 +997,6 @@ create policy "profilbilder loeschen" on storage.objects for delete
 
 -- ======================================================================
 -- Ergänzung 30.10.2026: Briefkasten (anonymes Eltern-Feedback, SVH-6)
--- Das SQL steht auch in der App unter Administration -> Funktionen
 -- ======================================================================
 -- Nachspielzeit: Briefkasten, anonymes Eltern-Feedback (wiederholbar)
 create table if not exists briefkasten (
@@ -1073,4 +1072,33 @@ notify pgrst, 'reload schema';
 -- (null = Teamstandard, 0 = aus, sonst Minuten)
 -- ======================================================================
 alter table public.spieltage add column if not exists wechsel_min integer check (wechsel_min is null or (wechsel_min between 0 and 45));
+notify pgrst, 'reload schema';
+
+-- ======================================================================
+-- Ergänzung 30.10.2026: Vereine als eigene Ebene über den Teams
+-- (wiederholbar; die App läuft auch vor dem Ausführen mit den alten Werten aus teams.config weiter)
+-- ======================================================================
+create table if not exists vereine (
+  id text primary key check (id ~ '^[a-z0-9-]{2,40}$'),
+  name text not null check (char_length(name) between 1 and 80),
+  logo_url text,
+  created_at timestamptz not null default now()
+);
+alter table vereine enable row level security;
+grant select, insert, update, delete on table vereine to anon, authenticated, service_role;
+drop policy if exists "vereine lesen" on vereine;
+drop policy if exists "vereine schreiben" on vereine;
+-- Lesen: jeder gültige Zugangscode (Name und Wappen erscheinen in der Trainer-App). Ändern: nur Admin-Codes.
+create policy "vereine lesen" on vereine for select to public using (nsz_code_ok());
+create policy "vereine schreiben" on vereine for all to public using (nsz_is_admin()) with check (nsz_is_admin());
+
+alter table teams add column if not exists verein_id text references vereine(id) on update cascade on delete set null;
+
+-- Bestehende Daten übernehmen: Standardverein aus den bisherigen Einstellungen des ersten Teams, alle Teams ohne Verein werden ihm zugeordnet
+insert into vereine (id, name, logo_url)
+select 'sv-heimstetten',
+       coalesce((select nullif(config ->> 'verein_name', '') from teams where nullif(config ->> 'verein_name', '') is not null order by created_at limit 1), 'SV Heimstetten'),
+       (select nullif(config ->> 'verein_logo_url', '') from teams where nullif(config ->> 'verein_logo_url', '') is not null order by created_at limit 1)
+on conflict (id) do nothing;
+update teams set verein_id = 'sv-heimstetten' where verein_id is null;
 notify pgrst, 'reload schema';

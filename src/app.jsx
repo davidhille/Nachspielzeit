@@ -182,7 +182,7 @@ async function uploadTeamFoto(file, team = Sitzung.team) {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}?t=${Date.now()}`;
 }
 
-async function uploadVereinsLogo(team, file) {
+async function uploadVereinsLogo(team, file, pfad = teamPfad(`team/wappen-${team}.png`, team)) {
   // als PNG (Transparenz bleibt erhalten), max. 400 px hoch
   const url = URL.createObjectURL(file);
   const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
@@ -193,7 +193,7 @@ async function uploadVereinsLogo(team, file) {
   c.height = Math.max(1, Math.round(img.naturalHeight * f));
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
   const blob = await new Promise((res) => c.toBlob(res, "image/png"));
-  const path = teamPfad(`team/wappen-${team}.png`, team);
+  const path = pfad;
   const res = await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": Sitzung.code, "x-upsert": "true", "Content-Type": "image/png" },
@@ -654,6 +654,23 @@ const FEATURES = [
 const FEATURES_STANDARD_AUS = ["eltern_briefkasten"];
 const featureAn = (f, key) => (FEATURES_STANDARD_AUS.includes(key) ? f[key] === true : f[key] !== false);
 
+/* Vereine (eigene Ebene über den Teams): Name und Wappen kommen aus der Tabelle "vereine" (teams.verein_id).
+   Fehlt die Tabelle oder die Zuordnung noch, gelten wie bisher die Werte aus teams.config (verein_name, verein_logo_url). */
+function teamMitVerein(team, vereine) {
+  if (!team) return team;
+  const v = (vereine || []).find((x) => x.id === team.verein_id);
+  if (!v) return team;
+  return { ...team, config: { ...(team.config || {}), verein_name: v.name, verein_logo_url: v.logo_url || undefined } };
+}
+async function ladeVereineListe() {
+  try {
+    return (await dbSelect("vereine")).sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
+  } catch (e) {
+    console.error(e);
+    return null; // Tabelle fehlt (noch) oder nicht lesbar: Fallback auf teams.config
+  }
+}
+
 const FeatureCtx = React.createContext({});
 // Ohne Eintrag in der Datenbank gilt eine Funktion als aktiv
 const useFeature = (key) => featureAn(React.useContext(FeatureCtx), key);
@@ -663,7 +680,7 @@ const IS_ADMIN_HOST = /^admin\./i.test(window.location.hostname) || /[?&]admin=1
 const BACKUP_TABELLEN = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele",
   "torschuetzen", "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "team_settings", "uebungen",
-  "training_uebungen", "app_features", "teams", "taktik_boards", "training_boards", "briefkasten", "notizen",
+  "training_uebungen", "app_features", "teams", "vereine", "taktik_boards", "training_boards", "briefkasten", "notizen",
 ];
 
 /* ---------- Spieler-Import (BFV/DFBnet-CSV) ---------- */
@@ -2491,7 +2508,10 @@ function App() {
   const [trainingBoardsFehlt, setTrainingBoardsFehlt] = useState(false);
   const [teamSettings, setTeamSettings] = useState({});
   const [features, setFeatures] = useState({});
-  const [teamInfo, setTeamInfo] = useState(null);
+  const [teamInfoRoh, setTeamInfo] = useState(null);
+  const [vereine, setVereine] = useState([]);
+  useEffect(() => { ladeVereineListe().then((l) => { if (l) setVereine(l); }); }, []);
+  const teamInfo = useMemo(() => teamMitVerein(teamInfoRoh, vereine), [teamInfoRoh, vereine]);
   const startTabErledigt = useRef(false);
   const [trashPlayers, setTrashPlayers] = useState([]);
   const [trashGegner, setTrashGegner] = useState([]);
