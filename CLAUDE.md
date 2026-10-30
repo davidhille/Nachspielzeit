@@ -7,6 +7,7 @@
 - Sprache der App und der Antworten: Deutsch. Kurz, konkret, handlungsorientiert. Subtiler Humor, nie platt.
 
 ## Arbeitsweise
+- Änderungen an der Eltern-Seite erst in `KartenSeiteVorschau`; sobald David zufrieden ist, immer auch in `KartenSeitePlus` (freigegebene Seite) übernehmen, ohne dass er es erneut anstoßen muss.
 - Bei Design- oder Ablaufänderungen erst einen kurzen Vorschlag (bei Optik gern mit Mockup), dann umsetzen.
 - Kleine, gezielte Änderungen. Größere Umbauten in eigenen Commits, damit sie sich zurückdrehen lassen.
 - Nach jeder Änderung Syntaxprüfung der App-Quelle (acorn + acorn-jsx, Ausgabe "ACORN_OK"). Im Sandbox-Browser ist kein Test möglich, das immer offen sagen ("nur Syntax geprüft").
@@ -18,7 +19,7 @@
 
 ## Datenbank
 - Neue Tabellen brauchen: RLS an, GRANT für anon/authenticated/service_role, Policy "access via code" mit `nsz_code_ok(team_id)`, danach `notify pgrst, 'reload schema'`.
-- Team-Tabellen in `TEAM_TABLES` und `BACKUP_TABELLEN` eintragen. SQL immer dem Nutzer zum einmaligen Ausführen im Supabase SQL Editor geben (und in der App als Hinweis zeigen, nur für Admin).
+- Team-Tabellen in `TEAM_TABLES` und `BACKUP_TABELLEN` eintragen. SQL immer dem Nutzer im Chat zum einmaligen Ausführen im Supabase SQL Editor geben (und in `supabase/schema.sql` ablegen), nicht als Block in der App anzeigen.
 - Löschen: Soft-Delete/Papierkorb bevorzugen.
 - Der Server entscheidet, der Client filtert nur: Zugriffsschutz liegt in RLS (`nsz_code_ok`, `nsz_is_admin`), der Teamfilter im Client ist Komfort.
 - Sonderfall `uebungen`: nutzt `team_ids[]` statt `team_id` (`'alle'` = für alle Teams lesbar, Prüfung über `nsz_code_ok_arr`). Schema und Wiederherstellung: `supabase/`.

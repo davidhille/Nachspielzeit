@@ -633,7 +633,7 @@ const FEATURES = [
   { key: "eltern_spieltage", label: "Bereich Spieltage", beschreibung: "Tab „Spieltage“ mit den Spieltagskarten", unter: "eltern_seite" },
   { key: "eltern_karten", label: "Bereich Karten", beschreibung: "Tab „Karten“ mit den Sammelkarten", unter: "eltern_seite" },
   { key: "eltern_songs", label: "Bereich Songs", beschreibung: "Tab „Songs“ mit Player und Liedtext", unter: "eltern_seite" },
-  { key: "eltern_briefkasten", label: "Bereich Briefkasten", beschreibung: "Tab „Briefkasten“: Eltern werfen anonym Lob, Kritik und Ideen ein (standardmäßig aus; dafür vorher das SQL aus der Fehlermeldung hier einmalig ausführen)", unter: "eltern_seite" },
+  { key: "eltern_briefkasten", label: "Bereich Briefkasten", beschreibung: "Tab „Briefkasten“: Eltern werfen anonym Lob, Kritik und Ideen ein (standardmäßig aus; dafür muss vorher einmalig das SQL in Supabase laufen)", unter: "eltern_seite" },
   { key: "taktik", label: "Taktik-Board", beschreibung: "Tab „Taktik“ (interaktives Taktikboard mit Spielern, Laufwegen und Animation)" },
   { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Home-Seite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
@@ -1861,54 +1861,6 @@ create policy "fehler lesen" on fehlerprotokoll for select to public using (nsz_
 create policy "fehler loeschen" on fehlerprotokoll for delete to public using (nsz_is_admin());
 notify pgrst, 'reload schema';`;
 
-const SQL_BRIEFKASTEN = `-- Nachspielzeit: Briefkasten, anonymes Eltern-Feedback (wiederholbar)
-create table if not exists briefkasten (
-  id bigint generated always as identity primary key,
-  team_id text not null,
-  -- bewusst nur auf die Stunde genau gespeichert (Anonymität); angezeigt wird nur das Datum
-  created_at timestamptz not null default date_trunc('hour', now()),
-  nachricht text not null check (char_length(nachricht) between 1 and 1000),
-  kategorie text not null default 'sonstiges' check (kategorie in ('lob', 'kritik', 'idee', 'sonstiges')),
-  status text not null default 'neu' check (status in ('neu', 'gelesen', 'erledigt')),
-  deleted_at timestamptz
-);
-create index if not exists briefkasten_team_idx on briefkasten (team_id, created_at desc);
-alter table briefkasten enable row level security;
-grant select, insert, update, delete on table briefkasten to anon, authenticated, service_role;
-drop policy if exists "access via code" on briefkasten;
--- Lesen/Ändern nur mit Zugangscode des Teams (Trainer-App). Eltern schreiben nur über die Funktion unten.
-create policy "access via code" on briefkasten for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
-
-create or replace function briefkasten_senden(p_token text, p_nachricht text, p_kategorie text default 'sonstiges', p_website text default '')
-returns text
-language plpgsql
-security definer
-set search_path to 'public'
-as $$
-declare
-  v_team text;
-  v_text text := btrim(coalesce(p_nachricht, ''));
-  v_kat text := case when p_kategorie in ('lob', 'kritik', 'idee', 'sonstiges') then p_kategorie else 'sonstiges' end;
-begin
-  -- Honeypot: Bots füllen das versteckte Feld, wir tun so, als wäre alles gut
-  if coalesce(p_website, '') <> '' then return 'ok'; end if;
-  if coalesce(p_token, '') = '' then return 'ungueltig'; end if;
-  select id into v_team from teams where config ->> 'share_token' = p_token and not archived limit 1;
-  if v_team is null then return 'ungueltig'; end if;
-  -- Briefkasten ist standardmäßig aus: nur mit ausdrücklich eingeschaltetem Schalter
-  if not exists (select 1 from app_features where team_id = v_team and key = 'eltern_briefkasten' and enabled) then return 'aus'; end if;
-  if exists (select 1 from app_features where team_id = v_team and key = 'eltern_seite' and not enabled) then return 'aus'; end if;
-  if char_length(v_text) < 1 or char_length(v_text) > 1000 then return 'laenge'; end if;
-  -- Bremse gegen Spam: höchstens 20 Nachrichten pro Stunde und Team
-  if (select count(*) from briefkasten where team_id = v_team and created_at = date_trunc('hour', now())) >= 20 then return 'zu_viele'; end if;
-  insert into briefkasten (team_id, nachricht, kategorie) values (v_team, v_text, v_kat);
-  return 'ok';
-end
-$$;
-revoke all on function briefkasten_senden(text, text, text, text) from public;
-grant execute on function briefkasten_senden(text, text, text, text) to anon, authenticated, service_role;
-notify pgrst, 'reload schema';`;
-
 const FEHLER_ART = { anzeige: "Anzeige", aktion: "Speichern/Aktion", unbehandelt: "Unbehandelt" };
 
 /* Administration → Fehler: gleiche Meldungen gruppiert mit Anzahl und letztem Zeitpunkt */
@@ -2360,11 +2312,6 @@ notify pgrst, 'reload schema';`;
                       <KartenTitel>Eltern-Seite</KartenTitel>
                       {eltern.map((f) => zeile(f, true))}
                     </div>
-                    <div style={{ ...styles.card, marginBottom: 16 }}>
-                      <KartenTitel zuStart>Briefkasten einrichten (SQL)</KartenTitel>
-                      <div style={styles.cardDesc}>Einmalig im Supabase SQL Editor ausführen, bevor „Bereich Briefkasten“ eingeschaltet wird. Das SQL ist wiederholbar und gilt für alle Teams.</div>
-                      <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: 0, userSelect: "all" }}>{SQL_BRIEFKASTEN}</pre>
-                    </div>
                   </>
                 );
               })()
@@ -2798,7 +2745,7 @@ function App() {
     } catch (e) {
       console.error(e);
       setBriefkasten([]);
-      setBriefkastenFehler("Der Briefkasten konnte nicht geladen werden. Falls er neu ist, muss der Admin unter Funktionen einmalig das SQL ausführen.");
+      setBriefkastenFehler("Der Briefkasten konnte nicht geladen werden. Falls er neu ist, muss einmalig das SQL in Supabase ausgeführt werden.");
     }
   }, []);
   useEffect(() => {
@@ -6491,6 +6438,7 @@ function KartenSeitePlus({ token }) {
   if (plus && be.spieltage && plus.spieltage && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
   if (be.karten && karten.spieler.length > 0) tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
   if (plus && be.songs && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
+  if (plus && be.briefkasten) tabs.push({ k: "briefkasten", label: "Briefkasten" });
   const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs.length ? tabs[0].k : null;
   const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
   // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
@@ -6589,6 +6537,11 @@ function KartenSeitePlus({ token }) {
         {plus && be.songs && plus.songs && plus.songs.length > 0 && panel("songs", (
           <section style={{ ...styles.card, marginTop: 16 }}>
             <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} token={token} />
+          </section>
+        ))}
+        {plus && be.briefkasten && panel("briefkasten", (
+          <section style={{ ...styles.card, marginTop: 16, position: "relative", maxWidth: 560 }}>
+            <BriefkastenFormular token={token} />
           </section>
         ))}
       </main>
