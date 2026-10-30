@@ -1462,14 +1462,10 @@ function FarbVorschau({ basis, kopf, akzent, auswahl, chip, trikot, regler }) {
   );
 }
 
-function TeamEinstellungen({ team, teamRow, onSaved }) {
+function TeamEinstellungen({ team, teamRow, vereine, onVereineAendern, onSaved }) {
   const cfg = (teamRow && teamRow.config) || {};
-  const [name, setName] = useState(teamRow ? teamRow.name : "");
   const [vorlauf, setVorlauf] = useState(String(cfg.geburtstage_vorlauf ?? 7));
   const [status, setStatus] = useState("");
-  const [verein, setVerein] = useState(cfg.verein_name || "");
-  const [logoUrl, setLogoUrl] = useState(cfg.verein_logo_url || "");
-  const [logoBusy, setLogoBusy] = useState(false);
   const [farbe, setFarbe] = useState(cfg.verein_farbe || "");
   const [farbeKopf, setFarbeKopf] = useState(cfg.farbe_kopf || "");
   const [farbeAkzent, setFarbeAkzent] = useState(cfg.farbe_akzent || "");
@@ -1510,7 +1506,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
     abzugVerspaetet: bwFeld("abzugVerspaetet", TEILNAHME_STD.abzugVerspaetet), unentschuldigt: bwFeld("unentschuldigt", TEILNAHME_STD.unentschuldigt), entschuldigt: bwFeld("entschuldigt", TEILNAHME_STD.entschuldigt),
   });
   // Ungespeicherte Änderungen erkennen: Stand beim Laden bzw. nach dem letzten Speichern merken und mit dem aktuellen vergleichen
-  const zustand = JSON.stringify([name, vorlauf, verein, logoUrl, farbe, farbeKopf, farbeAkzent, farbeAuswahl, farbeChip, farbeTrikot, farbeRegler, titel, trTage, trVon, trBis, trWochen, stZeit, stOrt, szListe, szStd, wcListe, wcTeiler, wcStd, startTab, backupTage, papierTage, saisonStart, saisonEnde, wertung, bewertung]);
+  const zustand = JSON.stringify([vorlauf, farbe, farbeKopf, farbeAkzent, farbeAuswahl, farbeChip, farbeTrikot, farbeRegler, titel, trTage, trVon, trBis, trWochen, stZeit, stOrt, szListe, szStd, wcListe, wcTeiler, wcStd, startTab, backupTage, papierTage, saisonStart, saisonEnde, wertung, bewertung]);
   const [basis, setBasis] = useState(null);
   const merke = useRef(true);
   useEffect(() => { if (merke.current) { merke.current = false; setBasis(zustand); } });
@@ -1521,25 +1517,11 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
     window.addEventListener("beforeunload", warne);
     return () => window.removeEventListener("beforeunload", warne);
   }, [geaendert]);
-  const logoWaehlen = async (file) => {
-    if (!file) return;
-    setLogoBusy(true);
-    try {
-      setLogoUrl(await uploadVereinsLogo(team, file));
-      setStatus("Wappen hochgeladen – bitte speichern");
-    } catch (e) {
-      setStatus(friendlyError(e));
-    } finally {
-      setLogoBusy(false);
-    }
-  };
   const speichern = async () => {
     setStatus("…");
     try {
       const v = Math.max(0, Math.min(60, parseInt(vorlauf, 10) || 0));
       const neuCfg = { ...cfg, geburtstage_vorlauf: v };
-      if (verein.trim()) neuCfg.verein_name = verein.trim(); else delete neuCfg.verein_name;
-      if (logoUrl) neuCfg.verein_logo_url = logoUrl; else delete neuCfg.verein_logo_url;
       if (farbe) neuCfg.verein_farbe = farbe; else delete neuCfg.verein_farbe;
       if (farbeKopf) neuCfg.farbe_kopf = farbeKopf; else delete neuCfg.farbe_kopf;
       if (farbeAkzent) neuCfg.farbe_akzent = farbeAkzent; else delete neuCfg.farbe_akzent;
@@ -1583,7 +1565,6 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
         geaendert.forEach((k) => { if (neuCfg[k] === undefined) delete frisch[k]; else frisch[k] = neuCfg[k]; });
         return frisch;
       });
-      if (name.trim() !== (teamRow.name || "")) await dbUpdate("teams", team, { name: name.trim() || team });
       setVorlauf(String(v));
       merke.current = true; // nach dem Speichern ist der aktuelle Stand der neue Ausgangspunkt
       setStatus("Gespeichert");
@@ -1592,6 +1573,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       setStatus(friendlyError(e));
     }
   };
+  const vereinAnzeige = (vereine || []).find((v) => v.id === (teamRow && teamRow.verein_id)) || {};
   if (!teamRow) {
     return <SqlHinweis fehler={`Für das Team „${team}“ gibt es noch keinen Eintrag in der Tabelle „teams“.`} />;
   }
@@ -1606,29 +1588,18 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       </div>
       <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
         <KartenTitel>Team & Verein</KartenTitel>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
-          Teamname
-          <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
-          Vereinsname
-          <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={verein} placeholder={CLUB_STD.name} onChange={(e) => setVerein(e.target.value)} />
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Erscheint in der Kopfzeile, auf der Eltern-Seite, den Karten und den Teilen-Bildern. Leer = „{CLUB_STD.name}“.
-          </div>
-        </label>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Wappen
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Teamname</div>
+          <div style={{ fontSize: 14, marginTop: 4 }}>{teamRow.name}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Verein</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
-            <img src={logoUrl || CLUB_STD.logo} alt="Wappen" style={{ height: 56, maxWidth: 120, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
-            <label style={{ ...styles.rowBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
-              {logoBusy ? "Lädt …" : "Wappen hochladen"}
-              <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { logoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-            </label>
-            {logoUrl && <button style={styles.linkBtn} onClick={() => setLogoUrl("")}>Zurücksetzen</button>}
+            <img src={(vereinAnzeige.logo_url || cfg.verein_logo_url) || CLUB_STD.logo} alt="Wappen" style={{ height: 44, maxWidth: 100, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
+            <span style={{ fontSize: 14 }}>{vereinAnzeige.name || cfg.verein_name || CLUB_STD.name}</span>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Am besten PNG mit transparentem Hintergrund. Leer = Standard-Wappen.
+          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
+            Teamname, Verein und Wappen werden im Bereich „Alle Teams“ geändert (Teams und Vereine). <button type="button" style={styles.linkBtn} onClick={onVereineAendern}>Dorthin wechseln</button>
           </div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
@@ -1815,7 +1786,24 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   );
 }
 
-function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) {
+function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onChanged }) {
+  const vereinListe = vereine || [];
+  const vereinName = (id) => (vereinListe.find((v) => v.id === id) || {}).name || null;
+  const [vereinWahl, setVereinWahl] = useState("");
+  const [bearbeite, setBearbeite] = useState(null); // Id des Teams im Bearbeiten-Modus
+  const [eName, setEName] = useState("");
+  const [eVerein, setEVerein] = useState("");
+  const speichereTeam = async (t) => {
+    if (!eName.trim()) return setMeldung("Bitte einen Namen eingeben.");
+    try {
+      await dbUpdate("teams", t.id, { name: eName.trim(), ...(vereine ? { verein_id: eVerein || null } : {}) });
+      setBearbeite(null);
+      setMeldung(`Team „${eName.trim()}“ gespeichert.`);
+      await onChanged();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
   const [name, setName] = useState("");
   const [kuerzel, setKuerzel] = useState("");
   const [meldung, setMeldung] = useState("");
@@ -1824,8 +1812,10 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
     if (!name.trim()) return setMeldung("Bitte einen Namen eingeben.");
     if (!/^[a-z0-9-]{2,20}$/.test(id)) return setMeldung("Kürzel: 2–20 Zeichen, nur a–z, 0–9 und Bindestrich.");
     if (["admin", "www", "app", "alle"].includes(id) || teams.some((t) => t.id === id)) return setMeldung("Dieses Kürzel ist nicht verfügbar.");
+    const verein = vereinWahl || (vereinListe[0] && vereinListe[0].id) || "";
+    if (vereine && vereinListe.length === 0) return setMeldung("Bitte zuerst unter „Vereine“ einen Verein anlegen.");
     try {
-      await dbInsert("teams", { id, name: name.trim(), config: {} });
+      await dbInsert("teams", { id, name: name.trim(), config: {}, ...(vereine && verein ? { verein_id: verein } : {}) });
       setName("");
       setKuerzel("");
       setMeldung(`Team „${name.trim()}“ angelegt.`);
@@ -1861,6 +1851,15 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
             value={kuerzel}
             onChange={(e) => setKuerzel(e.target.value)}
           />
+          {vereine && (
+            <>
+              <label htmlFor="team-verein" style={{ fontSize: 13, fontWeight: 700 }}>Verein</label>
+              <select id="team-verein" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={vereinWahl || (vereinListe[0] && vereinListe[0].id) || ""} onChange={(e) => setVereinWahl(e.target.value)}>
+                {vereinListe.length === 0 && <option value="">Noch kein Verein angelegt</option>}
+                {vereinListe.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button style={styles.primaryBtn} onClick={anlegen}>Team anlegen</button>
             <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
@@ -1872,20 +1871,166 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
       )}
       <div className="card-list" style={styles.cardList}>
         {teams.map((t) => (
-          <div key={t.id} style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, opacity: t.archived ? 0.6 : 1 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>
-                {t.name}
-                {t.id === aktuellesTeam ? " · ausgewählt" : ""}
-                {t.archived ? " · archiviert" : ""}
+          <div key={t.id} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10, opacity: t.archived ? 0.6 : 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  {t.name}
+                  {t.id === aktuellesTeam ? " · ausgewählt" : ""}
+                  {t.archived ? " · archiviert" : ""}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{vereinName(t.verein_id) ? `${vereinName(t.verein_id)} · ` : ""}{t.id}.nachspielzeit.app</div>
               </div>
-              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{t.id}.nachspielzeit.app</div>
+              {!fehler && bearbeite !== t.id && (
+                <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(t.id); setEName(t.name); setEVerein(t.verein_id || (vereinListe[0] && vereinListe[0].id) || ""); setMeldung(""); }}>Bearbeiten</button>
+              )}
+              {t.id !== aktuellesTeam && (
+                <button style={styles.rowBtnOutline} onClick={() => onSelect(t.id)}>Öffnen</button>
+              )}
+              {!fehler && t.id !== "u8" && (
+                <button style={styles.rowBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
+              )}
             </div>
-            {t.id !== aktuellesTeam && (
-              <button style={styles.rowBtnOutline} onClick={() => onSelect(t.id)}>Öffnen</button>
+            {bearbeite === t.id && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label htmlFor={`team-name-${t.id}`} style={{ fontSize: 13, fontWeight: 700 }}>Teamname</label>
+                <input id={`team-name-${t.id}`} style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={eName} onChange={(e) => setEName(e.target.value)} />
+                {vereine && (
+                  <>
+                    <label htmlFor={`team-verein-${t.id}`} style={{ fontSize: 13, fontWeight: 700 }}>Verein</label>
+                    <select id={`team-verein-${t.id}`} style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={eVerein} onChange={(e) => setEVerein(e.target.value)}>
+                      {vereinListe.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  </>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={styles.primaryBtn} onClick={() => speichereTeam(t)}>Speichern</button>
+                  <button style={{ ...styles.rowBtnOutline, height: 44 }} onClick={() => setBearbeite(null)}>Abbrechen</button>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>Das Kürzel ({t.id}) und damit die Adresse lassen sich nicht ändern.</div>
+              </div>
             )}
-            {!fehler && t.id !== "u8" && (
-              <button style={styles.rowBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* Administration → Vereine: Name und Wappen je Verein; Teams werden einem Verein zugeordnet (Teams → Bearbeiten) */
+const vereinKuerzel = (name) => String(name).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+function VereineVerwaltung({ vereine, teams, onChanged }) {
+  const [neuName, setNeuName] = useState("");
+  const [meldung, setMeldung] = useState("");
+  const [bearbeite, setBearbeite] = useState(null);
+  const [eName, setEName] = useState("");
+  const [eLogo, setELogo] = useState("");
+  const [logoBusy, setLogoBusy] = useState(false);
+  if (vereine === undefined) return <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>;
+  if (vereine === null) {
+    return (
+      <div style={{ ...styles.card }}>
+        <KartenTitel>Vereine</KartenTitel>
+        <div style={styles.cardDesc}>Die Tabelle „vereine“ gibt es noch nicht. Bitte das SQL aus dem Chat (Stand 30.10.2026, auch in supabase/schema.sql) einmalig im Supabase SQL Editor ausführen und die Seite neu laden. Bis dahin gelten Vereinsname und Wappen aus den Team-Einstellungen wie bisher.</div>
+      </div>
+    );
+  }
+  const anzahlTeams = (id) => teams.filter((t) => t.verein_id === id).length;
+  const anlegen = async () => {
+    const n = neuName.trim();
+    if (!n) return setMeldung("Bitte einen Namen eingeben.");
+    let id = vereinKuerzel(n);
+    if (id.length < 2) id = `verein-${vereine.length + 1}`;
+    const frei = (x) => !vereine.some((v) => v.id === x);
+    let kandidat = id;
+    for (let i = 2; !frei(kandidat); i++) kandidat = `${id.slice(0, 36)}-${i}`;
+    try {
+      await dbInsert("vereine", { id: kandidat, name: n });
+      setNeuName("");
+      setMeldung(`Verein „${n}“ angelegt.`);
+      await onChanged();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const logoWaehlen = async (v, file) => {
+    if (!file) return;
+    setLogoBusy(true);
+    try {
+      setELogo(await uploadVereinsLogo(null, file, `team/wappen-verein-${v.id}.png`));
+      setMeldung("Wappen hochgeladen, bitte speichern.");
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+  const speichern = async (v) => {
+    if (!eName.trim()) return setMeldung("Bitte einen Namen eingeben.");
+    try {
+      await dbUpdate("vereine", v.id, { name: eName.trim(), logo_url: eLogo || null });
+      setBearbeite(null);
+      setMeldung(`Verein „${eName.trim()}“ gespeichert.`);
+      await onChanged();
+    } catch (e) {
+      setMeldung(friendlyError(e));
+    }
+  };
+  const loeschen = (v) =>
+    confirmAnd(`Verein „${v.name}“ löschen?`, async () => {
+      try {
+        await dbDelete("vereine", v.id);
+        await onChanged();
+      } catch (e) {
+        setMeldung(friendlyError(e));
+      }
+    });
+  return (
+    <section>
+      <div style={{ ...styles.card, marginBottom: 14 }}>
+        <KartenTitel>Vereine</KartenTitel>
+        <div style={{ ...styles.cardDesc, marginBottom: 0 }}>Name und Wappen eines Vereins gelten für alle seine Teams (Kopfzeile, Eltern-Seite, Karten, Teilen-Bilder). Die Zuordnung eines Teams ändert man unter Teams → Bearbeiten.</div>
+      </div>
+      <div style={{ ...styles.card, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <KartenTitel>Neuen Verein anlegen</KartenTitel>
+        <label htmlFor="verein-neu" className="nz-sr">Name des Vereins</label>
+        <input id="verein-neu" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. SV Heimstetten)" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <button style={styles.primaryBtn} onClick={anlegen}>Verein anlegen</button>
+          <span role="status" style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
+        </div>
+      </div>
+      <div className="card-list" style={styles.cardList}>
+        {vereine.map((v) => (
+          <div key={v.id} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <img src={v.logo_url || CLUB_STD.logo} alt="" style={{ height: 44, maxWidth: 80, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{v.name}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}</div>
+              </div>
+              {bearbeite !== v.id && <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(v.id); setEName(v.name); setELogo(v.logo_url || ""); setMeldung(""); }}>Bearbeiten</button>}
+              {anzahlTeams(v.id) === 0 && <button style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => loeschen(v)}>Löschen</button>}
+            </div>
+            {bearbeite === v.id && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label htmlFor={`verein-name-${v.id}`} style={{ fontSize: 13, fontWeight: 700 }}>Vereinsname</label>
+                <input id={`verein-name-${v.id}`} style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={eName} onChange={(e) => setEName(e.target.value)} />
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Wappen</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <img src={eLogo || CLUB_STD.logo} alt="Wappen" style={{ height: 56, maxWidth: 120, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
+                  <label style={{ ...styles.rowBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
+                    {logoBusy ? "Lädt …" : "Wappen hochladen"}
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { logoWaehlen(v, e.target.files && e.target.files[0]); e.target.value = ""; }} />
+                  </label>
+                  {eLogo && <button style={styles.linkBtn} onClick={() => setELogo("")}>Zurücksetzen</button>}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>Am besten PNG mit transparentem Hintergrund. Leer = Standard-Wappen.</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={styles.primaryBtn} onClick={() => speichern(v)}>Speichern</button>
+                  <button style={{ ...styles.rowBtnOutline, height: 44 }} onClick={() => setBearbeite(null)}>Abbrechen</button>
+                </div>
+              </div>
             )}
           </div>
         ))}
@@ -1895,7 +2040,7 @@ function TeamsVerwaltung({ teams, fehler, aktuellesTeam, onSelect, onChanged }) 
 }
 
 const ADMIN_SCOPE = "__admin__";
-const ADMIN_TABS_ALLGEMEIN = [["teams", "Teams"], ["zugaenge", "Zugänge"], ["uebungen", "Übungen"], ["backup", "Backup"], ["fehler", "Fehler"]];
+const ADMIN_TABS_ALLGEMEIN = [["teams", "Teams"], ["vereine", "Vereine"], ["zugaenge", "Zugänge"], ["uebungen", "Übungen"], ["backup", "Backup"], ["fehler", "Fehler"]];
 const ADMIN_TABS_TEAM = [["funktionen", "Funktionen"], ["einstellungen", "Einstellungen"], ["import", "Spieler-Import"]];
 const ADMIN_TABS = [...ADMIN_TABS_ALLGEMEIN, ...ADMIN_TABS_TEAM].map((t) => t[0]);
 
@@ -2116,6 +2261,9 @@ function AdminApp() {
   };
   const [teams, setTeams] = useState([{ id: "u8", name: "U8" }]);
   const [teamsFehler, setTeamsFehler] = useState(null);
+  const [vereine, setVereine] = useState(undefined); // undefined = lädt, null = Tabelle fehlt noch
+  const ladeVereine = async () => setVereine(await ladeVereineListe());
+  useEffect(() => { ladeVereine(); }, []);
   const ladeTeams = async (waehle) => {
     try {
       const rows = (await dbSelect("teams")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
@@ -2312,11 +2460,12 @@ notify pgrst, 'reload schema';`;
         <DatenbankHinweis />
         {tab === "import" && <SpielerImport key={team} />}
         {/* Der Schlüssel wechselt, sobald die Team-Daten da sind: Das Formular übernimmt seine Startwerte nur beim Einbauen und wäre nach einem Reload sonst leer. */}
-        {tab === "einstellungen" && <TeamEinstellungen key={`${team}:${teamRow ? "geladen" : "lade"}`} team={team} teamRow={teamRow} onSaved={() => ladeTeams()} />}
+        {tab === "einstellungen" && <TeamEinstellungen key={`${team}:${teamRow ? "geladen" : "lade"}`} team={team} teamRow={teamRow} vereine={vereine} onVereineAendern={() => { setTeam(ADMIN_SCOPE); setTab("vereine"); }} onSaved={() => ladeTeams()} />}
         {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
         {tab === "uebungen" && <UebungenAdmin teams={teams} />}
         {tab === "fehler" && <FehlerAnsicht />}
-        {tab === "teams" && <TeamsVerwaltung teams={teams} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
+        {tab === "teams" && <TeamsVerwaltung teams={teams} vereine={vereine} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
+        {tab === "vereine" && <VereineVerwaltung vereine={vereine} teams={teams} onChanged={async () => { await ladeVereine(); await ladeTeams(); }} />}
 
         {tab === "funktionen" && (
           <section>
