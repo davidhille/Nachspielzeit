@@ -5811,13 +5811,16 @@ function Header({ tab, setTab }) {
     ? "linear-gradient(to right, black 92%, transparent 100%)"
     : "none";
 
+  // Browser-Tab: Team, Verein, dann der Produktname
+  useEffect(() => { document.title = `${TEAM_NAME} · ${CLUB.name} — Nachspielzeit`; }, [CLUB.name, TEAM_NAME]);
   return (
     <header className="app-header" style={styles.header}>
       <div className="nz-kopf-oben" style={styles.headerTop}>
         <img src={CLUB.logo} alt={CLUB.name} style={styles.crestImg} />
         <div style={{ flex: 1 }}>
-          <div style={styles.title}>Nachspielzeit</div>
-          <div style={styles.subtitle}>{CLUB.name} · Saison {aktuelleSaisonLabel()}</div>
+          <div style={styles.headerMarke}>Nachspielzeit</div>
+          <div style={{ ...styles.title, marginTop: 2 }}>{CLUB.name}</div>
+          <div style={styles.subtitle}>{TEAM_NAME} · Saison {aktuelleSaisonLabel()}</div>
         </div>
         <TeamWechsler />
         <button
@@ -13857,6 +13860,7 @@ const styles = {
   },
   crestImg: { width: 40, height: 48, objectFit: "contain", background: "#FFFFFF", borderRadius: 8, padding: 3 },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 19, lineHeight: 1.1, letterSpacing: "-0.01em" },
+  headerMarke: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 12, lineHeight: 1.2, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--on-header-soft)" }, // kleine Produktmarke über dem Vereinsnamen
   subtitle: { fontSize: 13, color: "var(--on-header-soft)", marginTop: 2 },
   nav: {
     display: "flex",
