@@ -1894,13 +1894,13 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
         {teams.map((t) => (
           <div key={t.id} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 180px", minWidth: 0, opacity: t.archived ? 0.65 : 1 }}>
+              <div style={{ flex: "1 1 220px", minWidth: 0, opacity: t.archived ? 0.65 : 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>
                   {t.name}
                   {t.id === aktuellesTeam ? " · ausgewählt" : ""}
                   {t.archived ? " · archiviert" : ""}
                 </div>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{vereinName(t.verein_id) ? `${vereinName(t.verein_id)} · ` : ""}{t.id}.nachspielzeit.app</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{vereinName(t.verein_id) ? `${vereinName(t.verein_id)} · ` : ""}<span style={{ whiteSpace: "nowrap" }}>{t.id}.nachspielzeit.app</span></div>
               </div>
               {!fehler && bearbeite !== t.id && (
                 <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(t.id); setEName(t.name); setEVerein(t.verein_id || (vereinListe[0] && vereinListe[0].id) || ""); setMeldung(""); }}>Bearbeiten</button>
