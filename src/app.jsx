@@ -6340,7 +6340,6 @@ function GegnerBilanzSortierbar({ zeilen }) {
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>Punkte: Sieg 3, Unentschieden 1, Niederlage 0.</div>
     </>
   );
 }
