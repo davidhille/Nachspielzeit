@@ -1,7 +1,7 @@
 {
-  "name": "Nachspielzeit — SV Heimstetten U8",
+  "name": "Nachspielzeit",
   "short_name": "Nachspielzeit",
-  "description": "Spielerbewertung, Trainingsplan und Spieltage für SV Heimstetten U8",
+  "description": "Spielerbewertung, Trainingsplan und Spieltage für dein Team",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
