@@ -619,13 +619,13 @@ function Gate({ onUnlock, hinweis = "" }) {
 /* ---------- Funktionsschalter (Admin: admin.nachspielzeit.app) ---------- */
 
 const FEATURES = [
-  { key: "mannschaftsbild", label: "Mannschaftsbild", beschreibung: "Großes Mannschaftsbild oben auf der Übersichtsseite (inkl. Foto-Upload)" },
+  { key: "mannschaftsbild", label: "Mannschaftsbild", beschreibung: "Großes Mannschaftsbild oben auf der Home-Seite (inkl. Foto-Upload)" },
   { key: "entwicklung", label: "Monatsentwicklung", beschreibung: "Tab „Monatsentwicklung“ (Extrapunkt je Spieler und Monat)" },
   { key: "spieltage", label: "Spieltage", beschreibung: "Tab „Spieltage“ inkl. Ergebnissen, Torschützen und Fotos" },
   { key: "teilen", label: "Spieltag teilen", beschreibung: "Button „Teilen“ (WhatsApp-Bild) an den Spieltagen" },
-  { key: "uebungen", label: "Übungsbibliothek", beschreibung: "Verwaltung → Übungen sowie Übungen und Notizen im Trainingsplan" },
-  { key: "material", label: "Material", beschreibung: "Verwaltung → Material (Bestandsführung)" },
-  { key: "eltern_seite", label: "Eltern-Seite („Unsere Saison“)", beschreibung: "Öffentliche Seite für die Eltern inkl. Link-Box unter Verwaltung. Ausgeschaltet: Link zeigt nur „nicht verfügbar“, die Link-Box verschwindet." },
+  { key: "uebungen", label: "Übungsbibliothek", beschreibung: "Setup → Übungen sowie Übungen und Notizen im Trainingsplan" },
+  { key: "material", label: "Material", beschreibung: "Setup → Material (Bestandsführung)" },
+  { key: "eltern_seite", label: "Eltern-Seite („Unsere Saison“)", beschreibung: "Öffentliche Seite für die Eltern inkl. Link-Box unter Setup. Ausgeschaltet: Link zeigt nur „nicht verfügbar“, die Link-Box verschwindet." },
   { key: "eltern_bilanz", label: "Bereich Bilanz", beschreibung: "Tab „Bilanz“ auf der Eltern-Seite", unter: "eltern_seite" },
   { key: "eltern_bilanz_saison", label: "Saisonbilanz", beschreibung: "Spiele, Siege, Unentschieden, Niederlagen, Tore", unter: "eltern_bilanz", ebene: 2 },
   { key: "eltern_bilanz_torschuetzen", label: "Torschützenliste", beschreibung: "Torschützen der Saison", unter: "eltern_bilanz", ebene: 2 },
@@ -634,7 +634,7 @@ const FEATURES = [
   { key: "eltern_karten", label: "Bereich Karten", beschreibung: "Tab „Karten“ mit den Sammelkarten", unter: "eltern_seite" },
   { key: "eltern_songs", label: "Bereich Songs", beschreibung: "Tab „Songs“ mit Player und Liedtext", unter: "eltern_seite" },
   { key: "taktik", label: "Taktik-Board", beschreibung: "Tab „Taktik“ (interaktives Taktikboard mit Spielern, Laufwegen und Animation)" },
-  { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Übersichtsseite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
+  { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Home-Seite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
 
 const FeatureCtx = React.createContext({});
@@ -1668,7 +1668,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Backup-Erinnerung nach … Tagen
           <input type="number" min="0" max="365" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={backupTage} onChange={(e) => setBackupTage(e.target.value)} />
           <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Auf der Übersicht erscheint ein Hinweis, wenn das letzte Backup (im Admin unter „Backup“) so lange her ist. 0 = keine Erinnerung. Standard: 7.
+            Auf Home erscheint ein Hinweis, wenn das letzte Backup (im Admin unter „Backup“) so lange her ist. 0 = keine Erinnerung. Standard: 7.
             {cfg.letztes_backup ? ` Letztes Backup: ${new Date(cfg.letztes_backup).toLocaleString("de-DE")}.` : " Bisher wurde noch kein Backup vermerkt."}
           </div>
         </label>
@@ -1696,7 +1696,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           Startansicht der App
           <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={startTab} onChange={(e) => setStartTab(e.target.value)}>
             <option value="letzte">Zuletzt geöffneter Bereich (Standard)</option>
-            <option value="dashboard">Übersicht</option>
+            <option value="dashboard">Home</option>
             <option value="training">Training bewerten</option>
             <option value="spieltage">Spieltage</option>
             <option value="taktik">Taktik</option>
@@ -1737,7 +1737,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             onChange={(e) => setVorlauf(e.target.value)}
           />
           <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            So viele Tage vorher erscheint der Hinweis auf der Übersicht (0 = nur am Geburtstag selbst). Ein-/ausschalten unter „Funktionen“.
+            So viele Tage vorher erscheint der Hinweis auf Home (0 = nur am Geburtstag selbst). Ein-/ausschalten unter „Funktionen“.
           </div>
         </label>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -2342,7 +2342,7 @@ class FehlerGrenze extends React.Component {
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           <button style={styles.primaryBtn} onClick={() => window.location.reload()}>Neu laden</button>
           {this.props.onUebersicht && (
-            <button style={styles.rowBtn} onClick={() => { this.setState({ fehler: null }); this.props.onUebersicht(); }}>Zur Übersicht</button>
+            <button style={styles.rowBtn} onClick={() => { this.setState({ fehler: null }); this.props.onUebersicht(); }}>Zu Home</button>
           )}
         </div>
       </div>
@@ -2954,7 +2954,7 @@ function App() {
       <Header tab={tab} setTab={(k) => { setZiel(null); setTab(k); }} />
       <main className="app-main" style={styles.main}>
         <FehlerGrenze key={tab} onUebersicht={() => setTab("dashboard")}>
-        <h1 className="nz-sr">{{ dashboard: "Übersicht", training: "Training bewerten", entwicklung: "Monatsentwicklung", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Verwaltung" }[tab] || "Nachspielzeit"}</h1>
+        <h1 className="nz-sr">{{ dashboard: "Home", training: "Training bewerten", entwicklung: "Monatsentwicklung", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Setup" }[tab] || "Nachspielzeit"}</h1>
         {tab === "dashboard" && (
           <Dashboard
             players={players}
@@ -3360,7 +3360,7 @@ function TkTrainingWahl({ board, onClose }) {
         {tb && tb.fehlt ? (
           <TrainingBoardSqlHinweis />
         ) : termine.length === 0 ? (
-          <div style={{ fontSize: 13.5, color: "var(--muted)" }}>Keine anstehenden Trainings gefunden. Lege sie unter „Verwaltung“ → „Trainingsplan“ an.</div>
+          <div style={{ fontSize: 13.5, color: "var(--muted)" }}>Keine anstehenden Trainings gefunden. Lege sie unter „Setup“ → „Trainingsplan“ an.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" }}>
             {termine.map((t) => {
@@ -5239,14 +5239,14 @@ function Header({ tab, setTab }) {
   const fSpieltage = useFeature("spieltage");
   const fTaktik = useFeature("taktik");
   const items = [
-    ["dashboard", "Übersicht"],
+    ["dashboard", "Home"],
     ["training", "Training bewerten"],
     fEntwicklung && ["entwicklung", "Monatsentwicklung"],
     fSpieltage && ["spieltage", "Spieltage"],
     fTaktik && ["taktik", "Taktik"],
-    ["verwaltung", "Verwaltung"],
+    ["verwaltung", "Setup"],
   ].filter(Boolean);
-  const NAV_KURZ = { dashboard: "Übersicht", training: "Bewerten", entwicklung: "Verlauf", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Mehr" };
+  const NAV_KURZ = { dashboard: "Home", training: "Bewerten", entwicklung: "Verlauf", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Setup" };
   const NAV_ICON = {
     dashboard: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></>,
     training: <><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4V3h6v1" /><path d="m9.5 13 2 2 3.5-4" /></>,
@@ -6331,7 +6331,7 @@ function KartenSeitePlus({ token }) {
       )}
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
-        {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
+        {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Setup → Spieler „Jetzt aktualisieren“ tippen.</div>}
         {plus && !plus.inaktiv && tabs.length === 0 && <div style={{ ...styles.card, marginTop: 18 }}>Hier gibt es im Moment nichts zu sehen.</div>}
         {plus && (
           <>
@@ -6483,7 +6483,7 @@ function KartenSeiteVorschau({ token }) {
       )}
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 40px" }}>
         {fehler && <div style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
-        {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Verwaltung → Spieler „Jetzt aktualisieren“ tippen.</div>}
+        {!plus && <div style={{ ...styles.card, marginTop: 18 }}>Die erweiterten Daten sind noch nicht veröffentlicht. In der App unter Setup → Spieler „Jetzt aktualisieren“ tippen.</div>}
         {plus && !plus.inaktiv && tabs.length === 0 && <div style={{ ...styles.card, marginTop: 18 }}>Hier gibt es im Moment nichts zu sehen.</div>}
         {plus && (
           <>
@@ -8715,7 +8715,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
     <section>
       <div style={styles.rowBetween}>
         <button style={styles.linkBtn} onClick={onClose}>
-          ← Zurück zur Übersicht
+          ← Zurück zu Home
         </button>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <button style={styles.linkBtn} onClick={handleSammelkarte} disabled={kartenLaeuft}>
@@ -9463,7 +9463,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
       {subTab === "liste" && (
         <>
           {sorted.length === 0 && (
-            <EmptyState nach="verwaltung" text="Noch keine Spieltage angelegt. Du legst sie in der Verwaltung unter „Spieltage“ an." />
+            <EmptyState nach="verwaltung" text="Noch keine Spieltage angelegt. Du legst sie im Setup unter „Spieltage“ an." />
           )}
 
           <div className="card-list" style={styles.cardList}>
@@ -10853,7 +10853,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                       <span id={`sp-gegner-${spieltag.id}`} style={styles.label}>Gegner</span>
                       <div role="group" aria-labelledby={`sp-gegner-${spieltag.id}`} style={{ ...styles.chipGroup, marginTop: 6 }}>
                         {spielGegnerOptionen.length === 0 && (
-                          <span style={styles.hint}>Noch kein Gegner in der Verwaltung angelegt.</span>
+                          <span style={styles.hint}>Noch kein Gegner im Setup angelegt.</span>
                         )}
                         {spielGegnerOptionen.map((g) => (
                           <button
@@ -10921,7 +10921,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
             <div style={{ marginBottom: 4 }}>
               <span id={`sp-kader-${spieltag.id}`} style={styles.label}>Kader an diesem Spieltag</span>
               <div role="group" aria-labelledby={`sp-kader-${spieltag.id}`} style={{ ...styles.chipGroup, marginTop: 6 }}>
-                {players.length === 0 && <span style={styles.hint}>Noch keine Spieler in der Verwaltung angelegt.</span>}
+                {players.length === 0 && <span style={styles.hint}>Noch keine Spieler im Setup angelegt.</span>}
                 {players.map((p) => {
                   const dabei = spieltag.teilnehmer.includes(p.id);
                   return (
@@ -12767,7 +12767,7 @@ function SpieltageVerwaltungBereich({ gegner, onAddGegner, onRemoveGegner, spiel
 }
 
 const NavCtx = React.createContext(null);
-const NAV_ZIELE = { verwaltung: "Zur Verwaltung", spieltage: "Zu den Spieltagen" };
+const NAV_ZIELE = { verwaltung: "Zum Setup", spieltage: "Zu den Spieltagen" };
 const EMPTY_ICONS = {
   spiel: <><path d="M8 4h8v4a4 4 0 0 1-8 0V4z" /><path d="M8 5H5a3 3 0 0 0 3 4M16 5h3a3 3 0 0 1-3 4M12 12v4M9 20h6M10 16h4l1 4H9z" /></>,
   spieler: <><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><circle cx="17" cy="9" r="2.4" /><path d="M16.5 14.6c2.6.2 4.5 2 4.5 4.9" /></>,
