@@ -22,7 +22,7 @@ const globals = {};
   .forEach((k) => (globals[k] = "readonly"));
 
 // Namen aus js/logik.js (klassisches Skript vor der App) sind in der App globale Variablen
-"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen torfolgeStand torfolgePasst spielminute Sitzung SUPABASE_URL SUPABASE_KEY REST baseHeaders dbHeaders TEAM_TABLES teamFilterAktiv mitTeamId pruefeZugang nszFetch dbSelect dbInsert dbUpsert dbUpdate dbConfigAendern dbDelete dbDeleteWhere dbIdsWhere ersetzeGruppe".split(" ").forEach((k) => (globals[k] = "writable"));
+"KARTEN TEILNAHME SAISON seasonKeyOf trainingPunkte basisNachMonat aktuelleBasis monatsBewertungProzent kartenZaehlen torfolgeStand torfolgePasst spielminute GEGNER_PUNKTE gegnerPunkte sortiereGegnerBilanz wechselIntervallMin naechsterWechselSek Sitzung SUPABASE_URL SUPABASE_KEY REST baseHeaders dbHeaders TEAM_TABLES teamFilterAktiv mitTeamId pruefeZugang nszFetch dbSelect dbInsert dbUpsert dbUpdate dbConfigAendern dbDelete dbDeleteWhere dbIdsWhere ersetzeGruppe".split(" ").forEach((k) => (globals[k] = "writable"));
 
 const meldungen = new Linter()
   .verify(
