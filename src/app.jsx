@@ -518,6 +518,7 @@ function registerConfirmHandler(fn) {
 let _toastHandler = null;
 function registerToastHandler(fn) { _toastHandler = fn; }
 const meldung = (msg, type = "info") => { if (_toastHandler) _toastHandler(msg, type); else window.alert(msg); };
+const zeigeMeldung = (msg, type = "info") => { if (msg) meldung(msg, type); }; // leere Meldung = nichts anzeigen
 let _promptHandler = null;
 function registerPromptHandler(fn) { _promptHandler = fn; }
 const frageAnd = (titel, wert, onOk) => { if (_promptHandler) _promptHandler({ titel, wert, onOk }); else { const v = window.prompt(titel, wert); if (v !== null) onOk(v); } };
@@ -1801,12 +1802,12 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
       setMeldung(`Team „${eName.trim()}“ gespeichert.`);
       await onChanged();
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   const [name, setName] = useState("");
   const [kuerzel, setKuerzel] = useState("");
-  const [meldung, setMeldung] = useState("");
+  const setMeldung = zeigeMeldung; // Rückmeldung als Toast (oben), nicht neben dem Button
   const anlegen = async () => {
     const id = kuerzel.trim().toLowerCase();
     if (!name.trim()) return setMeldung("Bitte einen Namen eingeben.");
@@ -1823,7 +1824,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
       setMeldung(`Team „${name.trim()}“ angelegt.`);
       await onChanged(id);
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   const archivieren = async (t) => {
@@ -1831,7 +1832,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
       await dbUpdate("teams", t.id, { archived: !t.archived });
       await onChanged();
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   /* Endgültig löschen: nur für archivierte Teams, Teamname muss zur Bestätigung eingetippt werden.
@@ -1845,7 +1846,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
         setMeldung(`Team „${t.name}“ gelöscht.`);
         await onChanged();
       } catch (e) {
-        setMeldung(friendlyError(e));
+        zeigeMeldung(friendlyError(e), "error");
       }
     });
   return (
@@ -1879,7 +1880,6 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button style={styles.primaryBtn} onClick={anlegen}>Team anlegen</button>
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
           </div>
           <div style={{ fontSize: 13, color: "var(--muted-2)" }}>
             Die Adresse kürzel.nachspielzeit.app muss zusätzlich in Cloudflare als Custom Domain beim Projekt eingetragen werden.
@@ -1941,7 +1941,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
 const vereinKuerzel = (name) => String(name).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 function VereineVerwaltung({ vereine, teams, onChanged }) {
   const [neuName, setNeuName] = useState("");
-  const [meldung, setMeldung] = useState("");
+  const setMeldung = zeigeMeldung; // Rückmeldung als Toast (oben), nicht neben dem Button
   const [bearbeite, setBearbeite] = useState(null);
   const [eName, setEName] = useState("");
   const [eLogo, setELogo] = useState("");
@@ -1970,7 +1970,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
       setMeldung(`Verein „${n}“ angelegt.`);
       await onChanged();
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   const logoWaehlen = async (v, file) => {
@@ -1980,7 +1980,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
       setELogo(await uploadVereinsLogo(null, file, `team/wappen-verein-${v.id}.png`));
       setMeldung("Wappen hochgeladen, bitte speichern.");
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     } finally {
       setLogoBusy(false);
     }
@@ -1993,7 +1993,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
       setMeldung(`Verein „${eName.trim()}“ gespeichert.`);
       await onChanged();
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   const loeschen = (v) =>
@@ -2006,7 +2006,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
         } catch (e) { console.warn("Wappen-Datei nicht gelöscht", e); }
         await onChanged();
       } catch (e) {
-        setMeldung(friendlyError(e));
+        zeigeMeldung(friendlyError(e), "error");
       }
     });
   return (
@@ -2021,7 +2021,6 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
         <input id="verein-neu" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. SV Heimstetten)" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <button style={styles.primaryBtn} onClick={anlegen}>Verein anlegen</button>
-          <span role="status" style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
         </div>
       </div>
       <div className="card-list" style={styles.cardList}>
