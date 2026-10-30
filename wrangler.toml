@@ -12,3 +12,6 @@ enabled = true
 enabled = true
 invocation_logs = true
 persist = true
+
+# Für Branch-Vorschauen (npx wrangler preview); der Block darf leer sein
+[previews]
