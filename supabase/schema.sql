@@ -994,3 +994,55 @@ create policy "profilbilder aendern" on storage.objects for update
   with check (bucket_id = 'profilbilder' and nsz_storage_ok(name));
 create policy "profilbilder loeschen" on storage.objects for delete
   using (bucket_id = 'profilbilder' and nsz_storage_ok(name));
+
+-- ======================================================================
+-- Ergänzung 30.10.2026: Briefkasten (anonymes Eltern-Feedback, SVH-6)
+-- Das SQL steht auch in der App unter Administration -> Funktionen
+-- ======================================================================
+-- Nachspielzeit: Briefkasten, anonymes Eltern-Feedback (wiederholbar)
+create table if not exists briefkasten (
+  id bigint generated always as identity primary key,
+  team_id text not null,
+  -- bewusst nur auf die Stunde genau gespeichert (Anonymität); angezeigt wird nur das Datum
+  created_at timestamptz not null default date_trunc('hour', now()),
+  nachricht text not null check (char_length(nachricht) between 1 and 1000),
+  kategorie text not null default 'sonstiges' check (kategorie in ('lob', 'kritik', 'idee', 'sonstiges')),
+  status text not null default 'neu' check (status in ('neu', 'gelesen', 'erledigt')),
+  deleted_at timestamptz
+);
+create index if not exists briefkasten_team_idx on briefkasten (team_id, created_at desc);
+alter table briefkasten enable row level security;
+grant select, insert, update, delete on table briefkasten to anon, authenticated, service_role;
+drop policy if exists "access via code" on briefkasten;
+-- Lesen/Ändern nur mit Zugangscode des Teams (Trainer-App). Eltern schreiben nur über die Funktion unten.
+create policy "access via code" on briefkasten for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
+
+create or replace function briefkasten_senden(p_token text, p_nachricht text, p_kategorie text default 'sonstiges', p_website text default '')
+returns text
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+declare
+  v_team text;
+  v_text text := btrim(coalesce(p_nachricht, ''));
+  v_kat text := case when p_kategorie in ('lob', 'kritik', 'idee', 'sonstiges') then p_kategorie else 'sonstiges' end;
+begin
+  -- Honeypot: Bots füllen das versteckte Feld, wir tun so, als wäre alles gut
+  if coalesce(p_website, '') <> '' then return 'ok'; end if;
+  if coalesce(p_token, '') = '' then return 'ungueltig'; end if;
+  select id into v_team from teams where config ->> 'share_token' = p_token and not archived limit 1;
+  if v_team is null then return 'ungueltig'; end if;
+  -- Briefkasten ist standardmäßig aus: nur mit ausdrücklich eingeschaltetem Schalter
+  if not exists (select 1 from app_features where team_id = v_team and key = 'eltern_briefkasten' and enabled) then return 'aus'; end if;
+  if exists (select 1 from app_features where team_id = v_team and key = 'eltern_seite' and not enabled) then return 'aus'; end if;
+  if char_length(v_text) < 1 or char_length(v_text) > 1000 then return 'laenge'; end if;
+  -- Bremse gegen Spam: höchstens 20 Nachrichten pro Stunde und Team
+  if (select count(*) from briefkasten where team_id = v_team and created_at = date_trunc('hour', now())) >= 20 then return 'zu_viele'; end if;
+  insert into briefkasten (team_id, nachricht, kategorie) values (v_team, v_text, v_kat);
+  return 'ok';
+end
+$$;
+revoke all on function briefkasten_senden(text, text, text, text) from public;
+grant execute on function briefkasten_senden(text, text, text, text) to anon, authenticated, service_role;
+notify pgrst, 'reload schema';
