@@ -5204,10 +5204,10 @@ function TeamWechsler() {
   const aktuell = liste.find((t) => t.id === Sitzung.team) || { name: Sitzung.team.toUpperCase() };
   const eintrag = { display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "0 12px", borderRadius: 8, color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 500 };
   return (
-    <div ref={boxRef} style={{ position: "relative", flexShrink: 0 }}>
+    <div ref={boxRef} className="nz-wechsler" style={{ position: "relative", flexShrink: 0 }}>
       <button ref={knopfRef} type="button" style={styles.logoutBtn} aria-expanded={offen} aria-controls="nsz-wechsler" onClick={umschalten}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 7h13" /><path d="m16 3 4 4-4 4" /><path d="M17 17H4" /><path d="m8 13-4 4 4 4" /></svg>
-        <span className="nz-sr">Team wechseln, aktuell </span>{aktuell.name}
+        <span className="nz-sr">Team wechseln, aktuell </span><span title={aktuell.name} style={{ maxWidth: 56, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aktuell.name}</span>
       </button>
       {offen && pos && (
         <div id="nsz-wechsler" style={{ position: "fixed", right: pos.right, top: pos.top, zIndex: 40, minWidth: 210, background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--sh-3)", padding: 6 }}>
@@ -5287,7 +5287,7 @@ function Header({ tab, setTab }) {
 
   return (
     <header className="app-header" style={styles.header}>
-      <div style={styles.headerTop}>
+      <div className="nz-kopf-oben" style={styles.headerTop}>
         <img src={CLUB.logo} alt={CLUB.name} style={styles.crestImg} />
         <div style={{ flex: 1 }}>
           <div style={styles.title}>Nachspielzeit</div>
@@ -5295,6 +5295,8 @@ function Header({ tab, setTab }) {
         </div>
         <TeamWechsler />
         <button
+          className="nz-abmelden"
+          aria-label="Abmelden"
           style={styles.logoutBtn}
           onClick={() => {
             Sitzung.vergiss();
@@ -5302,7 +5304,7 @@ function Header({ tab, setTab }) {
           }}
         >
           <LogoutIcon size={13} />
-          Abmelden
+          <span className="nz-abmelden-text">Abmelden</span>
         </button>
       </div>
       <nav

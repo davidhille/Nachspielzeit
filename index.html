@@ -180,6 +180,11 @@
   .app-header :focus-visible { outline-color: #FFFFFF; }
   .app-header { position: relative; overflow: hidden; }
   .app-header > *:not(.nav-bottom) { position: relative; }
+  /* Admin-Codes sehen neben "Abmelden" auch den Team-Knopf: Auf schmalen Handys zeigt Abmelden dann nur das Symbol (Name per aria-label), damit die Kopfzeile nicht überläuft */
+  @media (max-width: 430px) {
+    .nz-kopf-oben:has(.nz-wechsler) .nz-abmelden { padding: 0 !important; width: 44px; justify-content: center; }
+    .nz-kopf-oben:has(.nz-wechsler) .nz-abmelden-text { display: none; }
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
@@ -234,6 +239,6 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="app.1333cd1866.js"></script>
+<script src="app.297b6e34dd.js"></script>
 </body>
 </html>
