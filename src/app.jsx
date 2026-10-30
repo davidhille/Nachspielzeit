@@ -2006,13 +2006,15 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
     }
   };
   const loeschen = (v) =>
-    confirmAnd(`Verein „${v.name}“ löschen?`, async () => {
+    frageAnd(`Verein „${v.name}“ endgültig löschen? Zur Bestätigung den Vereinsnamen eintippen:`, "", async (eingabe) => {
+      if (String(eingabe).trim().toLowerCase() !== v.name.trim().toLowerCase()) return setMeldung("Der Name passte nicht, der Verein wurde nicht gelöscht.");
       try {
         await dbDelete("vereine", v.id);
         // hochgeladenes Wappen mit aufräumen; schlägt das fehl, bleibt nur eine unbenutzte Datei im Speicher
         try {
           await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/team/wappen-verein-${v.id}.png`, { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": Sitzung.code } });
         } catch (e) { console.warn("Wappen-Datei nicht gelöscht", e); }
+        setMeldung(`Verein „${v.name}“ gelöscht.`);
         await onChanged();
       } catch (e) {
         zeigeMeldung(friendlyError(e), "error");
