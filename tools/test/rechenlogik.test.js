@@ -112,3 +112,18 @@ test("Gegnerbilanz: Punkte (Sieg 3, Unentschieden 1, Niederlage 0) und Sortierun
   assert.deepEqual(namen("spiele", "desc"), ["A", "B", "C"]);
   assert.deepEqual(namen("toreFuer", "desc"), ["A", "C", "B"]);
 });
+
+test("Wechsel-Erinnerung: Intervall und nächster Wechsel", () => {
+  const W = ladeAusApp(["wechselIntervallMin", "naechsterWechselSek"]);
+  assert.equal(W.wechselIntervallMin(null, null, 12), 4); // automatisch: Spielzeit ÷ 3
+  assert.equal(W.wechselIntervallMin(undefined, null, 15), 5);
+  assert.equal(W.wechselIntervallMin(null, 6, 12), 6); // Teamstandard
+  assert.equal(W.wechselIntervallMin(3, 6, 12), 3); // Spieltag überschreibt
+  assert.equal(W.wechselIntervallMin(0, 6, 12), 0); // aus
+  assert.equal(W.wechselIntervallMin(null, 0, 12), 0);
+  assert.equal(W.naechsterWechselSek(0, 4, 12), 240);
+  assert.equal(W.naechsterWechselSek(240, 4, 12), 480); // genau auf dem Wechsel: der nächste
+  assert.equal(W.naechsterWechselSek(500, 4, 12), null); // 12:00 ist das Spielende, kein Wechsel mehr
+  assert.equal(W.naechsterWechselSek(0, 0, 12), null);
+  assert.equal(W.naechsterWechselSek(100, 3, 12), 180);
+});

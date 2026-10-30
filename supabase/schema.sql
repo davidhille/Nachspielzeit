@@ -1067,3 +1067,10 @@ grant select, insert, update, delete on table notizen to anon, authenticated, se
 drop policy if exists "access via code" on notizen;
 create policy "access via code" on notizen for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
 notify pgrst, 'reload schema';
+
+-- ======================================================================
+-- Ergänzung 30.10.2026: Wechsel-Erinnerung pro Spieltag
+-- (null = Teamstandard, 0 = aus, sonst Minuten)
+-- ======================================================================
+alter table public.spieltage add column if not exists wechsel_min integer check (wechsel_min is null or (wechsel_min between 0 and 45));
+notify pgrst, 'reload schema';

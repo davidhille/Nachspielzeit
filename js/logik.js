@@ -105,3 +105,20 @@ function sortiereGegnerBilanz(zeilen, schluessel, richtung) {
     return c !== 0 ? c * f : String(a.name).localeCompare(String(b.name), "de");
   });
 }
+
+/* Wechsel-Erinnerung am Spieltag. wert = Einstellung des Spieltags (null = Teamstandard, 0 = aus, sonst Minuten),
+   standard = Teamstandard (null = automatisch: Spielzeit ÷ 3). Ergebnis: Intervall in Minuten, 0 = keine Erinnerung. */
+function wechselIntervallMin(wert, standard, spielzeitMin) {
+  const w = wert === null || wert === undefined ? standard : wert;
+  if (w === 0) return 0;
+  if (w === null || w === undefined) return Math.max(1, Math.round((Number(spielzeitMin) || 12) / 3));
+  return Number(w);
+}
+
+/* Nächster Wechsel (in gespielten Sekunden) nach sek; null, wenn keiner mehr vor Spielende liegt oder das Intervall aus ist */
+function naechsterWechselSek(sek, intervallMin, spielzeitMin) {
+  const iv = Math.round(Number(intervallMin) * 60);
+  if (!(iv > 0)) return null;
+  const n = (Math.floor(sek / iv) + 1) * iv;
+  return n < (Number(spielzeitMin) || 12) * 60 ? n : null;
+}

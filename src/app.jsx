@@ -437,9 +437,18 @@ const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.
 const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
 const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
 let EINST = { backupTage: 7, papierkorbTage: 30 };
-let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "", spielzeiten: [10, 12, 15, 20], spielzeit: 12 } };
+let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "", spielzeiten: [10, 12, 15, 20], spielzeit: 12, wechsel: [3, 4, 6], wechselStd: null } };
 /* Spielzeiten je Team (Minuten): Auswahl im Spiel und Standard für neue Spieltage. Ohne Eintrag 10 / 12 / 15 / 20 und 12. */
 const SPIELZEITEN_STD = [10, 12, 15, 20];
+const WECHSEL_STD = [3, 4, 6];
+/* Wechsel-Erinnerung: Auswahl der Minuten-Chips und Standard (null = automatisch Spielzeit ÷ 3, 0 = aus) */
+function wechselAusConfig(std) {
+  const roh = std && Array.isArray(std.wechsel) ? std.wechsel : [];
+  const liste = [...new Set(roh.map(Number).filter((n) => n >= 1 && n <= 45))].sort((a, b) => a - b);
+  const s = std ? std.wechsel_std : undefined;
+  const vorgabe = s === 0 || s === "0" ? 0 : Number(s) >= 1 && Number(s) <= 45 ? Number(s) : null;
+  return { wechsel: liste.length ? liste : WECHSEL_STD, wechselStd: vorgabe };
+}
 function spielzeitenAusConfig(std) {
   const roh = std && Array.isArray(std.spielzeiten) ? std.spielzeiten : [];
   const liste = [...new Set(roh.map(Number).filter((n) => n >= 1 && n <= 90))].sort((a, b) => a - b);
@@ -465,6 +474,7 @@ const setzeEinstellungen = (cfg) => {
       zeit: (cfg.spieltag_std && cfg.spieltag_std.zeit) || "",
       ort: (cfg.spieltag_std && cfg.spieltag_std.ort) || "",
       ...spielzeitenAusConfig(cfg.spieltag_std),
+      ...wechselAusConfig(cfg.spieltag_std),
     },
   };
   const st = Number(cfg.saison_start), en = Number(cfg.saison_ende);
@@ -1462,6 +1472,9 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const sz0 = spielzeitenAusConfig(cfg.spieltag_std);
   const [szListe, setSzListe] = useState(sz0.spielzeiten.join(", "));
   const [szStd, setSzStd] = useState(String(sz0.spielzeit));
+  const wc0 = wechselAusConfig(cfg.spieltag_std);
+  const [wcListe, setWcListe] = useState(wc0.wechsel.join(", "));
+  const [wcStd, setWcStd] = useState(wc0.wechselStd === null ? "auto" : String(wc0.wechselStd));
   const [startTab, setStartTab] = useState(cfg.start_tab || "letzte");
   const [backupTage, setBackupTage] = useState(String(cfg.backup_tage === undefined ? 7 : cfg.backup_tage));
   const [papierTage, setPapierTage] = useState(String(cfg.papierkorb_tage === undefined || cfg.papierkorb_tage === null ? 30 : cfg.papierkorb_tage));
@@ -1527,8 +1540,12 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (JSON.stringify(trNeu) === JSON.stringify({ tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }) || trNeu.tage.length === 0) delete neuCfg.training_std; else neuCfg.training_std = trNeu;
       const szNeu = spielzeitenAusConfig({ spielzeiten: szListe.split(/[^0-9]+/).filter(Boolean), spielzeit: szStd });
       const szIstStd = JSON.stringify(szNeu) === JSON.stringify(spielzeitenAusConfig(null));
-      if (stZeit || stOrt.trim() || !szIstStd) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim(), ...(szIstStd ? {} : { spielzeiten: szNeu.spielzeiten, spielzeit: szNeu.spielzeit }) }; else delete neuCfg.spieltag_std;
+      const wcNeu = wechselAusConfig({ wechsel: wcListe.split(/[^0-9]+/).filter(Boolean), wechsel_std: wcStd === "auto" ? undefined : Number(wcStd) });
+      const wcIstStd = JSON.stringify(wcNeu) === JSON.stringify(wechselAusConfig(null));
+      if (stZeit || stOrt.trim() || !szIstStd || !wcIstStd) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim(), ...(szIstStd ? {} : { spielzeiten: szNeu.spielzeiten, spielzeit: szNeu.spielzeit }), ...(wcIstStd ? {} : { wechsel: wcNeu.wechsel, wechsel_std: wcNeu.wechselStd === null ? "auto" : wcNeu.wechselStd }) }; else delete neuCfg.spieltag_std;
       setSzListe(szNeu.spielzeiten.join(", "));
+      setWcListe(wcNeu.wechsel.join(", "));
+      setWcStd(wcNeu.wechselStd === null ? "auto" : String(wcNeu.wechselStd));
       setSzStd(String(szNeu.spielzeit));
       if (startTab === "letzte") delete neuCfg.start_tab; else neuCfg.start_tab = startTab;
       const bt = Math.max(0, Math.min(365, parseInt(backupTage, 10) || 0));
@@ -1669,6 +1686,17 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             <input id="sz-std" type="number" min="1" max="90" style={{ ...styles.input, width: 70 }} value={szStd} onChange={(e) => setSzStd(e.target.value)} />
           </div>
           <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Spielzeit im Spiel (mit Komma trennen) und Vorgabe für neue Spieltage. „Andere …“ bleibt immer möglich. Standard: 10, 12, 15, 20 und 12.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap", fontWeight: 400 }}>
+            <label htmlFor="wc-liste">Wechsel alle … Min.</label>
+            <input id="wc-liste" style={{ ...styles.input, width: 150 }} value={wcListe} placeholder="3, 4, 6" onChange={(e) => setWcListe(e.target.value)} />
+            <label htmlFor="wc-std">Standard</label>
+            <select id="wc-std" style={styles.input} value={wcStd} onChange={(e) => setWcStd(e.target.value)}>
+              <option value="auto">Automatisch (Spielzeit ÷ 3)</option>
+              <option value="0">Aus</option>
+              {[...new Set([...wcListe.split(/[^0-9]+/).filter(Boolean).map(Number).filter((n) => n >= 1 && n <= 45), ...(wcStd !== "auto" && wcStd !== "0" ? [Number(wcStd)] : [])])].sort((x, y) => x - y).map((n) => <option key={n} value={String(n)}>alle {n} Min.</option>)}
+            </select>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Wechsel-Erinnerung an der Spieluhr (mit Komma trennen) und Vorgabe für alle Spieltage. Am Spieltag lässt sich der Wert einzeln ändern. Standard: 3, 4, 6 und automatisch.</div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Backup-Erinnerung nach … Tagen
@@ -2626,6 +2654,7 @@ function App() {
         zeit: s.zeit || null,
         typ: s.typ || "spieltag",
         spielzeitMin: Number(s.spielzeit_min) || lokaleSpielzeit(s.id) || null, // null = Standard des Teams
+        wechselMin: s.wechsel_min === null || s.wechsel_min === undefined ? null : Number(s.wechsel_min), // null = Standard, 0 = aus
         ort: s.ort || "",
         deletedAt: s.deleted_at || null,
         zugeordneteGegner: sgRaw.filter((g) => g.spieltag_id === s.id).map((g) => g.opponent_id),
@@ -3206,6 +3235,7 @@ function App() {
               })
             }
             onUpdateNotizen={(spieltagId, notizen) => wrapAction(() => dbUpdate("spieltage", spieltagId, { notizen }))}
+            onUpdateWechsel={(spieltagId, min) => wrapAction(() => dbUpdate("spieltage", spieltagId, { wechsel_min: min }))}
             onUpdateSpielzeit={(spieltagId, min) =>
               wrapAction(async () => {
                 try {
@@ -9839,7 +9869,7 @@ function MonatsEntwicklung({ players, entwicklungen, onSave }) {
 
 /* ---------- Spieltage ---------- */
 
-function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUpdateSpielzeit, onUploadFoto, onOpenPlayer }) {
+function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUpdateSpielzeit, onUpdateWechsel, onUploadFoto, onOpenPlayer }) {
   const [openSpieltag, setOpenSpieltag] = useState(zielSpieltagId || null);
   const [subTab, setSubTab] = useState("liste");
   const [uebersichtSort, setUebersichtSort] = useState("spiele");
@@ -9911,6 +9941,7 @@ function Spieltage({ zielSpieltagId, players, gegner, spieltage, onRemoveSpielta
                 onToggleTeilnehmer={(playerId, istDabei) => onToggleTeilnehmer(s.id, playerId, istDabei)}
                 onUpdateNotizen={(notizen) => onUpdateNotizen(s.id, notizen)}
                 onUpdateSpielzeit={(min) => onUpdateSpielzeit(s.id, min)}
+                onUpdateWechsel={(min) => onUpdateWechsel(s.id, min)}
                 onUploadFoto={(file) => onUploadFoto(s.id, file)}
               />
             ))}
@@ -10681,9 +10712,48 @@ function SperreAbdeckung({ onFrei, uhr }) {
   );
 }
 
+/* Töne für die Spieluhr (Web Audio, keine Audiodatei). Der Ton muss mit einem Tipp freigeschaltet werden (iOS), das passiert bei Start/Weiter.
+   Muster: [Frequenz in Hz, Dauer in s, Pause danach in s]. An/aus pro Gerät (localStorage "nsz-ton"). */
+const NszTon = (() => {
+  let ctx = null;
+  const holen = () => {
+    try {
+      if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) ctx = new AC(); }
+      return ctx;
+    } catch { return null; }
+  };
+  return {
+    entsperren() { const c = holen(); if (c && c.state === "suspended") c.resume().catch(() => {}); },
+    piepen(muster) {
+      const c = holen();
+      if (!c) return;
+      if (c.state === "suspended") c.resume().catch(() => {});
+      let t = c.currentTime + 0.02;
+      muster.forEach(([hz, dauer, pause]) => {
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = "sine";
+        o.frequency.value = hz;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.6, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+        o.connect(g);
+        g.connect(c.destination);
+        o.start(t);
+        o.stop(t + dauer + 0.05);
+        t += dauer + pause;
+      });
+    },
+  };
+})();
+const TON_WECHSEL = [[880, 0.18, 0.12], [880, 0.18, 0]];
+const TON_ENDE = [[660, 0.4, 0.15], [660, 0.4, 0.15], [880, 0.9, 0]];
+const tonAn = () => { try { return localStorage.getItem("nsz-ton") !== "aus"; } catch { return true; } };
+const tonSetzen = (an) => { try { localStorage.setItem("nsz-ton", an ? "an" : "aus"); } catch {} };
+
 /* Spieluhr eines Spieltags: zählt über Zeitstempel (läuft also auch bei gesperrtem Handy richtig weiter) und bleibt beim
    Neuladen erhalten (nur auf diesem Gerät). Gespeichert wird die gespielte Zeit; angezeigt wird die Restzeit, danach die Nachspielzeit. */
-function useSpielUhr(spieltagId, spielzeitMin) {
+function useSpielUhr(spieltagId, spielzeitMin, wechselMin = 0) {
   const key = `nsz-uhr-${spieltagId}`;
   const [z, setZ] = useState(() => {
     try {
@@ -10695,6 +10765,7 @@ function useSpielUhr(spieltagId, spielzeitMin) {
   const [, setTick] = useState(0);
   const zRef = useRef(z);
   const alarm = useRef(false);
+  const naechster = useRef(null); // nächster Wechsel in gespielten Sekunden
   const gesamt = (Number(spielzeitMin) || 12) * 60;
   const sek = () => Math.floor((zRef.current.summeMs + (zRef.current.startTs ? Date.now() - zRef.current.startTs : 0)) / 1000);
   const setze = (n) => {
@@ -10708,6 +10779,7 @@ function useSpielUhr(spieltagId, spielzeitMin) {
   useEffect(() => {
     if (!z.startTs) return;
     alarm.current = sek() >= gesamt; // nach Neuladen in der Nachspielzeit nicht erneut melden
+    naechster.current = naechsterWechselSek(sek(), wechselMin, spielzeitMin); // vergangene Wechsel nicht nachholen
     let letzte = -1;
     const iv = setInterval(() => {
       const s = sek();
@@ -10716,21 +10788,31 @@ function useSpielUhr(spieltagId, spielzeitMin) {
       setTick((t) => t + 1);
       if (!alarm.current && s >= gesamt) {
         alarm.current = true;
+        naechster.current = null;
         try { if (navigator.vibrate) navigator.vibrate([400, 200, 400]); } catch {}
+        if (tonAn()) NszTon.piepen(TON_ENDE);
         meldung("Spielzeit um. Die Nachspielzeit läuft.", "info");
+      } else if (naechster.current !== null && s >= naechster.current && s < gesamt) {
+        // Wechsel fällig (auch verspätet, z. B. nach gesperrtem Display): einmal melden, dann auf den nächsten warten
+        naechster.current = naechsterWechselSek(s, wechselMin, spielzeitMin);
+        try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch {}
+        if (tonAn()) NszTon.piepen(TON_WECHSEL);
+        meldung("Wechsel!", "info");
       }
     }, 250);
     return () => clearInterval(iv);
-  }, [z.startTs, gesamt]); // eslint-disable-line
+  }, [z.startTs, gesamt, wechselMin]); // eslint-disable-line
   const rest = gesamt - sek();
   const mmss = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+  const nw = naechsterWechselSek(sek(), wechselMin, spielzeitMin);
   return {
     sek,
+    wechselText: nw !== null ? mmss(nw - sek()) : null, // Restzeit bis zum nächsten Wechsel
     laeuft: !!z.startTs,
     gestartet: z.summeMs > 0 || !!z.startTs,
     text: rest >= 0 ? mmss(rest) : `+${mmss(-rest)}`,
     nachspielzeit: rest < 0,
-    start: () => setze({ summeMs: zRef.current.summeMs, startTs: Date.now() }),
+    start: () => { NszTon.entsperren(); setze({ summeMs: zRef.current.summeMs, startTs: Date.now() }); },
     pause: () => setze({ summeMs: zRef.current.summeMs + (zRef.current.startTs ? Date.now() - zRef.current.startTs : 0), startTs: null }),
     zuruecksetzen: () => setze({ summeMs: 0, startTs: null }),
   };
@@ -10784,7 +10866,7 @@ function TorProtokoll({ eintraege, mitStand, spielerName, onZurueck, spielzeitMi
   );
 }
 
-function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUpdateSpielzeit, onUploadFoto }) {
+function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRemoveSpieltag, onAddSpiel, onUpdateSpiel, onRemoveSpiel, onToggleTeilnehmer, onUpdateNotizen, onUpdateSpielzeit, onUpdateWechsel, onUploadFoto }) {
   const [opponentId, setOpponentId] = useState(gegner[0]?.id || "");
   const [ourGoals, setOurGoals] = useState(0);
   const [theirGoals, setTheirGoals] = useState(0);
@@ -10795,7 +10877,9 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const letzteAktion = useRef(Date.now());
   const spielzeitMin = spieltag.spielzeitMin || STANDARDS.spieltag.spielzeit;
   const [zeitWahl, setZeitWahl] = useState(false); // Auswahl der Spielzeit offen
-  const uhr = useSpielUhr(spieltag.id, spielzeitMin);
+  const wechselMin = wechselIntervallMin(spieltag.wechselMin, STANDARDS.spieltag.wechselStd, spielzeitMin);
+  const [ton, setTon] = useState(tonAn);
+  const uhr = useSpielUhr(spieltag.id, spielzeitMin, wechselMin);
   const marke = () => (uhr.gestartet ? { sek: uhr.sek() } : {}); // Spielzeit des Tors, wenn die Uhr benutzt wird
   const [editingId, setEditingId] = useState(null);
   const [newOpponentId, setNewOpponentId] = useState(null);
@@ -11270,6 +11354,18 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
                           <button onClick={() => { setZeitWahl(false); spielzeitAndere(); }} style={styles.chip}>Andere …</button>
                         </div>
                       )}
+                      <div role="group" aria-label="Wechsel-Erinnerung" style={{ ...styles.chipGroup, justifyContent: "center", alignItems: "center", marginTop: 8 }}>
+                        <span style={{ fontSize: 13, color: "var(--muted)" }}>Wechsel alle</span>
+                        {[...new Set([...STANDARDS.spieltag.wechsel, ...(wechselMin > 0 ? [wechselMin] : [])])].sort((x, y) => x - y).map((m) => (
+                          <button key={m} onClick={(e) => { onUpdateWechsel(m); e.currentTarget.blur(); }} aria-pressed={wechselMin === m} style={{ ...styles.chip, ...(wechselMin === m ? styles.chipActive : {}) }}>{m} Min.</button>
+                        ))}
+                        <button onClick={(e) => { onUpdateWechsel(0); e.currentTarget.blur(); }} aria-pressed={wechselMin === 0} style={{ ...styles.chip, ...(wechselMin === 0 ? styles.chipActive : {}) }}>Aus</button>
+                      </div>
+                      {uhr.laeuft && uhr.wechselText && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>Nächster Wechsel in {uhr.wechselText}</div>}
+                      <div style={{ ...styles.chipGroup, justifyContent: "center", alignItems: "center", marginTop: 8 }}>
+                        <button aria-pressed={ton} onClick={() => { const neu = !ton; tonSetzen(neu); setTon(neu); if (neu) NszTon.entsperren(); }} style={{ ...styles.chip, ...(ton ? styles.chipActive : {}) }}>Ton {ton ? "an" : "aus"}</button>
+                        <button onClick={() => { NszTon.entsperren(); NszTon.piepen(TON_WECHSEL); }} style={styles.chip}>Ton testen</button>
+                      </div>
                       <button style={{ ...styles.rowBtn, width: "100%", marginTop: 10 }} onClick={uhr.laeuft ? uhr.pause : uhr.start}>
                         {uhr.laeuft ? "Pause" : uhr.gestartet ? "Weiter" : "Start"}
                       </button>
