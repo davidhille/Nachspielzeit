@@ -1812,12 +1812,14 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
     if (!name.trim()) return setMeldung("Bitte einen Namen eingeben.");
     if (!/^[a-z0-9-]{2,20}$/.test(id)) return setMeldung("Kürzel: 2–20 Zeichen, nur a–z, 0–9 und Bindestrich.");
     if (["admin", "www", "app", "alle"].includes(id) || teams.some((t) => t.id === id)) return setMeldung("Dieses Kürzel ist nicht verfügbar.");
-    const verein = vereinWahl || (vereinListe[0] && vereinListe[0].id) || "";
+    const verein = vereinWahl || (vereinListe.length === 1 ? vereinListe[0].id : "");
     if (vereine && vereinListe.length === 0) return setMeldung("Bitte zuerst unter „Vereine“ einen Verein anlegen.");
+    if (vereine && !verein) return setMeldung("Bitte einen Verein wählen.");
     try {
       await dbInsert("teams", { id, name: name.trim(), config: {}, ...(vereine && verein ? { verein_id: verein } : {}) });
       setName("");
       setKuerzel("");
+      setVereinWahl("");
       setMeldung(`Team „${name.trim()}“ angelegt.`);
       await onChanged(id);
     } catch (e) {
@@ -1854,8 +1856,9 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
           {vereine && (
             <>
               <label htmlFor="team-verein" style={{ fontSize: 13, fontWeight: 700 }}>Verein</label>
-              <select id="team-verein" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={vereinWahl || (vereinListe[0] && vereinListe[0].id) || ""} onChange={(e) => setVereinWahl(e.target.value)}>
+              <select id="team-verein" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={vereinWahl || (vereinListe.length === 1 ? vereinListe[0].id : "")} onChange={(e) => setVereinWahl(e.target.value)}>
                 {vereinListe.length === 0 && <option value="">Noch kein Verein angelegt</option>}
+                {vereinListe.length > 1 && <option value="" disabled>Bitte wählen …</option>}
                 {vereinListe.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </>
