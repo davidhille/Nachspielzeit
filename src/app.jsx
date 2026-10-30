@@ -1840,7 +1840,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
     frageAnd(`Team „${t.name}“ endgültig löschen? Alle Daten (Spieler, Trainings, Spieltage, Notizen, Zugangscodes) sind danach weg. Zur Bestätigung den Teamnamen eintippen:`, "", async (eingabe) => {
       if (String(eingabe).trim().toLowerCase() !== t.name.trim().toLowerCase()) return setMeldung("Der Name passte nicht, das Team wurde nicht gelöscht.");
       try {
-        const res = await nszFetch(REST + "rpc/team_loeschen", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ p_team: t.id }) });
+        const res = await nszFetch(REST + "rpc/team_loeschen", { method: "POST", headers: dbHeaders(), body: JSON.stringify({ p_team: t.id }) });
         if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
         setMeldung(`Team „${t.name}“ gelöscht.`);
         await onChanged();
@@ -1888,9 +1888,9 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
       )}
       <div className="card-list" style={styles.cardList}>
         {teams.map((t) => (
-          <div key={t.id} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10, opacity: t.archived ? 0.6 : 1 }}>
+          <div key={t.id} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: "1 1 180px", minWidth: 0, opacity: t.archived ? 0.65 : 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>
                   {t.name}
                   {t.id === aktuellesTeam ? " · ausgewählt" : ""}
