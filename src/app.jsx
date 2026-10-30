@@ -2444,6 +2444,7 @@ function AdminApp() {
   const imAdminBereich = team === ADMIN_SCOPE;
   const rolle = zugangsRolle(Sitzung.info);
   const istHaupt = rolle !== "verein"; // Vereins-Admins sehen nur Teams, Verein und Zugänge ihres Vereins
+  const eigenerVerein = !istHaupt && Array.isArray(vereine) && vereine.length > 0 ? vereine[0] : null; // Vereins-Admin: Wappen seines Vereins im Kopf
   const tabListe = (imAdminBereich ? ADMIN_TABS_ALLGEMEIN : ADMIN_TABS_TEAM)
     .filter(([k]) => istHaupt || ["teams", "vereine", "zugaenge", ...ADMIN_TABS_TEAM.map((x) => x[0])].includes(k))
     .map(([k, l]) => [k, !istHaupt && k === "vereine" ? "Verein" : l]);
@@ -2550,7 +2551,7 @@ notify pgrst, 'reload schema';`;
     <div style={styles.app}>
       <header className="app-header" style={{ ...styles.header, background: "var(--header-grad-admin)" }}>
         <div style={styles.headerTop}>
-          <img src={LOGO_DATA_URI} alt="SV Heimstetten" style={styles.crestImg} />
+          <img src={(eigenerVerein && eigenerVerein.logo_url) || LOGO_DATA_URI} alt={eigenerVerein ? eigenerVerein.name : "SV Heimstetten"} style={styles.crestImg} />
           <div style={{ flex: 1 }}>
             <div style={styles.title}>Nachspielzeit Admin</div>
             <div style={{ ...styles.subtitle, display: "flex", alignItems: "center", gap: 6 }}>
