@@ -1306,3 +1306,27 @@ notify pgrst, 'reload schema';
 -- create policy "nur admin" on access_codes for all to public using (nsz_is_admin()) with check (nsz_is_admin());
 -- (team_loeschen: Prüfzeile wieder auf "if not nsz_is_admin() then" stellen)
 -- ------------------------------------------------------------
+
+
+-- Speicher-Regel für den Vereins-Admin (30.10.2026), Stand der bisherigen Funktion aus der Datenbank übernommen und erweitert; lokal getestet
+-- Speicher-Regel: Vereins-Admin nur in Ordnern der Teams seines Vereins (plus sein Vereinswappen), Haupt-Admin überall
+create or replace function public.nsz_storage_ok(obj text) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select exists (
+    select 1 from access_codes a
+    where a.code = nsz_header_code() and a.active
+      and (
+        (a.team_id is null and a.verein_id is null)                           -- Haupt-Admin: überall
+        or split_part(obj, '/', 1) = a.team_id                                 -- eigener Teamordner
+        or split_part(obj, '/', 1) = 'karten'                                  -- öffentlicher Elternlink (geheimer Token)
+        or (a.team_id = 'u8' and split_part(obj, '/', 1) in ('players', 'team', 'uebungen', 'textbilder', 'spieltage', 'songs'))  -- bisherige U8-Pfade
+        or (a.verein_id is not null and (
+              split_part(obj, '/', 1) in (select t.id from teams t where t.verein_id = a.verein_id)   -- Teamordner des eigenen Vereins
+              or obj = 'team/wappen-verein-' || a.verein_id || '.png'                                  -- eigenes Vereinswappen
+              or (exists (select 1 from teams t where t.id = 'u8' and t.verein_id = a.verein_id)       -- bisherige U8-Pfade, wenn u8 zum Verein gehört
+                  and split_part(obj, '/', 1) in ('players', 'team', 'uebungen', 'textbilder', 'spieltage', 'songs'))
+        ))
+      )
+  )
+$$;
+notify pgrst, 'reload schema';
