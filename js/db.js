@@ -21,7 +21,7 @@ const dbHeaders = (extra = {}) => baseHeaders({ "x-access-code": Sitzung.code, .
    Fehlt die Spalte noch in der Datenbank, arbeitet die App wie bisher ohne Filter. */
 const TEAM_TABLES = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele", "torschuetzen",
-  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards", "training_boards", "briefkasten",
+  "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "uebungen", "training_uebungen", "app_features", "taktik_boards", "training_boards", "briefkasten", "notizen",
 ];
 const teamFilterAktiv = (table) => TEAM_TABLES.includes(table);
 

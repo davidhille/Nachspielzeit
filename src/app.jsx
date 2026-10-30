@@ -635,6 +635,7 @@ const FEATURES = [
   { key: "eltern_songs", label: "Bereich Songs", beschreibung: "Tab „Songs“ mit Player und Liedtext", unter: "eltern_seite" },
   { key: "eltern_briefkasten", label: "Bereich Briefkasten", beschreibung: "Tab „Briefkasten“: Eltern werfen anonym Lob, Kritik und Ideen ein (standardmäßig aus; dafür muss vorher einmalig das SQL in Supabase laufen)", unter: "eltern_seite" },
   { key: "taktik", label: "Taktik-Board", beschreibung: "Tab „Taktik“ (interaktives Taktikboard mit Spielern, Laufwegen und Animation)" },
+  { key: "notizbuch", label: "Notizbuch", beschreibung: "Setup → Notizen (freie Notizen der Trainer) und Karte „Angepinnt“ auf der Home-Seite" },
   { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Home-Seite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
 
@@ -651,7 +652,7 @@ const IS_ADMIN_HOST = /^admin\./i.test(window.location.hostname) || /[?&]admin=1
 const BACKUP_TABELLEN = [
   "players", "basisqualitaet", "trainingstermine", "trainings", "entwicklungen", "gegner", "spieltage", "spiele",
   "torschuetzen", "spieltag_gegner", "spieltag_teilnehmer", "material_bestand", "team_settings", "uebungen",
-  "training_uebungen", "app_features", "teams", "taktik_boards", "training_boards", "briefkasten",
+  "training_uebungen", "app_features", "teams", "taktik_boards", "training_boards", "briefkasten", "notizen",
 ];
 
 /* ---------- Spieler-Import (BFV/DFBnet-CSV) ---------- */
@@ -2733,6 +2734,55 @@ function App() {
     }
   };
 
+  /* Notizbuch: freie Trainer-Notizen ohne Bezug zu Training oder Spieltag. Nur laden, wenn die Funktion an ist. */
+  const notizbuchAn = featureAn(features, "notizbuch");
+  const [notizen, setNotizen] = useState(null); // null = noch nicht geladen
+  const [notizenFehler, setNotizenFehler] = useState("");
+  const ladeNotizen = useCallback(async () => {
+    try {
+      const rows = await dbSelect("notizen");
+      setNotizen(rows.filter((n) => !n.deleted_at));
+      setNotizenFehler("");
+    } catch (e) {
+      console.error(e);
+      setNotizen([]);
+      setNotizenFehler("Das Notizbuch konnte nicht geladen werden. Falls es neu ist, muss einmalig das SQL in Supabase ausgeführt werden.");
+    }
+  }, []);
+  useEffect(() => {
+    if (notizbuchAn) ladeNotizen();
+  }, [notizbuchAn, ladeNotizen]);
+  // Autospeichern ohne Toast und ohne Neuladen der ganzen App; liefert die Id der (neuen) Notiz
+  const notizSpeichern = async (id, felder) => {
+    const row = { titel: felder.titel, inhalt: felder.inhalt, kategorie: felder.kategorie, angepinnt: !!felder.angepinnt, updated_at: new Date().toISOString() };
+    let neuId = id;
+    if (id == null) {
+      const res = await dbInsert("notizen", row);
+      neuId = res[0].id;
+    } else {
+      await dbUpdate("notizen", id, row);
+    }
+    await ladeNotizen();
+    return neuId;
+  };
+  const notizLoeschen = (id, danach) =>
+    confirmAnd("Diese Notiz löschen?", async () => {
+      try {
+        await dbUpdate("notizen", id, { deleted_at: new Date().toISOString() });
+        await ladeNotizen();
+        showToast("Notiz gelöscht", async () => {
+          try { await dbUpdate("notizen", id, { deleted_at: null }); await ladeNotizen(); showToast("Wiederhergestellt"); } catch (e) { showToast(friendlyError(e), null, "error"); }
+        });
+        if (danach) danach();
+      } catch (e) {
+        console.error(e);
+        meldeFehler("aktion", e);
+        showToast(friendlyError(e), null, "error");
+      }
+    });
+  const notizenSortiert = (notizen || []).slice().sort((x, y) => Number(!!y.angepinnt) - Number(!!x.angepinnt) || String(y.updated_at).localeCompare(String(x.updated_at)));
+  const notizenAngepinnt = notizbuchAn ? notizenSortiert.filter((n) => n.angepinnt) : [];
+
   /* Briefkasten (SVH-6): anonyme Nachrichten der Eltern. Wird nur geladen, wenn die Funktion eingeschaltet ist. */
   const briefkastenAn = featureAn(features, "eltern_briefkasten") && features.eltern_seite !== false;
   const [briefkasten, setBriefkasten] = useState(null); // null = noch nicht geladen
@@ -3038,6 +3088,8 @@ function App() {
             selectedPlayerId={selectedPlayerId}
             onSelectPlayer={setSelectedPlayerId}
             onOpenSettings={openPlayerSettings}
+            notizenAngepinnt={notizenAngepinnt}
+            onNotiz={(id) => { NZ_SETUP_START = "notizen"; NZ_NOTIZ_START = id; setTab("verwaltung"); }}
             briefkastenNeu={briefkastenNeu}
             onBriefkasten={() => { NZ_SETUP_START = "briefkasten"; setTab("verwaltung"); }}
           />
@@ -3211,6 +3263,7 @@ function App() {
 
         {tab === "verwaltung" && (
           <Verwaltung
+            notizbuch={{ an: notizbuchAn, liste: notizenSortiert, geladen: notizen !== null, fehler: notizenFehler, onSpeichern: notizSpeichern, onLoeschen: notizLoeschen }}
             briefkasten={{ an: briefkastenAn, liste: briefkasten, fehler: briefkastenFehler, neu: briefkastenNeu, onStatus: briefkastenStatus, onAlleGelesen: briefkastenAlleGelesen, onLoeschen: briefkastenLoeschen }}
             kartenBox={
               teamInfo && elternAn ? (
@@ -8048,6 +8101,162 @@ function GeburtstagsKarte({ players, vorlauf }) {
   );
 }
 
+/* ---------- Notizbuch (Setup → Notizen, Home → Angepinnt) ---------- */
+const NOTIZ_KATEGORIEN = [["orga", "Orga"], ["ideen", "Ideen"], ["eltern", "Eltern"], ["sonstiges", "Sonstiges"]];
+const notizTitel = (n) => (n.titel && n.titel.trim()) || (n.inhalt || "").split("\n").find((z) => z.trim()) || "Ohne Titel";
+// Vorschau: ohne eigenen Titel dient die erste Zeile als Titel, die Vorschau zeigt den Rest
+const notizVorschau = (n) => {
+  const t = (n.inhalt || "").trim();
+  return n.titel && n.titel.trim() ? t : t.split("\n").slice(1).join(" ").trim();
+};
+const notizDatum = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+const NOTIZ_KLAMMER = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" };
+
+function NotizenBereich({ daten }) {
+  const { liste, geladen, fehler, onSpeichern, onLoeschen } = daten;
+  const [offen, setOffen] = useState(() => { const s = NZ_NOTIZ_START; NZ_NOTIZ_START = null; return s != null ? s : null; }); // null | "neu" | Id
+  const [suche, setSuche] = useState("");
+  const [kat, setKat] = useState("alle");
+  if (offen !== null) {
+    const notiz = offen === "neu" ? null : liste.find((n) => n.id === offen) || null;
+    if (offen === "neu" || notiz) {
+      return <NotizEditor key={String(offen)} notiz={notiz} onSpeichern={onSpeichern} onLoeschen={onLoeschen} onZurueck={() => setOffen(null)} />;
+    }
+  }
+  const q = suche.trim().toLowerCase();
+  const treffer = liste.filter((n) => (kat === "alle" || n.kategorie === kat) && (!q || `${n.titel || ""} ${n.inhalt || ""}`.toLowerCase().includes(q)));
+  return (
+    <section style={styles.card}>
+      <KartenTitel aktion={<button type="button" style={styles.rowBtn} onClick={() => setOffen("neu")}>+ Neu</button>}>Notizen</KartenTitel>
+      <p style={styles.cardDesc}>Freie Notizen für das ganze Trainerteam, unabhängig von Training und Spieltag. Alle Trainer sehen alle Notizen. Bitte keine Gesundheitsdaten oder Kontaktdaten von Kindern eintragen.</p>
+      {fehler && <div role="alert" style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 12 }}>{fehler}</div>}
+      {liste.length > 0 && (
+        <>
+          <label htmlFor="notiz-suche" className="nz-sr">Notizen durchsuchen</label>
+          <input id="notiz-suche" type="search" placeholder="Suchen …" value={suche} onChange={(e) => setSuche(e.target.value)} style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 44, fontSize: 16, marginBottom: 10 }} />
+          <div role="group" aria-label="Kategorie" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {[["alle", "Alle"], ...NOTIZ_KATEGORIEN].map(([k, l]) => (
+              <button key={k} type="button" aria-pressed={kat === k} onClick={() => setKat(k)} style={{ ...styles.chip, ...(kat === k ? styles.chipActive : null) }}>{l}</button>
+            ))}
+          </div>
+        </>
+      )}
+      {!geladen ? (
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
+      ) : liste.length === 0 ? (
+        !fehler && <EmptyState text="Noch keine Notizen. Lege die erste an, zum Beispiel Hallenregeln oder Ideen für den Elternabend." />
+      ) : treffer.length === 0 ? (
+        <div style={{ fontSize: 14, color: "var(--muted)" }}>Keine Notiz gefunden.</div>
+      ) : (
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          {treffer.map((n) => (
+            <li key={n.id}>
+              <button type="button" onClick={() => setOffen(n.id)} style={{ width: "100%", minHeight: 44, textAlign: "left", fontFamily: "inherit", cursor: "pointer", border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface)", color: "var(--text)", padding: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, overflowWrap: "anywhere" }}>{n.angepinnt ? <span aria-label="Angepinnt">📌 </span> : null}{notizTitel(n)}</div>
+                {notizVorschau(n) && <div style={{ ...NOTIZ_KLAMMER, fontSize: 14, color: "var(--text-2)", marginTop: 2 }}>{notizVorschau(n)}</div>}
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>{(NOTIZ_KATEGORIEN.find((k) => k[0] === n.kategorie) || [0, "Sonstiges"])[1]} · geändert {notizDatum(n.updated_at)}</div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* Editor: speichert automatisch nach kurzer Pause (kein Speichern-Button); "Zurück" speichert vorher noch ausstehende Änderungen */
+function NotizEditor({ notiz, onSpeichern, onLoeschen, onZurueck }) {
+  const [titel, setTitel] = useState(notiz ? notiz.titel || "" : "");
+  const [inhalt, setInhalt] = useState(notiz ? notiz.inhalt || "" : "");
+  const [kategorie, setKategorie] = useState(notiz ? notiz.kategorie || "sonstiges" : "sonstiges");
+  const [angepinnt, setAngepinnt] = useState(notiz ? !!notiz.angepinnt : false);
+  const [stand, setStand] = useState("gespeichert"); // gespeichert | speichert | fehler
+  const idRef = useRef(notiz ? notiz.id : null);
+  const kette = useRef(Promise.resolve()); // Speichervorgänge nacheinander, sonst entstehen doppelte Notizen
+  const geaendert = useRef(false);
+  const aktuell = useRef({});
+  aktuell.current = { titel, inhalt, kategorie, angepinnt };
+  const speichernRef = useRef(onSpeichern);
+  speichernRef.current = onSpeichern;
+  const speichere = useCallback(() => {
+    const f = aktuell.current;
+    if (idRef.current == null && !f.titel.trim() && !f.inhalt.trim()) { geaendert.current = false; return kette.current; }
+    setStand("speichert");
+    kette.current = kette.current.then(async () => {
+      try {
+        idRef.current = await speichernRef.current(idRef.current, aktuell.current);
+        geaendert.current = false;
+        setStand("gespeichert");
+      } catch (e) {
+        console.error(e);
+        setStand("fehler");
+      }
+    });
+    return kette.current;
+  }, []);
+  const aendere = (setter) => (wert) => { geaendert.current = true; setStand("speichert"); setter(wert); };
+  useEffect(() => {
+    if (!geaendert.current) return undefined;
+    const t = setTimeout(speichere, 800);
+    return () => clearTimeout(t);
+  }, [titel, inhalt, kategorie, angepinnt, speichere]);
+  useEffect(() => () => { if (geaendert.current) speichere(); }, [speichere]);
+  const zurueck = async () => {
+    if (geaendert.current) await speichere();
+    if (!geaendert.current) onZurueck();
+  };
+  const loeschen = async () => {
+    await kette.current;
+    if (idRef.current == null) { geaendert.current = false; onZurueck(); return; }
+    onLoeschen(idRef.current, () => { geaendert.current = false; onZurueck(); });
+  };
+  const standText = stand === "speichert" ? "Speichert …" : stand === "fehler" ? "Nicht gespeichert" : "Gespeichert";
+  return (
+    <section style={styles.card}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <button type="button" style={{ ...styles.rowBtnOutline, height: 44 }} onClick={zurueck}>← Notizen</button>
+        <span role="status" aria-live="polite" style={{ fontSize: 13, color: stand === "fehler" ? "var(--danger-text)" : "var(--muted)" }}>
+          {standText}
+          {stand === "fehler" && <> · <button type="button" style={styles.linkBtn} onClick={speichere}>Erneut versuchen</button></>}
+        </span>
+      </div>
+      <label htmlFor="notiz-titel" style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Titel (optional)</label>
+      <input id="notiz-titel" value={titel} maxLength={120} onChange={(e) => aendere(setTitel)(e.target.value)} style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 44, fontSize: 16, fontWeight: 700, marginBottom: 12 }} />
+      <label htmlFor="notiz-inhalt" style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Notiz</label>
+      <textarea id="notiz-inhalt" value={inhalt} maxLength={10000} onChange={(e) => aendere(setInhalt)(e.target.value)} autoFocus={!notiz} style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 240, fontSize: 16, resize: "vertical", marginBottom: 12 }} />
+      <div role="group" aria-label="Kategorie" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {NOTIZ_KATEGORIEN.map(([k, l]) => (
+          <button key={k} type="button" aria-pressed={kategorie === k} onClick={() => aendere(setKategorie)(k)} style={{ ...styles.chip, ...(kategorie === k ? styles.chipActive : null) }}>{l}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+        <button type="button" aria-pressed={angepinnt} style={{ ...styles.chip, ...(angepinnt ? styles.chipActive : null) }} onClick={() => aendere(setAngepinnt)(!angepinnt)}>📌 {angepinnt ? "Angepinnt" : "Anpinnen"}</button>
+        <button type="button" style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={loeschen}>Löschen</button>
+      </div>
+    </section>
+  );
+}
+
+/* Home: angepinnte Notizen (höchstens drei) */
+function NotizenAngepinnt({ liste, onOpen }) {
+  if (!liste || liste.length === 0) return null;
+  return (
+    <div style={styles.card}>
+      <KartenTitel>Angepinnt</KartenTitel>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {liste.slice(0, 3).map((n, i) => (
+          <li key={n.id} style={{ borderTop: i ? "1px solid var(--divider)" : "none" }}>
+            <button type="button" onClick={() => onOpen(n.id)} style={{ width: "100%", minHeight: 44, textAlign: "left", fontFamily: "inherit", cursor: "pointer", border: "none", background: "transparent", color: "var(--text)", padding: "10px 0" }}>
+              <div style={{ fontWeight: 700, fontSize: 14, overflowWrap: "anywhere" }}>{notizTitel(n)}</div>
+              {notizVorschau(n) && <div style={{ ...NOTIZ_KLAMMER, fontSize: 14, color: "var(--text-2)", marginTop: 2 }}>{notizVorschau(n)}</div>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /* Briefkasten, Trainer-Ansicht (Setup → Briefkasten): anonyme Nachrichten der Eltern */
 const BRIEFKASTEN_LABEL = { lob: "Lob", kritik: "Kritik", idee: "Idee", sonstiges: "Sonstiges" };
 const BRIEFKASTEN_STATUS = { neu: "Neu", gelesen: "Gelesen", erledigt: "Erledigt" };
@@ -8125,6 +8334,8 @@ function Dashboard({
   onOpenSettings,
   briefkastenNeu = 0,
   onBriefkasten,
+  notizenAngepinnt = [],
+  onNotiz,
 }) {
   const months = useMemo(() => {
     const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
@@ -8252,6 +8463,7 @@ function Dashboard({
       </div>
       <div className="dash-side">
         <BriefkastenHinweis neu={briefkastenNeu} onOpen={onBriefkasten} />
+        <NotizenAngepinnt liste={notizenAngepinnt} onOpen={onNotiz} />
         <HeuteKarte termine={termine} spieltage={spieltage} trainings={trainings} onOpen={onOpenTermin} />
         <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
         {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
@@ -9889,6 +10101,7 @@ function ChevronIcon({ size = 16, open }) {
 const NZ_ZU = {};
 /* Einmalig: welcher Unterbereich in Setup beim nächsten Öffnen vorne liegt (z. B. von Home aus der Briefkasten) */
 let NZ_SETUP_START = null;
+let NZ_NOTIZ_START = null; // Notiz, die beim Öffnen von Setup → Notizen direkt aufgeht (von Home aus)
 function KartenTitel({ children, block = false, aktion = null, zuStart = false, style }) {
   const ref = useRef(null);
   const key = [].concat(children).join("");
@@ -11252,11 +11465,13 @@ function Verwaltung({
   onDeleteMaterialEintrag,
   kartenBox,
   briefkasten,
+  notizbuch,
 }) {
   const [subTab, setSubTab] = useState(() => { const s = NZ_SETUP_START; NZ_SETUP_START = null; return s || "spieler"; });
   const fUebungen = useFeature("uebungen");
   const fMaterial = useFeature("material");
   const fEltern = useFeature("eltern_seite");
+  const fNotizbuch = useFeature("notizbuch");
   const trashCount = trashPlayers.length + trashGegner.length + trashSpieltage.length;
   const items = [
     ["spieler", "Spieler"],
@@ -11266,6 +11481,7 @@ function Verwaltung({
     fMaterial && ["material", "Material"],
     fEltern && kartenBox && ["eltern", "Eltern-Seite"],
     fEltern && briefkasten && briefkasten.an && ["briefkasten", `Briefkasten${briefkasten.neu > 0 ? ` (${briefkasten.neu})` : ""}`],
+    fNotizbuch && notizbuch && notizbuch.an && ["notizen", "Notizen"],
     ["darstellung", "Darstellung"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ].filter(Boolean);
@@ -11286,6 +11502,7 @@ function Verwaltung({
       </div>
 
       {subTab === "eltern" && fEltern && kartenBox}
+      {subTab === "notizen" && fNotizbuch && notizbuch && notizbuch.an && <NotizenBereich daten={notizbuch} />}
       {subTab === "briefkasten" && fEltern && briefkasten && briefkasten.an && <BriefkastenListe daten={briefkasten} />}
       {subTab === "spieler" && (
         <SpielerBereich

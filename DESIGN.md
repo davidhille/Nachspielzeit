@@ -46,6 +46,7 @@ Neue Stile im `styles`-Objekt (`src/app.jsx`) ergänzen, nicht inline dupliziere
 | `Avatar` | Spielerbild oder Initialen | `size`, `photoUrl`, `ring` | Farben aus `AVATAR_FARBEN` |
 | `Header` / `TeamWechsler` | Kopfzeile mit Team-Menü | Admin-Variante mit "Zur Trainer-App" | Team-Menü ist `position: fixed` (Header schneidet sonst ab) |
 | `.nz-tabelle`, `.nz-sr`, `.nz-nur-maus` | Hilfsklassen | | siehe `CLAUDE.md` |
+| `NotizenBereich` / `NotizEditor` / `NotizenAngepinnt` | Notizbuch: Liste mit Suche und Kategorie-Chips, Editor mit Autospeichern (Status „Gespeichert“), Home-Karte „Angepinnt“ | Kategorien orga/ideen/eltern/sonstiges | Kein Speichern-Button; „Zurück“ speichert vorher |
 | `BriefkastenFormular` | Anonymes Eltern-Formular (Kategorie-Chips mit `aria-pressed`, Textfeld mit Zähler, Honeypot) | Zustände bereit/sendet/ok | Schreibt nur über RPC `briefkasten_senden` |
 | `BriefkastenListe` / `BriefkastenHinweis` | Trainer-Liste unter Setup und Hinweiskarte auf Home | Status neu/gelesen/erledigt, Löschen mit Rückgängig | Ungelesenes zusätzlich mit Text „Neu“, nicht nur Farbe |
 

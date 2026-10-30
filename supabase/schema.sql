@@ -1046,3 +1046,24 @@ $$;
 revoke all on function briefkasten_senden(text, text, text, text) from public;
 grant execute on function briefkasten_senden(text, text, text, text) to anon, authenticated, service_role;
 notify pgrst, 'reload schema';
+
+-- ======================================================================
+-- Ergänzung 30.10.2026: Notizbuch (freie Trainer-Notizen)
+-- ======================================================================
+create table if not exists notizen (
+  id bigint generated always as identity primary key,
+  team_id text not null,
+  titel text not null default '' check (char_length(titel) <= 120),
+  inhalt text not null default '' check (char_length(inhalt) <= 10000),
+  kategorie text not null default 'sonstiges' check (kategorie in ('orga', 'ideen', 'eltern', 'sonstiges')),
+  angepinnt boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists notizen_team_idx on notizen (team_id, updated_at desc);
+alter table notizen enable row level security;
+grant select, insert, update, delete on table notizen to anon, authenticated, service_role;
+drop policy if exists "access via code" on notizen;
+create policy "access via code" on notizen for all to public using (nsz_code_ok(team_id)) with check (nsz_code_ok(team_id));
+notify pgrst, 'reload schema';
