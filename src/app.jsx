@@ -9062,7 +9062,7 @@ function SpielerDetail({ player, trainings, entwicklungen, basis, spieltage, mon
                   </div>
                   <div>
                     {toreAnDiesemTag > 0 && (
-                      <span style={{ ...styles.pill, background: "var(--pos-bg)", color: "var(--pos-text)" }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}>
                         ⚽ {toreAnDiesemTag} {toreAnDiesemTag === 1 ? "Tor" : "Tore"}
                       </span>
                     )}
