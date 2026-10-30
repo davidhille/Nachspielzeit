@@ -38,7 +38,7 @@
   })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Nachspielzeit — SV Heimstetten U8</title>
+<title>Nachspielzeit</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -58,7 +58,7 @@
   try {
     var _m = location.hostname.match(/^([a-z0-9-]+)\.nachspielzeit\.app$/i);
     if (_m && _m[1].toLowerCase() === "admin") document.title = "Nachspielzeit — Administration";
-    else if (_m && _m[1].toLowerCase() !== "www") document.title = "Nachspielzeit — SV Heimstetten " + _m[1].toUpperCase();
+    else if (_m && _m[1].toLowerCase() !== "www") document.title = _m[1].toUpperCase() + " — Nachspielzeit"; // die App setzt danach Team und Verein
   } catch (e) {}
   // Administration als eigene App erkennbar: eigener Name, eigenes Symbol, dunkle Statusleiste (gleiche Regel wie IS_ADMIN_HOST in der App)
   try {
@@ -239,6 +239,6 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="app.d63c1d7025.js"></script>
+<script src="app.1dedd7fa0d.js"></script>
 </body>
 </html>
