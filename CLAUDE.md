@@ -10,6 +10,7 @@
 - Änderungen an der Eltern-Seite erst in `KartenSeiteVorschau`; sobald David zufrieden ist, immer auch in `KartenSeitePlus` (freigegebene Seite) übernehmen, ohne dass er es erneut anstoßen muss.
 - Bei Design- oder Ablaufänderungen erst einen kurzen Vorschlag (bei Optik gern mit Mockup), dann umsetzen.
 - Kleine, gezielte Änderungen. Größere Umbauten in eigenen Commits, damit sie sich zurückdrehen lassen.
+- Branches: Kleine Änderungen direkt auf `main` (kleine, getrennte Commits, Rollback per `git revert`). Größere Umbauten und alles mit riskanter Datenmigration auf `feature/<name>`, Merge nach `main` erst, wenn David zufrieden ist. `main` ist live (Deployment per Push). Datenbank-SQL lässt sich nicht per Git zurückrollen, deshalb wiederholbar schreiben.
 - Nach jeder Änderung Syntaxprüfung der App-Quelle (acorn + acorn-jsx, Ausgabe "ACORN_OK"). Im Sandbox-Browser ist kein Test möglich, das immer offen sagen ("nur Syntax geprüft").
 - Commit-Nachricht endet mit:
   Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
