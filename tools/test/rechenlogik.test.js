@@ -129,3 +129,13 @@ test("Wechsel-Erinnerung: Intervall und nächster Wechsel", () => {
   assert.equal(W.naechsterWechselSek(0, 0, 12), null);
   assert.equal(W.naechsterWechselSek(100, 3, 12), 180);
 });
+
+test("Zugangsrolle: Haupt-Admin, Vereins-Admin, Trainer", () => {
+  const R = ladeAusApp(["zugangsRolle"]);
+  assert.equal(R.zugangsRolle({ ok: true, team_id: null, verein_id: null }), "haupt");
+  assert.equal(R.zugangsRolle({ ok: true, team_id: null, verein_id: "fct" }), "verein");
+  assert.equal(R.zugangsRolle({ ok: true, team_id: "u8", verein_id: null }), "trainer");
+  assert.equal(R.zugangsRolle({ ok: true, team_id: "u8" }), "trainer"); // ältere Antwort ohne verein_id
+  assert.equal(R.zugangsRolle({ ok: false }), null);
+  assert.equal(R.zugangsRolle(null), null);
+});

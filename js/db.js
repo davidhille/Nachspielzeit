@@ -42,7 +42,7 @@ async function pruefeZugang(code) {
   const res = await nszFetch(REST + "rpc/check_access", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ code }) });
   if (res.ok) {
     const j = await res.json();
-    return { ok: !!(j && j.ok), team_id: (j && j.team_id) || null };
+    return { ok: !!(j && j.ok), team_id: (j && j.team_id) || null, verein_id: (j && j.verein_id) || null };
   }
   throw new Error("Zugang konnte nicht geprüft werden");
 }

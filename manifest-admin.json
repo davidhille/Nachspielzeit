@@ -1,5 +1,5 @@
 {
-  "name": "Nachspielzeit Admin — SV Heimstetten",
+  "name": "Nachspielzeit Admin",
   "short_name": "Admin",
   "description": "Administration von Nachspielzeit: Teams, Zugänge, Übungen und Backup",
   "start_url": "./",

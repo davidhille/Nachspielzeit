@@ -1143,3 +1143,219 @@ do $$ begin
 end $$;
 create unique index if not exists vereine_kuerzel_eindeutig on public.vereine (kuerzel) where kuerzel is not null;
 notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- Vereins-Admin (Stand 30.10.2026) – wiederholbar
+-- Rollen eines Zugangscodes:
+--   Haupt-Admin   team_id leer, verein_id leer  -> alles (wie bisher)
+--   Vereins-Admin team_id leer, verein_id = X   -> nur Teams, Zugänge, Name/Wappen von Verein X
+--   Trainer       team_id = T                   -> nur Team T (wie bisher)
+-- Alle bestehenden Codes haben verein_id leer und verhalten sich unverändert.
+-- ============================================================
+
+alter table public.access_codes add column if not exists verein_id text references public.vereine(id) on update cascade on delete cascade;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'access_codes_rolle') then
+    alter table public.access_codes add constraint access_codes_rolle check (team_id is null or verein_id is null);
+  end if;
+end $$;
+
+-- Haupt-Admin: Code ohne Team UND ohne Verein
+create or replace function public.nsz_is_admin() returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select exists (select 1 from access_codes where code = nsz_header_code() and active and team_id is null and verein_id is null)
+$$;
+
+-- Verein, für den der aktuelle Code Vereins-Admin ist (sonst null)
+create or replace function public.nsz_vereinsadmin_von() returns text
+language sql stable security definer set search_path to 'public' as $$
+  select verein_id from access_codes where code = nsz_header_code() and active and team_id is null and verein_id is not null limit 1
+$$;
+
+-- Verein, zu dem der aktuelle Code gehört (Vereins-Admin direkt, Trainer über sein Team; Haupt-Admin: null)
+create or replace function public.nsz_code_verein() returns text
+language sql stable security definer set search_path to 'public' as $$
+  select coalesce(a.verein_id, (select t.verein_id from teams t where t.id = a.team_id))
+  from access_codes a where a.code = nsz_header_code() and a.active limit 1
+$$;
+
+-- darf der aktuelle Code den Verein v verwalten? (Haupt-Admin immer, Vereins-Admin nur seinen eigenen)
+create or replace function public.nsz_verein_admin(v text) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select nsz_is_admin() or coalesce(v is not null and nsz_vereinsadmin_von() = v, false)
+$$;
+
+-- Zugriff auf Team t (t leer = irgendein gültiger Code, wie bisher)
+create or replace function public.nsz_code_ok(t text default null) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select exists (
+    select 1 from access_codes a
+    where a.code = nsz_header_code() and a.active
+      and ((a.team_id is null and a.verein_id is null)
+        or t is null
+        or a.team_id = t
+        or (a.verein_id is not null and a.verein_id = (select tm.verein_id from teams tm where tm.id = t))))
+$$;
+
+-- dasselbe für Listen von Teams (Übungen)
+create or replace function public.nsz_code_ok_arr(t text[]) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select exists (
+    select 1 from access_codes a
+    where a.code = nsz_header_code() and a.active
+      and ((a.team_id is null and a.verein_id is null)
+        or a.team_id = any(t)
+        or (a.verein_id is not null and exists (select 1 from teams tm where tm.id = any(t) and tm.verein_id = a.verein_id))))
+$$;
+
+-- Anmeldung liefert zusätzlich den Verein
+create or replace function public.check_access(code text) returns json
+language sql stable security definer set search_path to 'public' as $$
+  select coalesce(
+    (select json_build_object('ok', true, 'team_id', a.team_id, 'verein_id', a.verein_id) from access_codes a where a.code = check_access.code and a.active limit 1),
+    json_build_object('ok', false))
+$$;
+
+-- Teams: lesen nur eigene (Trainer: sein Team, Vereins-Admin: Teams seines Vereins, Haupt-Admin: alle)
+drop policy if exists "teams lesen" on teams;
+drop policy if exists "teams anlegen" on teams;
+drop policy if exists "teams loeschen" on teams;
+create policy "teams lesen" on teams for select using (nsz_code_ok(id));
+create policy "teams anlegen" on teams for insert with check (nsz_verein_admin(verein_id));
+-- Direktes Löschen nur Haupt-Admin; Vereins-Admins löschen über die Funktion team_loeschen (räumt alle Daten mit auf)
+create policy "teams loeschen" on teams for delete using (nsz_is_admin());
+
+-- Schutz vor Umgehung per API: Vereinszuordnung ändert nur der Haupt-Admin, archivieren nur ein Admin des Vereins.
+-- Ohne Zugangscode im Aufruf (SQL Editor, service_role) greift der Schutz nicht.
+create or replace function public.teams_schutz() returns trigger
+language plpgsql security definer set search_path to 'public' as $$
+begin
+  if nsz_header_code() is null then return new; end if;
+  if new.verein_id is distinct from old.verein_id and not nsz_is_admin() then
+    raise exception 'Die Vereinszuordnung eines Teams darf nur der Haupt-Admin ändern.';
+  end if;
+  if new.archived is distinct from old.archived and not nsz_verein_admin(old.verein_id) then
+    raise exception 'Teams archivieren dürfen nur Admins.';
+  end if;
+  return new;
+end $$;
+drop trigger if exists teams_schutz on public.teams;
+create trigger teams_schutz before update on public.teams for each row execute function public.teams_schutz();
+
+-- Vereine: lesen den eigenen (Trainer über sein Team), ändern Name/Wappen der Vereins-Admin seines Vereins, anlegen/löschen nur Haupt-Admin
+drop policy if exists "vereine lesen" on vereine;
+drop policy if exists "vereine schreiben" on vereine;
+drop policy if exists "vereine aendern" on vereine;
+drop policy if exists "vereine anlegen" on vereine;
+drop policy if exists "vereine loeschen" on vereine;
+create policy "vereine lesen" on vereine for select using (nsz_is_admin() or id = nsz_code_verein());
+create policy "vereine aendern" on vereine for update using (nsz_verein_admin(id)) with check (nsz_verein_admin(id));
+create policy "vereine anlegen" on vereine for insert with check (nsz_is_admin());
+create policy "vereine loeschen" on vereine for delete using (nsz_is_admin());
+
+-- Zugangscodes: Haupt-Admin alle; Vereins-Admin nur Codes seines Vereins (Trainer-Codes seiner Teams und Vereins-Admin-Codes), nie Haupt-Admin-Codes
+drop policy if exists "nur admin" on access_codes;
+drop policy if exists "codes verwalten" on access_codes;
+create policy "codes verwalten" on access_codes for all
+  using (nsz_is_admin()
+    or (nsz_vereinsadmin_von() is not null
+        and coalesce(verein_id, (select t.verein_id from teams t where t.id = access_codes.team_id)) = nsz_vereinsadmin_von()))
+  with check (nsz_is_admin()
+    or (nsz_vereinsadmin_von() is not null
+        and coalesce(verein_id, (select t.verein_id from teams t where t.id = access_codes.team_id)) = nsz_vereinsadmin_von()));
+
+-- Team löschen: Haupt-Admin oder Vereins-Admin des zugehörigen Vereins
+create or replace function public.team_loeschen(p_team text) returns void
+language plpgsql security definer set search_path to 'public' as $$
+declare t text;
+begin
+  if not nsz_verein_admin((select verein_id from teams where id = p_team)) then raise exception 'Nur ein Admin des Vereins darf Teams löschen.'; end if;
+  if p_team is null or p_team = 'u8' then raise exception 'Dieses Team darf nicht gelöscht werden.'; end if;
+  if not exists (select 1 from teams where id = p_team and archived) then raise exception 'Das Team muss zuerst archiviert werden.'; end if;
+  foreach t in array array['torschuetzen','spiele','spieltag_teilnehmer','spieltag_gegner','spieltage','training_uebungen','trainings','entwicklungen','basisqualitaet','trainingstermine','players','gegner','material_bestand','app_features','taktik_boards','training_boards','briefkasten','notizen'] loop
+    if to_regclass('public.' || t) is not null then
+      execute format('delete from public.%I where team_id = $1', t) using p_team;
+    end if;
+  end loop;
+  delete from uebungen where team_ids = array[p_team];
+  update uebungen set team_ids = array_remove(team_ids, p_team) where p_team = any(team_ids);
+  delete from access_codes where team_id = p_team;
+  delete from teams where id = p_team;
+end $$;
+grant execute on function public.team_loeschen(text) to anon, authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+-- ------------------------------------------------------------
+-- ZURÜCKROLLEN (nur bei Problemen; stellt den Stand vor dem Vereins-Admin her, Codes mit verein_id werden dann zu Haupt-Admin-Codes: vorher löschen!)
+-- delete from access_codes where verein_id is not null;
+-- drop trigger if exists teams_schutz on teams;
+-- create or replace function nsz_is_admin() returns boolean language sql stable security definer set search_path to 'public' as $$ select exists (select 1 from access_codes where code = nsz_header_code() and active and team_id is null) $$;
+-- create or replace function nsz_code_ok(t text default null) returns boolean language sql stable security definer set search_path to 'public' as $$ select exists (select 1 from access_codes where code = nsz_header_code() and active and (team_id is null or t is null or team_id = t)) $$;
+-- create or replace function nsz_code_ok_arr(t text[]) returns boolean language sql stable security definer set search_path to 'public' as $$ select exists (select 1 from access_codes where code = nsz_header_code() and active and (team_id is null or team_id = any(t))) $$;
+-- create or replace function check_access(code text) returns json language sql stable security definer set search_path to 'public' as $$ select coalesce((select json_build_object('ok', true, 'team_id', a.team_id) from access_codes a where a.code = check_access.code and a.active limit 1), json_build_object('ok', false)) $$;
+-- drop policy if exists "teams lesen" on teams; drop policy if exists "teams anlegen" on teams; drop policy if exists "teams loeschen" on teams;
+-- create policy "teams lesen" on teams for select using (nsz_code_ok());
+-- create policy "teams anlegen" on teams for insert with check (nsz_is_admin());
+-- create policy "teams loeschen" on teams for delete using (nsz_is_admin());
+-- drop policy if exists "vereine lesen" on vereine; drop policy if exists "vereine aendern" on vereine; drop policy if exists "vereine anlegen" on vereine; drop policy if exists "vereine loeschen" on vereine;
+-- create policy "vereine lesen" on vereine for select to public using (nsz_code_ok());
+-- create policy "vereine schreiben" on vereine for all to public using (nsz_is_admin()) with check (nsz_is_admin());
+-- drop policy if exists "codes verwalten" on access_codes;
+-- create policy "nur admin" on access_codes for all to public using (nsz_is_admin()) with check (nsz_is_admin());
+-- (team_loeschen: Prüfzeile wieder auf "if not nsz_is_admin() then" stellen)
+-- ------------------------------------------------------------
+
+
+-- Speicher-Regel für den Vereins-Admin (30.10.2026), Stand der bisherigen Funktion aus der Datenbank übernommen und erweitert; lokal getestet
+-- Speicher-Regel: Vereins-Admin nur in Ordnern der Teams seines Vereins (plus sein Vereinswappen), Haupt-Admin überall
+create or replace function public.nsz_storage_ok(obj text) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select exists (
+    select 1 from access_codes a
+    where a.code = nsz_header_code() and a.active
+      and (
+        (a.team_id is null and a.verein_id is null)                           -- Haupt-Admin: überall
+        or split_part(obj, '/', 1) = a.team_id                                 -- eigener Teamordner
+        or split_part(obj, '/', 1) = 'karten'                                  -- öffentlicher Elternlink (geheimer Token)
+        or (a.team_id = 'u8' and split_part(obj, '/', 1) in ('players', 'team', 'uebungen', 'textbilder', 'spieltage', 'songs'))  -- bisherige U8-Pfade
+        or (a.verein_id is not null and (
+              split_part(obj, '/', 1) in (select t.id from teams t where t.verein_id = a.verein_id)   -- Teamordner des eigenen Vereins
+              or obj = 'team/wappen-verein-' || a.verein_id || '.png'                                  -- eigenes Vereinswappen
+              or (exists (select 1 from teams t where t.id = 'u8' and t.verein_id = a.verein_id)       -- bisherige U8-Pfade, wenn u8 zum Verein gehört
+                  and split_part(obj, '/', 1) in ('players', 'team', 'uebungen', 'textbilder', 'spieltage', 'songs'))
+        ))
+      )
+  )
+$$;
+notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- team_settings (alte Einzeltabelle fürs U8-Mannschaftsfoto) nur noch für u8 (30.10.2026)
+-- Vorher las und schrieb jeder gültige Code die Tabelle (nsz_code_ok() ohne Team), auch ein Vereins-Admin eines anderen Vereins. Wiederholbar.
+-- ============================================================
+drop policy if exists "access via code" on public.team_settings;
+create policy "access via code" on public.team_settings for all to public using (nsz_code_ok('u8')) with check (nsz_code_ok('u8'));
+notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- Korrektur Vereins-Admin: Team anlegen (30.10.2026)
+-- ============================================================
+-- Team, zu dem der aktuelle Code gehört (Trainer); sonst null
+create or replace function public.nsz_code_team() returns text
+language sql stable security definer set search_path to 'public' as $$
+  select team_id from access_codes where code = nsz_header_code() and active limit 1
+$$;
+
+-- Teams lesen über die Spalten der Zeile selbst (nicht über eine Suche in der Tabelle): nur so ist eine frisch eingefügte Zeile
+-- schon beim INSERT ... RETURNING lesbar, was die App beim Anlegen verwendet.
+drop policy if exists "teams lesen" on teams;
+create policy "teams lesen" on teams for select using (
+  nsz_is_admin()
+  or id = nsz_code_team()
+  or (verein_id is not null and verein_id = nsz_vereinsadmin_von())
+);
+notify pgrst, 'reload schema';

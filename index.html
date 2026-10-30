@@ -38,7 +38,7 @@
   })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Nachspielzeit — SV Heimstetten U8</title>
+<title>Nachspielzeit</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -58,7 +58,7 @@
   try {
     var _m = location.hostname.match(/^([a-z0-9-]+)\.nachspielzeit\.app$/i);
     if (_m && _m[1].toLowerCase() === "admin") document.title = "Nachspielzeit — Administration";
-    else if (_m && _m[1].toLowerCase() !== "www") document.title = "Nachspielzeit — SV Heimstetten " + _m[1].toUpperCase();
+    else if (_m && _m[1].toLowerCase() !== "www") document.title = _m[1].toUpperCase() + " — Nachspielzeit"; // die App setzt danach Team und Verein
   } catch (e) {}
   // Administration als eigene App erkennbar: eigener Name, eigenes Symbol, dunkle Statusleiste (gleiche Regel wie IS_ADMIN_HOST in der App)
   try {
@@ -174,6 +174,9 @@
   html, body { margin: 0; padding: 0; background: var(--bg); }
   input, select, textarea { color: var(--text); }
   button, input, select, textarea, option { font-family: inherit; }
+  /* Auswahllisten in farbigen Kopfzeilen: Einträge und Gruppentitel erben sonst helle Schrift auf hellem Grund */
+  option, optgroup { color: var(--text); background-color: var(--surface); }
+  optgroup { font-weight: 700; }
   button { appearance: none; -webkit-appearance: none; transition: transform 100ms ease, background-color 120ms ease; }
   button:not(:disabled):active { transform: scale(0.98); }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -239,6 +242,6 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="app.cd3c42cede.js"></script>
+<script src="app.c561a72c3d.js"></script>
 </body>
 </html>
