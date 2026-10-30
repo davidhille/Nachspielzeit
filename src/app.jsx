@@ -1461,8 +1461,6 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [farbeTrikot, setFarbeTrikot] = useState(cfg.farbe_trikot || "");
   const [farbeRegler, setFarbeRegler] = useState(cfg.farbe_regler || "");
   const [titel, setTitel] = useState(cfg.eltern_titel || "");
-  const [fotoUrl, setFotoUrl] = useState(cfg.team_photo_url || "");
-  const [fotoBusy, setFotoBusy] = useState(false);
   const trs = cfg.training_std || {};
   const [trTage, setTrTage] = useState(Array.isArray(trs.tage) && trs.tage.length ? trs.tage.map(Number) : [2, 4]);
   const [trVon, setTrVon] = useState(trs.von || "16:30");
@@ -1494,18 +1492,18 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
     anwesend: bwFeld("anwesend", TEILNAHME_STD.anwesend), abzugAnmeldung: bwFeld("abzugAnmeldung", TEILNAHME_STD.abzugAnmeldung),
     abzugVerspaetet: bwFeld("abzugVerspaetet", TEILNAHME_STD.abzugVerspaetet), unentschuldigt: bwFeld("unentschuldigt", TEILNAHME_STD.unentschuldigt), entschuldigt: bwFeld("entschuldigt", TEILNAHME_STD.entschuldigt),
   });
-  const fotoWaehlen = async (file) => {
-    if (!file) return;
-    setFotoBusy(true);
-    try {
-      setFotoUrl(await uploadTeamFoto(file, team));
-      setStatus("Mannschaftsbild hochgeladen – bitte speichern");
-    } catch (e) {
-      setStatus(friendlyError(e));
-    } finally {
-      setFotoBusy(false);
-    }
-  };
+  // Ungespeicherte Änderungen erkennen: Stand beim Laden bzw. nach dem letzten Speichern merken und mit dem aktuellen vergleichen
+  const zustand = JSON.stringify([name, vorlauf, verein, logoUrl, farbe, farbeKopf, farbeAkzent, farbeAuswahl, farbeChip, farbeTrikot, farbeRegler, titel, trTage, trVon, trBis, trWochen, stZeit, stOrt, szListe, szStd, wcListe, wcTeiler, wcStd, startTab, backupTage, papierTage, saisonStart, saisonEnde, wertung, bewertung]);
+  const [basis, setBasis] = useState(null);
+  const merke = useRef(true);
+  useEffect(() => { if (merke.current) { merke.current = false; setBasis(zustand); } });
+  const geaendert = basis !== null && zustand !== basis;
+  useEffect(() => {
+    if (!geaendert) return undefined;
+    const warne = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warne);
+    return () => window.removeEventListener("beforeunload", warne);
+  }, [geaendert]);
   const logoWaehlen = async (file) => {
     if (!file) return;
     setLogoBusy(true);
@@ -1533,7 +1531,6 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (farbeTrikot) neuCfg.farbe_trikot = farbeTrikot; else delete neuCfg.farbe_trikot;
       if (farbeRegler) neuCfg.farbe_regler = farbeRegler; else delete neuCfg.farbe_regler;
       if (titel.trim()) neuCfg.eltern_titel = titel.trim(); else delete neuCfg.eltern_titel;
-      if (fotoUrl) neuCfg.team_photo_url = fotoUrl;
       const sS = Number(saisonStart), sE = Number(saisonEnde);
       if (!(sE < sS)) { setStatus("Das Saisonende muss vor dem Saisonbeginn liegen (z. B. Beginn September, Ende Juli)."); return; }
       if (sS === 9 && sE === 7) { delete neuCfg.saison_start; delete neuCfg.saison_ende; } else { neuCfg.saison_start = sS; neuCfg.saison_ende = sE; }
@@ -1571,6 +1568,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       });
       if (name.trim() !== (teamRow.name || "")) await dbUpdate("teams", team, { name: name.trim() || team });
       setVorlauf(String(v));
+      merke.current = true; // nach dem Speichern ist der aktuelle Stand der neue Ausgangspunkt
       setStatus("Gespeichert");
       onSaved && onSaved();
     } catch (e) {
@@ -1582,13 +1580,15 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   }
   return (
     <section>
-      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div>
-          <KartenTitel>Einstellungen · {teamRow.name}</KartenTitel>
-          <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
-        Einstellungen gelten nur für dieses Team. Die Änderung gilt nach dem nächsten Laden der App.
-          </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ ...styles.card }}>
+        <KartenTitel>Einstellungen · {teamRow.name}</KartenTitel>
+        <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
+          Gelten nur für dieses Team und werden mit „Speichern“ unten übernommen. Die Änderung gilt nach dem nächsten Laden der App. Das Mannschaftsbild wird auf Home geändert.
         </div>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel>Team & Verein</KartenTitel>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Teamname
           <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={name} onChange={(e) => setName(e.target.value)} />
@@ -1614,6 +1614,13 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             Am besten PNG mit transparentem Hintergrund. Leer = Standard-Wappen.
           </div>
         </div>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Titel der Eltern-Seite
+          <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={titel} placeholder={CLUB_STD.titel} onChange={(e) => setTitel(e.target.value)} />
+        </label>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel zuStart>Farben & Design</KartenTitel>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <FarbWahl
             titel="Teamfarbe"
@@ -1631,22 +1638,11 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           <FarbWahl titel="Regler" hinweis="Schieberegler, zum Beispiel bei der Bewertung. Leer = Buttons-Farbe." wert={farbeRegler} onChange={setFarbeRegler} leer="Wie Buttons" onLeer={() => setFarbeRegler("")} />
           <FarbVorschau basis={farbe} kopf={farbeKopf} akzent={farbeAkzent} auswahl={farbeAuswahl} chip={farbeChip} trikot={farbeTrikot} regler={farbeRegler} />
         </div>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
-          Titel der Eltern-Seite
-          <input style={{ ...styles.input, marginTop: 4, width: "100%", boxSizing: "border-box" }} value={titel} placeholder={CLUB_STD.titel} onChange={(e) => setTitel(e.target.value)} />
-        </label>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel zuStart>Saison</KartenTitel>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Mannschaftsbild
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
-            {fotoUrl ? <img src={fotoUrl} alt="Mannschaftsbild" style={{ height: 64, borderRadius: 8, objectFit: "cover" }} /> : <span style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)" }}>Noch kein Bild</span>}
-            <label style={{ ...styles.rowBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", cursor: "pointer" }}>
-              {fotoBusy ? "Lädt …" : fotoUrl ? "Bild ersetzen" : "Bild hochladen"}
-              <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { fotoWaehlen(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-            </label>
-          </div>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Saison
+          Saisonzeitraum
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontWeight: 400 }}>
             Beginn im
             <select style={{ ...styles.input, width: "auto" }} value={saisonStart} onChange={(e) => setSaisonStart(e.target.value)}>
@@ -1662,7 +1658,19 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
           </div>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Standard für neue Trainings
+          Wann zählt ein Spieltag als gespielt?
+          <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={wertung} onChange={(e) => setWertung(e.target.value)}>
+            <option value="ergebnisse">Sobald ein Ergebnis eingetragen ist (Standard)</option>
+            <option value="teilnehmer">Sobald Ergebnisse oder Teilnehmer eingetragen sind</option>
+            <option value="datum">Sobald das Datum erreicht ist</option>
+          </select>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Gilt für Spieltagsquote, Spieltage-Anzahl und die Karten. Zukünftige Spieltage zählen nie.</div>
+        </div>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel zuStart>Trainings</KartenTitel>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Vorgaben für neue Trainings
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
             {[1, 2, 3, 4, 5, 6, 0].map((d) => {
               const an = trTage.includes(d);
@@ -1675,80 +1683,6 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             für <input type="number" min="1" max="52" style={{ ...styles.input, width: 70 }} value={trWochen} onChange={(e) => setTrWochen(e.target.value)} /> Wochen
           </div>
           <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Vorbelegung beim Anlegen von Trainingsterminen im Trainingsplan.</div>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Standard für neue Spieltage
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontWeight: 400 }}>
-            Uhrzeit <input type="time" style={{ ...styles.input, width: "auto" }} value={stZeit} onChange={(e) => setStZeit(e.target.value)} />
-            Ort <input style={{ ...styles.input, flex: 1, minWidth: 160 }} value={stOrt} placeholder="z. B. Sportanlage Heimstetten" onChange={(e) => setStOrt(e.target.value)} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap", fontWeight: 400 }}>
-            <label htmlFor="sz-liste">Spielzeiten (Min.)</label>
-            <input id="sz-liste" style={{ ...styles.input, width: 150 }} value={szListe} placeholder="10, 12, 15, 20" onChange={(e) => setSzListe(e.target.value)} />
-            <label htmlFor="sz-std">Standard</label>
-            <input id="sz-std" type="number" min="1" max="90" style={{ ...styles.input, width: 70 }} value={szStd} onChange={(e) => setSzStd(e.target.value)} />
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Spielzeit im Spiel (mit Komma trennen) und Vorgabe für neue Spieltage. „Andere …“ bleibt immer möglich. Standard: 10, 12, 15, 20 und 12.</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap", fontWeight: 400 }}>
-            <label htmlFor="wc-liste">Wechsel alle … Min.</label>
-            <input id="wc-liste" style={{ ...styles.input, width: 150 }} value={wcListe} placeholder="3, 4, 6" onChange={(e) => setWcListe(e.target.value)} />
-            <label htmlFor="wc-std">Standard</label>
-            <select id="wc-std" style={styles.input} value={wcStd} onChange={(e) => setWcStd(e.target.value)}>
-              <option value="auto">Automatisch (Spielzeit ÷ {Math.min(10, Math.max(2, parseInt(wcTeiler, 10) || 4))})</option>
-              <option value="0">Aus</option>
-              {[...new Set([...wcListe.split(/[^0-9]+/).filter(Boolean).map(Number).filter((n) => n >= 1 && n <= 45), ...(wcStd !== "auto" && wcStd !== "0" ? [Number(wcStd)] : [])])].sort((x, y) => x - y).map((n) => <option key={n} value={String(n)}>alle {n} Min.</option>)}
-            </select>
-            <label htmlFor="wc-teiler">Teiler</label>
-            <input id="wc-teiler" type="number" min="2" max="10" style={{ ...styles.input, width: 70 }} value={wcTeiler} onChange={(e) => setWcTeiler(e.target.value)} />
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Wechsel-Erinnerung an der Spieluhr (mit Komma trennen) und Vorgabe für alle Spieltage. „Automatisch“ teilt die Spielzeit durch den Teiler (2 bis 10, Standard 4, also bei 12 Minuten alle 3). Am Spieltag lässt sich der Wert einzeln ändern. Standard: 3, 4, 6 und automatisch.</div>
-        </div>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
-          Backup-Erinnerung nach … Tagen
-          <input type="number" min="0" max="365" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={backupTage} onChange={(e) => setBackupTage(e.target.value)} />
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Auf Home erscheint ein Hinweis, wenn das letzte Backup (im Admin unter „Backup“) so lange her ist. 0 = keine Erinnerung. Standard: 7.
-            {cfg.letztes_backup ? ` Letztes Backup: ${new Date(cfg.letztes_backup).toLocaleString("de-DE")}.` : " Bisher wurde noch kein Backup vermerkt."}
-          </div>
-        </label>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
-          Papierkorb: Hinweis nach … Tagen
-          <input type="number" min="0" max="3650" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={papierTage} onChange={(e) => setPapierTage(e.target.value)} />
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
-            Im Papierkorb wird markiert, was länger als diese Frist liegt, mit einem Knopf zum endgültigen Löschen. Es wird nie automatisch gelöscht. 0 = kein Hinweis. Standard: 30.
-          </div>
-        </label>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Zugangscodes dieses Teams
-          <div style={{ marginTop: 6, fontWeight: 400, fontSize: 13 }}>
-            {codes === null ? "Lade …" : codes.length === 0 ? "Keine Codes für dieses Team hinterlegt." : codes.map((c) => (
-              <div key={c.code} style={{ display: "flex", gap: 10, padding: "3px 0", alignItems: "center" }}>
-                <span style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em" }}>{"•••" + String(c.code).slice(-4)}</span>
-                <span style={{ flex: 1 }}>{c.label || "ohne Bezeichnung"}</span>
-                <span style={{ color: c.active === false ? "var(--danger-text)" : "var(--success-text)", fontWeight: 700 }}>{c.active === false ? "gesperrt" : "aktiv"}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Anlegen, sperren und löschen im Bereich „Zugänge“ (Admin, Ansicht „Alle Teams“).</div>
-        </div>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>
-          Startansicht der App
-          <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={startTab} onChange={(e) => setStartTab(e.target.value)}>
-            <option value="letzte">Zuletzt geöffneter Bereich (Standard)</option>
-            <option value="dashboard">Home</option>
-            <option value="training">Training bewerten</option>
-            <option value="spieltage">Spieltage</option>
-            <option value="taktik">Taktik</option>
-          </select>
-        </label>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          Wann zählt ein Spieltag als gespielt?
-          <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={wertung} onChange={(e) => setWertung(e.target.value)}>
-            <option value="ergebnisse">Sobald ein Ergebnis eingetragen ist (Standard)</option>
-            <option value="teilnehmer">Sobald Ergebnisse oder Teilnehmer eingetragen sind</option>
-            <option value="datum">Sobald das Datum erreicht ist</option>
-          </select>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Gilt für Spieltagsquote, Spieltage-Anzahl und die Karten. Zukünftige Spieltage zählen nie.</div>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>
           Bewertung im Training (Punkte)
@@ -1765,6 +1699,50 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             <button style={{ ...styles.linkBtn, marginLeft: 8 }} onClick={() => setBewertung({ gelb: "0,5", blau: "1", rot: "2", anwesend: "0,5", abzugAnmeldung: "0,25", abzugVerspaetet: "0,25", unentschuldigt: "-0,25", entschuldigt: "0" })}>Standard setzen</button>
           </div>
         </div>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel>Spieltage</KartenTitel>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Vorgaben für neue Spieltage
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontWeight: 400 }}>
+            Uhrzeit <input type="time" style={{ ...styles.input, width: "auto" }} value={stZeit} onChange={(e) => setStZeit(e.target.value)} />
+            Ort <input style={{ ...styles.input, flex: 1, minWidth: 160 }} value={stOrt} placeholder="z. B. Sportanlage Heimstetten" onChange={(e) => setStOrt(e.target.value)} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap", fontWeight: 400 }}>
+            <label htmlFor="sz-liste">Spielzeiten (Min.)</label>
+            <input id="sz-liste" style={{ ...styles.input, width: 150 }} value={szListe} placeholder="10, 12, 15, 20" onChange={(e) => setSzListe(e.target.value)} />
+            <label htmlFor="sz-std">Standard</label>
+            <input id="sz-std" type="number" min="1" max="90" style={{ ...styles.input, width: 70 }} value={szStd} onChange={(e) => setSzStd(e.target.value)} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Spielzeit im Spiel (mit Komma trennen) und Vorgabe für neue Spieltage. „Andere …“ bleibt immer möglich. Standard: 10, 12, 15, 20 und 12.</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 16 }}>Wechsel-Erinnerung</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap", fontWeight: 400 }}>
+            <label htmlFor="wc-liste">Wechsel alle … Min.</label>
+            <input id="wc-liste" style={{ ...styles.input, width: 150 }} value={wcListe} placeholder="3, 4, 6" onChange={(e) => setWcListe(e.target.value)} />
+            <label htmlFor="wc-std">Standard</label>
+            <select id="wc-std" style={styles.input} value={wcStd} onChange={(e) => setWcStd(e.target.value)}>
+              <option value="auto">Automatisch (Spielzeit ÷ {Math.min(10, Math.max(2, parseInt(wcTeiler, 10) || 4))})</option>
+              <option value="0">Aus</option>
+              {[...new Set([...wcListe.split(/[^0-9]+/).filter(Boolean).map(Number).filter((n) => n >= 1 && n <= 45), ...(wcStd !== "auto" && wcStd !== "0" ? [Number(wcStd)] : [])])].sort((x, y) => x - y).map((n) => <option key={n} value={String(n)}>alle {n} Min.</option>)}
+            </select>
+            <label htmlFor="wc-teiler">Teiler</label>
+            <input id="wc-teiler" type="number" min="2" max="10" style={{ ...styles.input, width: 70 }} value={wcTeiler} onChange={(e) => setWcTeiler(e.target.value)} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Wechsel-Erinnerung an der Spieluhr (mit Komma trennen) und Vorgabe für alle Spieltage. „Automatisch“ teilt die Spielzeit durch den Teiler (2 bis 10, Standard 4, also bei 12 Minuten alle 3). Am Spieltag lässt sich der Wert einzeln ändern. Standard: 3, 4, 6 und automatisch.</div>
+        </div>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel zuStart>App & Hinweise</KartenTitel>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Startansicht der App
+          <select style={{ ...styles.input, display: "block", marginTop: 6, width: "100%", boxSizing: "border-box" }} value={startTab} onChange={(e) => setStartTab(e.target.value)}>
+            <option value="letzte">Zuletzt geöffneter Bereich (Standard)</option>
+            <option value="dashboard">Home</option>
+            <option value="training">Training bewerten</option>
+            <option value="spieltage">Spieltage</option>
+            <option value="taktik">Taktik</option>
+          </select>
+        </label>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Geburtstagsreminder: Vorlauf in Tagen
           <input
@@ -1779,10 +1757,42 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             So viele Tage vorher erscheint der Hinweis auf Home (0 = nur am Geburtstag selbst). Ein-/ausschalten unter „Funktionen“.
           </div>
         </label>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button style={styles.primaryBtn} onClick={speichern}>Speichern</button>
-          <span style={{ fontSize: 13, color: "var(--muted)" }}>{status}</span>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Backup-Erinnerung nach … Tagen
+          <input type="number" min="0" max="365" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={backupTage} onChange={(e) => setBackupTage(e.target.value)} />
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            Auf Home erscheint ein Hinweis, wenn das letzte Backup (im Admin unter „Backup“) so lange her ist. 0 = keine Erinnerung. Standard: 7.
+            {cfg.letztes_backup ? ` Letztes Backup: ${new Date(cfg.letztes_backup).toLocaleString("de-DE")}.` : " Bisher wurde noch kein Backup vermerkt."}
+          </div>
+        </label>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>
+          Papierkorb: Hinweis nach … Tagen
+          <input type="number" min="0" max="3650" style={{ ...styles.input, display: "block", marginTop: 6, width: 100 }} value={papierTage} onChange={(e) => setPapierTage(e.target.value)} />
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>
+            Im Papierkorb wird markiert, was länger als diese Frist liegt, mit einem Knopf zum endgültigen Löschen. Es wird nie automatisch gelöscht. 0 = kein Hinweis. Standard: 30.
+          </div>
+        </label>
+      </div>
+      <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 14 }}>
+        <KartenTitel zuStart>Zugang</KartenTitel>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          Codes dieses Teams
+          <div style={{ marginTop: 6, fontWeight: 400, fontSize: 13 }}>
+            {codes === null ? "Lade …" : codes.length === 0 ? "Keine Codes für dieses Team hinterlegt." : codes.map((c) => (
+              <div key={c.code} style={{ display: "flex", gap: 10, padding: "3px 0", alignItems: "center" }}>
+                <span style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em" }}>{"•••" + String(c.code).slice(-4)}</span>
+                <span style={{ flex: 1 }}>{c.label || "ohne Bezeichnung"}</span>
+                <span style={{ color: c.active === false ? "var(--danger-text)" : "var(--success-text)", fontWeight: 700 }}>{c.active === false ? "gesperrt" : "aktiv"}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Anlegen, sperren und löschen im Bereich „Zugänge“ (Admin, Ansicht „Alle Teams“).</div>
         </div>
+      </div>
+      </div>
+      <div style={{ position: "sticky", bottom: 12, zIndex: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 14px", marginTop: 14, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--sh-2)" }}>
+        <button style={styles.primaryBtn} onClick={speichern}>Speichern</button>
+        <span role="status" aria-live="polite" style={{ fontSize: 13, color: geaendert ? "var(--danger-text)" : "var(--muted)", fontWeight: geaendert ? 700 : 400 }}>{geaendert ? "Ungespeicherte Änderungen" : status}</span>
       </div>
     </section>
   );
