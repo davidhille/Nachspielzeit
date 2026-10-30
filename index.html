@@ -217,8 +217,8 @@
       .nav-top { display: none !important; }
       /* Meldung (Toast) über der festen Navigationsleiste (55 px + Safe-Area) statt darüber gelegt */
       .nz-toast { bottom: calc(55px + 12px + env(safe-area-inset-bottom)) !important; }
-      .nav-bottom { display: grid; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--surface); border-top: 1px solid var(--divider); box-shadow: 0 -2px 10px rgba(28,20,20,0.06); padding-bottom: env(safe-area-inset-bottom); }
-      .nav-bottom button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 8px 2px 7px; border: none; background: transparent; color: var(--muted); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+      .nav-bottom { display: grid; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--surface); border-top: 1px solid var(--divider); box-shadow: 0 -2px 10px rgba(28,20,20,0.06); padding: 0 max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left)); /* seitlich mindestens 8 px Abstand zum Rand, im Querformat zusätzlich die Notch */ }
+      .nav-bottom button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 8px 0 7px; border: none; background: transparent; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
       .app-header .nav-bottom button:focus-visible { outline-color: var(--accent-text); }
       .nav-bottom button[aria-current="page"] { color: var(--accent-text); }
       .nav-bottom button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -234,6 +234,6 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="app.afcb646176.js"></script>
+<script src="app.5896968533.js"></script>
 </body>
 </html>

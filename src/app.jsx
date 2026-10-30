@@ -5246,7 +5246,7 @@ function Header({ tab, setTab }) {
     fTaktik && ["taktik", "Taktik"],
     ["verwaltung", "Verwaltung"],
   ].filter(Boolean);
-  const NAV_KURZ = { dashboard: "Übersicht", training: "Bewerten", entwicklung: "Verlauf", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Verwaltung" };
+  const NAV_KURZ = { dashboard: "Übersicht", training: "Bewerten", entwicklung: "Verlauf", spieltage: "Spieltage", taktik: "Taktik", verwaltung: "Mehr" };
   const NAV_ICON = {
     dashboard: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></>,
     training: <><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4V3h6v1" /><path d="m9.5 13 2 2 3.5-4" /></>,
