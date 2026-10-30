@@ -11551,16 +11551,19 @@ function SpielerBereich({
           const open = openId === p.id;
           return (
             <div key={p.id} style={styles.card}>
-              <div style={styles.cardHead}>
-                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 10 }}>
-                  <Avatar name={p.name} size={36} photoUrl={p.photo_url} />
-                  <button style={styles.playerNameBtn} onClick={() => onOpenPlayer(p.id)}>
-                    {p.name}
+              {/* Eine Zeile ohne Umbruch: Bei Platzmangel wird der Name gekürzt (voller Name im Tooltip), die drei Knöpfe bleiben rechts auf gleicher Höhe. */}
+              <div style={{ ...styles.cardHead, flexWrap: "nowrap" }}>
+                <span style={{ ...styles.cardName, display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
+                  <span style={{ display: "inline-flex", flexShrink: 0 }}>
+                    <Avatar name={p.name} size={36} photoUrl={p.photo_url} />
+                  </span>
+                  <button title={p.name} style={{ ...styles.playerNameBtn, minWidth: 0, flex: "0 1 auto", overflow: "hidden" }} onClick={() => onOpenPlayer(p.id)}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                   </button>
                   <JerseyBadge number={p.trikotnummer} size={36} />
-                  {p.active === false && <span style={styles.mutedTag}> · inaktiv</span>}
+                  {p.active === false && <span style={{ ...styles.mutedTag, flexShrink: 0, whiteSpace: "nowrap" }}> · inaktiv</span>}
                 </span>
-                <div style={styles.cardActions}>
+                <div style={{ ...styles.cardActions, gap: 4, flexShrink: 0 }}>
                   <button
                     style={styles.iconBtn}
                     title={open ? "Schließen" : "Einstellungen"}
