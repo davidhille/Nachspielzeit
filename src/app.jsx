@@ -1,7 +1,7 @@
 const { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } = React;
 
 function zugangFehler(info) {
-  if (IS_ADMIN_HOST) return info.team_id ? "Dieser Code hat keinen Zugriff auf die Administration." : "";
+  if (IS_ADMIN_HOST) return zugangsRolle(info) === "trainer" ? "Dieser Code hat keinen Zugriff auf die Administration." : "";
   if (info.team_id && info.team_id !== Sitzung.team) return "Dieser Code gehört zu einem anderen Team.";
   return "";
 }
@@ -1279,14 +1279,20 @@ function UebungenAdmin({ teams }) {
   );
 }
 
-function ZugaengeVerwaltung({ teams }) {
+/* Administration → Zugänge. Zugangsarten: Trainer (ein Team), Vereins-Admin (ein Verein), Haupt-Admin (alles; nur für den Haupt-Admin).
+   Die Liste ist nach Verein gruppiert. Welche Codes man sieht und anlegen darf, entscheidet die Datenbank (RLS), die Oberfläche blendet nur aus. */
+function ZugaengeVerwaltung({ teams, vereine, rolle }) {
+  const istHaupt = rolle === "haupt";
+  const vereinListe = vereine || [];
   const [codes, setCodes] = useState(null);
   const [fehler, setFehler] = useState(null);
   const [offen, setOffen] = useState({});
   const [label, setLabel] = useState("");
-  const [teamId, setTeamId] = useState(teams[0] ? teams[0].id : "");
+  const [art, setArt] = useState("trainer"); // trainer | verein | haupt
+  const [teamId, setTeamId] = useState("");
+  const [vereinId, setVereinId] = useState("");
   const [code, setCode] = useState(() => neuerCode());
-  const [meldung, setMeldung] = useState("");
+  const setMeldung = zeigeMeldung; // Rückmeldung als Toast
   const laden = async () => {
     try {
       setCodes((await dbSelect("access_codes", { alle: true })).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
@@ -1299,19 +1305,31 @@ function ZugaengeVerwaltung({ teams }) {
   useEffect(() => {
     laden();
   }, []);
-  const teamName = (id) => (id ? (teams.find((t) => t.id === id) || { name: id }).name : "Alle Teams (Admin)");
+  const vereinVonTeam = (id) => (teams.find((t) => t.id === id) || {}).verein_id || null;
+  const vereinVonCode = (c) => c.verein_id || (c.team_id ? vereinVonTeam(c.team_id) : null);
+  const vereinName = (id) => (vereinListe.find((v) => v.id === id) || {}).name || "Ohne Verein";
+  const teamName = (id) => (teams.find((t) => t.id === id) || { name: id }).name;
+  const rolleText = (c) => (c.team_id ? `Trainer · ${teamName(c.team_id)}` : c.verein_id ? `Vereins-Admin · ${vereinName(c.verein_id)}` : "Haupt-Admin · alle Vereine");
+  // Vereins-Admin hat genau einen Verein: der ist fest gesetzt
+  const festerVerein = !istHaupt && vereinListe.length === 1 ? vereinListe[0].id : "";
+  const gewaehlterVerein = vereinId || festerVerein || (vereinListe.length === 1 ? vereinListe[0].id : "");
   const anlegen = async () => {
     const c = code.trim();
     if (c.length < 6) return setMeldung("Der Code braucht mindestens 6 Zeichen.");
     if (codes.some((x) => x.code === c)) return setMeldung("Diesen Code gibt es schon.");
+    if (art === "trainer" && !teamId) return setMeldung("Bitte ein Team wählen.");
+    if (art === "verein" && !gewaehlterVerein) return setMeldung("Bitte einen Verein wählen.");
+    const zeile = { code: c, label: label.trim() || null, active: true, team_id: art === "trainer" ? teamId : null, verein_id: art === "verein" ? gewaehlterVerein : null };
     try {
-      await dbInsert("access_codes", { code: c, team_id: teamId === "*" ? null : teamId, label: label.trim() || null, active: true });
+      await dbInsert("access_codes", zeile);
       setLabel("");
+      setTeamId("");
+      setVereinId("");
       setCode(neuerCode());
-      setMeldung("Code angelegt. Jetzt an die Trainer des Teams weitergeben.");
+      setMeldung(art === "trainer" ? "Code angelegt. Jetzt an die Trainer des Teams weitergeben." : "Code angelegt.");
       await laden();
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   const umschalten = async (c) => {
@@ -1320,7 +1338,7 @@ function ZugaengeVerwaltung({ teams }) {
       await dbUpdate("access_codes", c.code, { active: !c.active }, "code");
       await laden();
     } catch (e) {
-      setMeldung(friendlyError(e));
+      zeigeMeldung(friendlyError(e), "error");
     }
   };
   const loeschen = async (c) => {
@@ -1330,16 +1348,30 @@ function ZugaengeVerwaltung({ teams }) {
         await dbDelete("access_codes", c.code, "code");
         await laden();
       } catch (e) {
-        setMeldung(friendlyError(e));
+        zeigeMeldung(friendlyError(e), "error");
       }
     });
   };
+  // Gruppen: je Verein, am Ende die Haupt-Admin-Codes
+  const gruppen = (() => {
+    const liste = codes || [];
+    const g = vereinListe.map((v) => ({ id: v.id, titel: v.name, codes: liste.filter((c) => vereinVonCode(c) === v.id) }));
+    const ohne = liste.filter((c) => !vereinVonCode(c) && (c.team_id || c.verein_id));
+    if (ohne.length) g.push({ id: "ohne", titel: "Ohne Verein", codes: ohne });
+    const haupt = liste.filter((c) => !c.team_id && !c.verein_id);
+    if (haupt.length) g.push({ id: "haupt", titel: "Haupt-Admin (alle Vereine)", codes: haupt });
+    return g.filter((x) => x.codes.length > 0);
+  })();
+  const teamsNachVerein = vereinListe.map((v) => ({ v, teams: teams.filter((t) => t.verein_id === v.id && !t.archived) })).filter((x) => x.teams.length > 0);
+  const teamsOhneVerein = teams.filter((t) => !t.archived && !vereinListe.some((v) => v.id === t.verein_id));
   return (
     <section>
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <KartenTitel>Zugänge</KartenTitel>
         <div style={{ ...styles.cardDesc, marginBottom: 0 }}>
-        Jedes Team hat eigene Zugangscodes und sieht nur seine Daten. Ein Code ohne Team („Alle Teams“) ist ein Admin-Code und funktioniert auch in der Administration.
+          {istHaupt
+            ? "Ein Trainer-Code gehört zu einem Team und sieht nur dessen Daten. Ein Vereins-Admin verwaltet die Teams, Zugänge sowie Name und Wappen seines Vereins. Ein Haupt-Admin-Code sieht alle Vereine und funktioniert auch in der gesamten Administration."
+            : "Ein Trainer-Code gehört zu einem Team deines Vereins und sieht nur dessen Daten. Ein Vereins-Admin-Code verwaltet wie du die Teams und Zugänge deines Vereins."}
         </div>
       </div>
       {fehler && (
@@ -1352,52 +1384,83 @@ function ZugaengeVerwaltung({ teams }) {
       {!fehler && codes !== null && (
         <div style={{ ...styles.card, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <KartenTitel>Neuen Code anlegen</KartenTitel>
-          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
-          <select style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
+          <div role="group" aria-label="Zugangsart" style={{ ...styles.segNav, marginBottom: 0 }}>
+            {[["trainer", "Trainer (Team)"], ["verein", "Vereins-Admin"], ...(istHaupt ? [["haupt", "Haupt-Admin"]] : [])].map(([k, l]) => (
+              <button key={k} aria-pressed={art === k} onClick={() => setArt(k)} style={{ ...styles.segBtn, ...(art === k ? styles.segBtnActive : {}) }}>{l}</button>
             ))}
-            <option value="*">Alle Teams (Admin)</option>
-          </select>
-          <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={code} onChange={(e) => setCode(e.target.value)} />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={styles.primaryBtn} onClick={anlegen}>Code anlegen</button>
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>{meldung}</span>
           </div>
+          <label htmlFor="code-label" className="nz-sr">Bezeichnung</label>
+          <input id="code-label" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Bezeichnung (z. B. Trainer U9)" value={label} onChange={(e) => setLabel(e.target.value)} />
+          {art === "trainer" && (
+            <>
+              <label htmlFor="code-team" style={{ fontSize: 13, fontWeight: 700 }}>Team</label>
+              <select id="code-team" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+                <option value="" disabled>Bitte wählen …</option>
+                {teamsNachVerein.map((x) => (
+                  <optgroup key={x.v.id} label={x.v.name}>
+                    {x.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </optgroup>
+                ))}
+                {teamsOhneVerein.length > 0 && (
+                  <optgroup label="Ohne Verein">
+                    {teamsOhneVerein.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </optgroup>
+                )}
+              </select>
+            </>
+          )}
+          {art === "verein" && (
+            <>
+              <label htmlFor="code-verein" style={{ fontSize: 13, fontWeight: 700 }}>Verein</label>
+              <select id="code-verein" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={gewaehlterVerein} onChange={(e) => setVereinId(e.target.value)} disabled={!!festerVerein}>
+                {vereinListe.length > 1 && <option value="" disabled>Bitte wählen …</option>}
+                {vereinListe.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </>
+          )}
+          {art === "haupt" && <div style={{ fontSize: 13, color: "var(--muted)" }}>Ein Haupt-Admin-Code sieht alle Vereine und Teams. Bitte sparsam vergeben.</div>}
+          <label htmlFor="code-wert" style={{ fontSize: 13, fontWeight: 700 }}>Code</label>
+          <input id="code-wert" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={code} onChange={(e) => setCode(e.target.value)} />
+          <button style={styles.primaryBtn} onClick={anlegen}>Code anlegen</button>
         </div>
       )}
       {codes === null ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
       ) : (
-        <div className="card-list" style={styles.cardList}>
-          {codes.map((c) => (
-            <div key={c.code} style={{ ...styles.card, opacity: c.active ? 1 : 0.6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 140 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    {c.label || "(ohne Bezeichnung)"}
-                    {c.active ? "" : " · gesperrt"}
-                    {c.code === Sitzung.code ? " · dein aktueller Code" : ""}
+        <>
+          {gruppen.map((g) => (
+            <div key={g.id} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 8px 2px" }}>{g.titel}</div>
+              <div className="card-list" style={styles.cardList}>
+                {g.codes.map((c) => (
+                  <div key={c.code} style={{ ...styles.card }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ flex: "1 1 160px", minWidth: 0, opacity: c.active ? 1 : 0.65 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>
+                          {c.label || "(ohne Bezeichnung)"}
+                          {c.active ? "" : " · gesperrt"}
+                          {c.code === Sitzung.code ? " · dein aktueller Code" : ""}
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{rolleText(c)}</div>
+                        <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, letterSpacing: "0.02em", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
+                      </div>
+                      <button style={styles.rowBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
+                        {offen[c.code] ? "Verbergen" : "Anzeigen"}
+                      </button>
+                      <button style={styles.rowBtnOutline} onClick={() => umschalten(c)}>
+                        {c.active ? "Sperren" : "Entsperren"}
+                      </button>
+                      <button style={styles.rowBtnOutline} onClick={() => loeschen(c)}>
+                        Löschen
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{teamName(c.team_id)}</div>
-                  <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, letterSpacing: "0.02em", userSelect: "all" }}>{offen[c.code] ? c.code : "••••••••"}</div>
-                </div>
-                <button style={styles.rowBtnOutline} onClick={() => setOffen((o) => ({ ...o, [c.code]: !o[c.code] }))}>
-                  {offen[c.code] ? "Verbergen" : "Anzeigen"}
-                </button>
-                <button style={styles.rowBtnOutline} onClick={() => umschalten(c)}>
-                  {c.active ? "Sperren" : "Entsperren"}
-                </button>
-                <button style={styles.rowBtnOutline} onClick={() => loeschen(c)}>
-                  Löschen
-                </button>
+                ))}
               </div>
             </div>
           ))}
           {codes.length === 0 && !fehler && <div style={{ fontSize: 13, color: "var(--muted)" }}>Noch keine Codes.</div>}
-        </div>
+        </>
       )}
     </section>
   );
@@ -1787,7 +1850,7 @@ function TeamEinstellungen({ team, teamRow, vereine, onVereineAendern, onSaved }
   );
 }
 
-function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onChanged }) {
+function TeamsVerwaltung({ teams, vereine, istHaupt = true, fehler, aktuellesTeam, onSelect, onChanged }) {
   const vereinListe = vereine || [];
   const vereinName = (id) => (vereinListe.find((v) => v.id === id) || {}).name || null;
   const [vereinWahl, setVereinWahl] = useState("");
@@ -1799,7 +1862,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
   const speichereTeam = async (t) => {
     if (!eName.trim()) return setMeldung("Bitte einen Namen eingeben.");
     try {
-      await dbUpdate("teams", t.id, { name: eName.trim(), ...(vereine ? { verein_id: eVerein || null } : {}) });
+      await dbUpdate("teams", t.id, { name: eName.trim(), ...(vereine && istHaupt ? { verein_id: eVerein || null } : {}) }); // die Vereinszuordnung ändert nur der Haupt-Admin
       setBearbeite(null);
       setMeldung(`Team „${eName.trim()}“ gespeichert.`);
       await onChanged();
@@ -1919,7 +1982,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <label htmlFor={`team-name-${t.id}`} style={{ fontSize: 13, fontWeight: 700 }}>Teamname</label>
                 <input id={`team-name-${t.id}`} style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={eName} onChange={(e) => setEName(e.target.value)} />
-                {vereine && (
+                {vereine && istHaupt && (
                   <>
                     <label htmlFor={`team-verein-${t.id}`} style={{ fontSize: 13, fontWeight: 700 }}>Verein</label>
                     <select id={`team-verein-${t.id}`} style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={eVerein} onChange={(e) => setEVerein(e.target.value)}>
@@ -1943,7 +2006,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
 
 /* Administration → Vereine: Name und Wappen je Verein; Teams werden einem Verein zugeordnet (Teams → Bearbeiten) */
 const vereinKuerzel = (name) => String(name).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
-function VereineVerwaltung({ vereine, teams, onChanged }) {
+function VereineVerwaltung({ vereine, teams, istHaupt = true, onChanged }) {
   const [neuName, setNeuName] = useState("");
   const [neuKuerzel, setNeuKuerzel] = useState("");
   const setMeldung = zeigeMeldung; // Rückmeldung als Toast (oben), nicht neben dem Button
@@ -2024,8 +2087,9 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
     <section>
       <div style={{ ...styles.card, marginBottom: 14 }}>
         <KartenTitel>Vereine</KartenTitel>
-        <div style={{ ...styles.cardDesc, marginBottom: 0 }}>Name und Wappen eines Vereins gelten für alle seine Teams (Kopfzeile, Eltern-Seite, Karten, Teilen-Bilder). Die Zuordnung eines Teams ändert man unter Teams → Bearbeiten.</div>
+        <div style={{ ...styles.cardDesc, marginBottom: 0 }}>Name und Wappen eines Vereins gelten für alle seine Teams (Kopfzeile, Eltern-Seite, Karten, Teilen-Bilder).{istHaupt ? " Die Zuordnung eines Teams ändert man unter Teams → Bearbeiten." : ""}</div>
       </div>
+      {istHaupt && (
       <div style={{ ...styles.card, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <KartenTitel>Neuen Verein anlegen</KartenTitel>
         <label htmlFor="verein-neu" className="nz-sr">Name des Vereins</label>
@@ -2037,6 +2101,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
           <button style={styles.primaryBtn} onClick={anlegen}>Verein anlegen</button>
         </div>
       </div>
+      )}
       <div className="card-list" style={styles.cardList}>
         {vereine.map((v) => (
           <div key={v.id} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2044,10 +2109,10 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
               <img src={v.logo_url || CLUB_STD.logo} alt="" style={{ height: 44, maxWidth: 80, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{v.name}{v.kuerzel ? ` · ${v.kuerzel}` : ""}</div>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}{anzahlTeams(v.id) > 0 ? " · Löschen erst möglich, wenn kein Team mehr zugeordnet ist (Teams → archivieren, dann endgültig löschen)" : ""}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}{istHaupt && anzahlTeams(v.id) > 0 ? " · Löschen erst möglich, wenn kein Team mehr zugeordnet ist (Teams → archivieren, dann endgültig löschen)" : ""}</div>
               </div>
               {bearbeite !== v.id && <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(v.id); setEName(v.name); setELogo(v.logo_url || ""); setMeldung(""); }}>Bearbeiten</button>}
-              {anzahlTeams(v.id) === 0 && <button style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => loeschen(v)}>Löschen</button>}
+              {istHaupt && anzahlTeams(v.id) === 0 && <button style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => loeschen(v)}>Löschen</button>}
             </div>
             {bearbeite === v.id && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2374,7 +2439,15 @@ function AdminApp() {
   const teamRow = teams.find((t) => t.id === team && t.created_at !== undefined) || null;
   const teamName = (teams.find((t) => t.id === team) || { name: team }).name;
   const imAdminBereich = team === ADMIN_SCOPE;
-  const tabListe = imAdminBereich ? ADMIN_TABS_ALLGEMEIN : ADMIN_TABS_TEAM;
+  const rolle = zugangsRolle(Sitzung.info);
+  const istHaupt = rolle !== "verein"; // Vereins-Admins sehen nur Teams, Verein und Zugänge ihres Vereins
+  const tabListe = (imAdminBereich ? ADMIN_TABS_ALLGEMEIN : ADMIN_TABS_TEAM)
+    .filter(([k]) => istHaupt || ["teams", "vereine", "zugaenge", ...ADMIN_TABS_TEAM.map((x) => x[0])].includes(k))
+    .map(([k, l]) => [k, !istHaupt && k === "vereine" ? "Verein" : l]);
+  // Gemerktes Team gehört nicht (mehr) zu diesem Zugang, z. B. nach Wechsel des Codes im selben Browser: zurück zur Übersicht
+  useEffect(() => {
+    if (team !== ADMIN_SCOPE && teams.some((t) => t.created_at !== undefined) && !teams.some((t) => t.id === team)) setTeam(ADMIN_SCOPE);
+  }, [teams]);
   const tab = tabListe.some((t) => t[0] === tabWahl) ? tabWahl : tabListe[0][0];
   useEffect(() => { FEHLER_BEREICH = `admin/${tab}`; }, [tab]);
   const [features, setFeatures] = useState(null);
@@ -2485,12 +2558,23 @@ notify pgrst, 'reload schema';`;
                 aria-label="Team auswählen"
                 style={{ font: "inherit", fontWeight: 700, background: "transparent", color: "inherit", border: "1px solid var(--border-strong)", borderRadius: 8, padding: "1px 4px" }}
               >
-                <option value={ADMIN_SCOPE} style={{ color: "#1a1a1a", background: "#fff" }}>Admin</option>
-                {teams.filter((t) => !t.archived || t.id === team).map((t) => (
-                  <option key={t.id} value={t.id} style={{ color: "#1a1a1a", background: "#fff" }}>
-                    {t.name}
-                  </option>
-                ))}
+                <option value={ADMIN_SCOPE} style={{ color: "#1a1a1a", background: "#fff" }}>{istHaupt ? "Admin" : "Verein"}</option>
+                {(() => {
+                  const sichtbar = teams.filter((t) => !t.archived || t.id === team);
+                  const opt = (t) => <option key={t.id} value={t.id} style={{ color: "#1a1a1a", background: "#fff" }}>{t.name}</option>;
+                  if (!vereine || vereine.length < 2) return sichtbar.map(opt);
+                  // mehrere Vereine: Teams unter ihrem Verein gruppieren
+                  const ohne = sichtbar.filter((t) => !vereine.some((v) => v.id === t.verein_id));
+                  return (
+                    <>
+                      {vereine.map((v) => {
+                        const ts = sichtbar.filter((t) => t.verein_id === v.id);
+                        return ts.length ? <optgroup key={v.id} label={v.name}>{ts.map(opt)}</optgroup> : null;
+                      })}
+                      {ohne.length > 0 && <optgroup label="Ohne Verein">{ohne.map(opt)}</optgroup>}
+                    </>
+                  );
+                })()}
               </select>
             </div>
           </div>
@@ -2556,11 +2640,11 @@ notify pgrst, 'reload schema';`;
         {tab === "import" && <SpielerImport key={team} />}
         {/* Der Schlüssel wechselt, sobald die Team-Daten da sind: Das Formular übernimmt seine Startwerte nur beim Einbauen und wäre nach einem Reload sonst leer. */}
         {tab === "einstellungen" && <TeamEinstellungen key={`${team}:${teamRow ? "geladen" : "lade"}`} team={team} teamRow={teamRow} vereine={vereine} onVereineAendern={() => { setTeam(ADMIN_SCOPE); setTab("vereine"); }} onSaved={() => ladeTeams()} />}
-        {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} />}
+        {tab === "zugaenge" && <ZugaengeVerwaltung teams={teams} vereine={vereine} rolle={rolle} />}
         {tab === "uebungen" && <UebungenAdmin teams={teams} />}
         {tab === "fehler" && <FehlerAnsicht />}
-        {tab === "teams" && <TeamsVerwaltung teams={teams} vereine={vereine} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
-        {tab === "vereine" && <VereineVerwaltung vereine={vereine} teams={teams} onChanged={async () => { await ladeVereine(); await ladeTeams(); }} />}
+        {tab === "teams" && <TeamsVerwaltung teams={teams} vereine={vereine} istHaupt={istHaupt} fehler={teamsFehler} aktuellesTeam={team} onSelect={setTeam} onChanged={ladeTeams} />}
+        {tab === "vereine" && <VereineVerwaltung vereine={vereine} teams={teams} istHaupt={istHaupt} onChanged={async () => { await ladeVereine(); await ladeTeams(); }} />}
 
         {tab === "funktionen" && (
           <section>
@@ -3746,7 +3830,7 @@ create policy "access via code" on training_boards for all to public using (nsz_
 notify pgrst, 'reload schema';`;
 
 function TrainingBoardSqlHinweis() {
-  if (!Sitzung.info || Sitzung.info.team_id) {
+  if (zugangsRolle(Sitzung.info) !== "haupt") {
     return <div style={{ fontSize: 13, color: "var(--muted)" }}>Diese Funktion ist noch nicht aktiviert. Bitte beim Admin nachfragen.</div>;
   }
   return (
@@ -5585,15 +5669,17 @@ const trainerUrl = (teamId) => {
 };
 
 function TeamWechsler() {
-  const istAdmin = !!Sitzung.info && !Sitzung.info.team_id;
+  const istAdmin = ["haupt", "verein"].includes(zugangsRolle(Sitzung.info)); // Haupt- und Vereins-Admins wechseln zwischen Teams (Vereins-Admins sehen nur ihre)
   const [offen, setOffen] = useState(false);
   const [pos, setPos] = useState(null); // Menü liegt fest im Fenster, weil die Kopfzeile abschneidet (overflow: hidden)
   const [teams, setTeams] = useState(null);
+  const [vereine, setVereine] = useState(null); // für die Gruppierung nach Verein; fehlt die Tabelle, bleibt die Liste flach
   const knopfRef = useRef(null);
   const boxRef = useRef(null);
   useEffect(() => {
     if (!istAdmin) return;
     let weg = false;
+    ladeVereineListe().then((l) => !weg && setVereine(l)).catch(() => {});
     dbSelect("teams")
       .then((rows) => !weg && setTeams(rows.filter((t) => !t.archived || t.id === Sitzung.team).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))))
       .catch(() => !weg && setTeams([]));
@@ -5620,6 +5706,16 @@ function TeamWechsler() {
   if (!istAdmin) return null;
   const liste = teams && teams.length > 0 ? teams : [{ id: Sitzung.team, name: Sitzung.team.toUpperCase() }];
   const aktuell = liste.find((t) => t.id === Sitzung.team) || { name: Sitzung.team.toUpperCase() };
+  // Gruppen nach Verein; bei nur einem Verein (oder ohne Vereinstabelle) eine Gruppe ohne Überschrift
+  const gruppen = (() => {
+    const vl = vereine || [];
+    const nutzt = vl.filter((v) => liste.some((t) => t.verein_id === v.id));
+    if (nutzt.length < 2) return [{ id: "alle", titel: "", teams: liste }];
+    const g = nutzt.map((v) => ({ id: v.id, titel: v.name, teams: liste.filter((t) => t.verein_id === v.id) }));
+    const ohne = liste.filter((t) => !nutzt.some((v) => v.id === t.verein_id));
+    if (ohne.length) g.push({ id: "ohne", titel: "Ohne Verein", teams: ohne });
+    return g;
+  })();
   const eintrag = { display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "0 12px", borderRadius: 8, color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 500 };
   return (
     <div ref={boxRef} className="nz-wechsler" style={{ position: "relative", flexShrink: 0 }}>
@@ -5630,15 +5726,20 @@ function TeamWechsler() {
       {offen && pos && (
         <div id="nsz-wechsler" style={{ position: "fixed", right: pos.right, top: pos.top, zIndex: 40, minWidth: 210, background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--sh-3)", padding: 6 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", padding: "8px 12px 4px" }}>Team wechseln</div>
-          {liste.map((t) => {
-            const istJetzt = t.id === Sitzung.team;
-            return (
-              <a key={t.id} href={"/?team=" + encodeURIComponent(t.id)} aria-current={istJetzt ? "true" : undefined} style={{ ...eintrag, fontWeight: istJetzt ? 700 : 500 }}>
-                <span style={{ width: 16, color: "var(--accent-text)" }} aria-hidden="true">{istJetzt ? "✓" : ""}</span>
-                {t.name}
-              </a>
-            );
-          })}
+          {gruppen.map((g) => (
+            <div key={g.id} role="group" aria-label={g.titel || undefined}>
+              {g.titel && <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", padding: "8px 12px 2px" }}>{g.titel}</div>}
+              {g.teams.map((t) => {
+                const istJetzt = t.id === Sitzung.team;
+                return (
+                  <a key={t.id} href={"/?team=" + encodeURIComponent(t.id)} aria-current={istJetzt ? "true" : undefined} style={{ ...eintrag, fontWeight: istJetzt ? 700 : 500 }}>
+                    <span style={{ width: 16, color: "var(--accent-text)" }} aria-hidden="true">{istJetzt ? "✓" : ""}</span>
+                    {t.name}
+                  </a>
+                );
+              })}
+            </div>
+          ))}
           <div style={{ borderTop: "1px solid var(--border)", margin: "6px 0" }} />
           <a href="/?admin=1" style={eintrag}>
             <span style={{ width: 16 }} aria-hidden="true" />
@@ -5760,8 +5861,8 @@ function BackupHinweis({ config }) {
   const key = `nsz_backup_hint_${heute}`;
   const [weg, setWeg] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
   if (!tage || weg) return null;
-  // Nur Admin-Codes (ohne Team) können Backups machen – andere Trainer sehen den Hinweis nicht
-  if (!Sitzung.info || Sitzung.info.team_id) return null;
+  // Nur der Haupt-Admin kann Backups machen – Vereins-Admins und Trainer sehen den Hinweis nicht
+  if (zugangsRolle(Sitzung.info) !== "haupt") return null;
   const alter = letztes ? Math.floor((Date.now() - letztes.getTime()) / 86400000) : null;
   if (alter !== null && alter < tage) return null;
   return (

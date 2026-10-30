@@ -22,7 +22,7 @@ const Sitzung = (() => {
   return {
     code: lese(),
     team: ermittleTeam(),
-    info: null, // { ok, team_id }  (team_id leer = Admin mit Zugriff auf alle Teams)
+    info: null, // { ok, team_id, verein_id }  (beides leer = Haupt-Admin; nur verein_id = Vereins-Admin; team_id = Trainer), Rolle: zugangsRolle(info)
     /** Nach erfolgreicher Prüfung: Code merken (auch über Neuladen hinaus). */
     merkeCode(code) {
       this.code = code;

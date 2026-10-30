@@ -122,3 +122,11 @@ function naechsterWechselSek(sek, intervallMin, spielzeitMin) {
   const n = (Math.floor(sek / iv) + 1) * iv;
   return n < (Number(spielzeitMin) || 12) * 60 ? n : null;
 }
+
+/* Rolle eines Zugangscodes aus der Antwort von check_access: Haupt-Admin (weder Team noch Verein),
+   Vereins-Admin (nur Verein) oder Trainer (Team). Ungültige Angaben ergeben null. */
+function zugangsRolle(info) {
+  if (!info || !info.ok) return null;
+  if (info.team_id) return "trainer";
+  return info.verein_id ? "verein" : "haupt";
+}
