@@ -437,17 +437,18 @@ const TEILNAHME_STD = { anwesend: 0.5, abzugAnmeldung: 0.25, abzugVerspaetet: 0.
 const KARTEN_STD = { gelb: 0.5, blau: 1, rot: 2 };
 const zahlOder = (v, d) => { const n = Number(String(v ?? "").replace(",", ".")); return v === undefined || v === null || v === "" || !isFinite(n) ? d : n; };
 let EINST = { backupTage: 7, papierkorbTage: 30 };
-let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "", spielzeiten: [10, 12, 15, 20], spielzeit: 12, wechsel: [3, 4, 6], wechselStd: null } };
+let STANDARDS = { training: { tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }, spieltag: { zeit: "", ort: "", spielzeiten: [10, 12, 15, 20], spielzeit: 12, wechsel: [3, 4, 6], wechselStd: null, wechselTeiler: 4 } };
 /* Spielzeiten je Team (Minuten): Auswahl im Spiel und Standard für neue Spieltage. Ohne Eintrag 10 / 12 / 15 / 20 und 12. */
 const SPIELZEITEN_STD = [10, 12, 15, 20];
 const WECHSEL_STD = [3, 4, 6];
-/* Wechsel-Erinnerung: Auswahl der Minuten-Chips und Standard (null = automatisch Spielzeit ÷ 3, 0 = aus) */
+/* Wechsel-Erinnerung: Auswahl der Minuten-Chips, Standard (null = automatisch Spielzeit ÷ Teiler, 0 = aus) und Teiler (Standard 4) */
 function wechselAusConfig(std) {
   const roh = std && Array.isArray(std.wechsel) ? std.wechsel : [];
   const liste = [...new Set(roh.map(Number).filter((n) => n >= 1 && n <= 45))].sort((a, b) => a - b);
   const s = std ? std.wechsel_std : undefined;
   const vorgabe = s === 0 || s === "0" ? 0 : Number(s) >= 1 && Number(s) <= 45 ? Number(s) : null;
-  return { wechsel: liste.length ? liste : WECHSEL_STD, wechselStd: vorgabe };
+  const teiler = Number(std && std.wechsel_teiler);
+  return { wechsel: liste.length ? liste : WECHSEL_STD, wechselStd: vorgabe, wechselTeiler: teiler >= 2 && teiler <= 10 ? Math.round(teiler) : 4 };
 }
 function spielzeitenAusConfig(std) {
   const roh = std && Array.isArray(std.spielzeiten) ? std.spielzeiten : [];
@@ -1474,6 +1475,7 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
   const [szStd, setSzStd] = useState(String(sz0.spielzeit));
   const wc0 = wechselAusConfig(cfg.spieltag_std);
   const [wcListe, setWcListe] = useState(wc0.wechsel.join(", "));
+  const [wcTeiler, setWcTeiler] = useState(String(wc0.wechselTeiler));
   const [wcStd, setWcStd] = useState(wc0.wechselStd === null ? "auto" : String(wc0.wechselStd));
   const [startTab, setStartTab] = useState(cfg.start_tab || "letzte");
   const [backupTage, setBackupTage] = useState(String(cfg.backup_tage === undefined ? 7 : cfg.backup_tage));
@@ -1540,11 +1542,12 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
       if (JSON.stringify(trNeu) === JSON.stringify({ tage: [2, 4], von: "16:30", bis: "17:45", wochen: 8 }) || trNeu.tage.length === 0) delete neuCfg.training_std; else neuCfg.training_std = trNeu;
       const szNeu = spielzeitenAusConfig({ spielzeiten: szListe.split(/[^0-9]+/).filter(Boolean), spielzeit: szStd });
       const szIstStd = JSON.stringify(szNeu) === JSON.stringify(spielzeitenAusConfig(null));
-      const wcNeu = wechselAusConfig({ wechsel: wcListe.split(/[^0-9]+/).filter(Boolean), wechsel_std: wcStd === "auto" ? undefined : Number(wcStd) });
+      const wcNeu = wechselAusConfig({ wechsel: wcListe.split(/[^0-9]+/).filter(Boolean), wechsel_std: wcStd === "auto" ? undefined : Number(wcStd), wechsel_teiler: wcTeiler });
       const wcIstStd = JSON.stringify(wcNeu) === JSON.stringify(wechselAusConfig(null));
-      if (stZeit || stOrt.trim() || !szIstStd || !wcIstStd) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim(), ...(szIstStd ? {} : { spielzeiten: szNeu.spielzeiten, spielzeit: szNeu.spielzeit }), ...(wcIstStd ? {} : { wechsel: wcNeu.wechsel, wechsel_std: wcNeu.wechselStd === null ? "auto" : wcNeu.wechselStd }) }; else delete neuCfg.spieltag_std;
+      if (stZeit || stOrt.trim() || !szIstStd || !wcIstStd) neuCfg.spieltag_std = { zeit: stZeit, ort: stOrt.trim(), ...(szIstStd ? {} : { spielzeiten: szNeu.spielzeiten, spielzeit: szNeu.spielzeit }), ...(wcIstStd ? {} : { wechsel: wcNeu.wechsel, wechsel_std: wcNeu.wechselStd === null ? "auto" : wcNeu.wechselStd, wechsel_teiler: wcNeu.wechselTeiler }) }; else delete neuCfg.spieltag_std;
       setSzListe(szNeu.spielzeiten.join(", "));
       setWcListe(wcNeu.wechsel.join(", "));
+      setWcTeiler(String(wcNeu.wechselTeiler));
       setWcStd(wcNeu.wechselStd === null ? "auto" : String(wcNeu.wechselStd));
       setSzStd(String(szNeu.spielzeit));
       if (startTab === "letzte") delete neuCfg.start_tab; else neuCfg.start_tab = startTab;
@@ -1691,12 +1694,14 @@ function TeamEinstellungen({ team, teamRow, onSaved }) {
             <input id="wc-liste" style={{ ...styles.input, width: 150 }} value={wcListe} placeholder="3, 4, 6" onChange={(e) => setWcListe(e.target.value)} />
             <label htmlFor="wc-std">Standard</label>
             <select id="wc-std" style={styles.input} value={wcStd} onChange={(e) => setWcStd(e.target.value)}>
-              <option value="auto">Automatisch (Spielzeit ÷ 3)</option>
+              <option value="auto">Automatisch (Spielzeit ÷ {Math.min(10, Math.max(2, parseInt(wcTeiler, 10) || 4))})</option>
               <option value="0">Aus</option>
               {[...new Set([...wcListe.split(/[^0-9]+/).filter(Boolean).map(Number).filter((n) => n >= 1 && n <= 45), ...(wcStd !== "auto" && wcStd !== "0" ? [Number(wcStd)] : [])])].sort((x, y) => x - y).map((n) => <option key={n} value={String(n)}>alle {n} Min.</option>)}
             </select>
+            <label htmlFor="wc-teiler">Teiler</label>
+            <input id="wc-teiler" type="number" min="2" max="10" style={{ ...styles.input, width: 70 }} value={wcTeiler} onChange={(e) => setWcTeiler(e.target.value)} />
           </div>
-          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Wechsel-Erinnerung an der Spieluhr (mit Komma trennen) und Vorgabe für alle Spieltage. Am Spieltag lässt sich der Wert einzeln ändern. Standard: 3, 4, 6 und automatisch.</div>
+          <div style={{ fontSize: 13, fontWeight: 400, color: "var(--muted)", marginTop: 4 }}>Auswahl der Wechsel-Erinnerung an der Spieluhr (mit Komma trennen) und Vorgabe für alle Spieltage. „Automatisch“ teilt die Spielzeit durch den Teiler (2 bis 10, Standard 4, also bei 12 Minuten alle 3). Am Spieltag lässt sich der Wert einzeln ändern. Standard: 3, 4, 6 und automatisch.</div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 700 }}>
           Backup-Erinnerung nach … Tagen
@@ -10877,7 +10882,7 @@ function SpieltagCard({ spieltag, nummer, players, gegner, open, onToggle, onRem
   const letzteAktion = useRef(Date.now());
   const spielzeitMin = spieltag.spielzeitMin || STANDARDS.spieltag.spielzeit;
   const [zeitWahl, setZeitWahl] = useState(false); // Auswahl der Spielzeit offen
-  const wechselMin = wechselIntervallMin(spieltag.wechselMin, STANDARDS.spieltag.wechselStd, spielzeitMin);
+  const wechselMin = wechselIntervallMin(spieltag.wechselMin, STANDARDS.spieltag.wechselStd, spielzeitMin, STANDARDS.spieltag.wechselTeiler);
   const [ton, setTon] = useState(tonAn);
   const uhr = useSpielUhr(spieltag.id, spielzeitMin, wechselMin);
   const marke = () => (uhr.gestartet ? { sek: uhr.sek() } : {}); // Spielzeit des Tors, wenn die Uhr benutzt wird

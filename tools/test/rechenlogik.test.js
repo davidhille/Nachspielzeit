@@ -115,8 +115,10 @@ test("Gegnerbilanz: Punkte (Sieg 3, Unentschieden 1, Niederlage 0) und Sortierun
 
 test("Wechsel-Erinnerung: Intervall und nächster Wechsel", () => {
   const W = ladeAusApp(["wechselIntervallMin", "naechsterWechselSek"]);
-  assert.equal(W.wechselIntervallMin(null, null, 12), 4); // automatisch: Spielzeit ÷ 3
-  assert.equal(W.wechselIntervallMin(undefined, null, 15), 5);
+  assert.equal(W.wechselIntervallMin(null, null, 12), 3); // automatisch: Spielzeit ÷ 4
+  assert.equal(W.wechselIntervallMin(undefined, null, 20), 5);
+  assert.equal(W.wechselIntervallMin(null, null, 12, 3), 4); // Teiler einstellbar
+  assert.equal(W.wechselIntervallMin(null, null, 12, 0), 3); // ungültiger Teiler: Standard 4
   assert.equal(W.wechselIntervallMin(null, 6, 12), 6); // Teamstandard
   assert.equal(W.wechselIntervallMin(3, 6, 12), 3); // Spieltag überschreibt
   assert.equal(W.wechselIntervallMin(0, 6, 12), 0); // aus

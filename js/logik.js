@@ -107,11 +107,11 @@ function sortiereGegnerBilanz(zeilen, schluessel, richtung) {
 }
 
 /* Wechsel-Erinnerung am Spieltag. wert = Einstellung des Spieltags (null = Teamstandard, 0 = aus, sonst Minuten),
-   standard = Teamstandard (null = automatisch: Spielzeit ÷ 3). Ergebnis: Intervall in Minuten, 0 = keine Erinnerung. */
-function wechselIntervallMin(wert, standard, spielzeitMin) {
+   standard = Teamstandard (null = automatisch: Spielzeit ÷ teiler, Standard 4). Ergebnis: Intervall in Minuten, 0 = keine Erinnerung. */
+function wechselIntervallMin(wert, standard, spielzeitMin, teiler) {
   const w = wert === null || wert === undefined ? standard : wert;
   if (w === 0) return 0;
-  if (w === null || w === undefined) return Math.max(1, Math.round((Number(spielzeitMin) || 12) / 3));
+  if (w === null || w === undefined) return Math.max(1, Math.round((Number(spielzeitMin) || 12) / (Number(teiler) >= 1 ? Number(teiler) : 4)));
   return Number(w);
 }
 
