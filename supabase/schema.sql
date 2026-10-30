@@ -1129,3 +1129,17 @@ begin
 end $$;
 grant execute on function public.team_loeschen(text) to anon, authenticated, service_role;
 notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- Vereinskürzel für Team-Adressen (30.10.2026)
+-- Neue Vereine bekommen ein Kürzel (Pflicht in der App), SV Heimstetten bleibt bewusst ohne. Wiederholbar.
+-- ============================================================
+alter table public.vereine add column if not exists kuerzel text;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'vereine_kuerzel_format') then
+    alter table public.vereine add constraint vereine_kuerzel_format check (kuerzel is null or kuerzel ~ '^[a-z0-9]{2,8}$');
+  end if;
+end $$;
+create unique index if not exists vereine_kuerzel_eindeutig on public.vereine (kuerzel) where kuerzel is not null;
+notify pgrst, 'reload schema';

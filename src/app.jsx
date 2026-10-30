@@ -1791,6 +1791,8 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
   const vereinListe = vereine || [];
   const vereinName = (id) => (vereinListe.find((v) => v.id === id) || {}).name || null;
   const [vereinWahl, setVereinWahl] = useState("");
+  const gewaehlterVerein = vereinListe.find((v) => v.id === (vereinWahl || (vereinListe.length === 1 ? vereinListe[0].id : ""))) || null;
+  const kuerzelPraefix = gewaehlterVerein && gewaehlterVerein.kuerzel ? `${gewaehlterVerein.kuerzel}-` : "";
   const [bearbeite, setBearbeite] = useState(null); // Id des Teams im Bearbeiten-Modus
   const [eName, setEName] = useState("");
   const [eVerein, setEVerein] = useState("");
@@ -1806,12 +1808,14 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
     }
   };
   const [name, setName] = useState("");
-  const [kuerzel, setKuerzel] = useState("");
+  const [kuerzel, setKuerzel] = useState(null); // null = Vorschlag aus Vereinskürzel und Teamname; sonst Eingabe des Admins
   const setMeldung = zeigeMeldung; // Rückmeldung als Toast (oben), nicht neben dem Button
+  const kuerzelWert = kuerzel !== null ? kuerzel : kuerzelPraefix && name.trim() ? kuerzelPraefix + vereinKuerzel(name).slice(0, 30 - kuerzelPraefix.length) : "";
   const anlegen = async () => {
-    const id = kuerzel.trim().toLowerCase();
+    const id = kuerzelWert.trim().toLowerCase();
     if (!name.trim()) return setMeldung("Bitte einen Namen eingeben.");
-    if (!/^[a-z0-9-]{2,20}$/.test(id)) return setMeldung("Kürzel: 2–20 Zeichen, nur a–z, 0–9 und Bindestrich.");
+    if (!/^[a-z0-9-]{2,30}$/.test(id)) return setMeldung("Kürzel: 2–30 Zeichen, nur a–z, 0–9 und Bindestrich.");
+    if (kuerzelPraefix && !id.startsWith(kuerzelPraefix)) return setMeldung(`Das Kürzel muss mit „${kuerzelPraefix}“ beginnen, damit es zwischen den Vereinen eindeutig bleibt.`);
     if (["admin", "www", "app", "alle"].includes(id) || teams.some((t) => t.id === id)) return setMeldung("Dieses Kürzel ist nicht verfügbar.");
     const verein = vereinWahl || (vereinListe.length === 1 ? vereinListe[0].id : "");
     if (vereine && vereinListe.length === 0) return setMeldung("Bitte zuerst unter „Vereine“ einen Verein anlegen.");
@@ -1819,7 +1823,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
     try {
       await dbInsert("teams", { id, name: name.trim(), config: {}, ...(vereine && verein ? { verein_id: verein } : {}) });
       setName("");
-      setKuerzel("");
+      setKuerzel(null);
       setVereinWahl("");
       setMeldung(`Team „${name.trim()}“ angelegt.`);
       await onChanged(id);
@@ -1864,8 +1868,8 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
           <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. U9)" value={name} onChange={(e) => setName(e.target.value)} />
           <input
             style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
-            placeholder="Kürzel für die Adresse (z. B. u9)"
-            value={kuerzel}
+            placeholder={kuerzelPraefix ? `Kürzel für die Adresse (z. B. ${kuerzelPraefix}u9)` : "Kürzel für die Adresse (z. B. u9)"}
+            value={kuerzelWert}
             onChange={(e) => setKuerzel(e.target.value)}
           />
           {vereine && (
@@ -1941,6 +1945,7 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
 const vereinKuerzel = (name) => String(name).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 function VereineVerwaltung({ vereine, teams, onChanged }) {
   const [neuName, setNeuName] = useState("");
+  const [neuKuerzel, setNeuKuerzel] = useState("");
   const setMeldung = zeigeMeldung; // Rückmeldung als Toast (oben), nicht neben dem Button
   const [bearbeite, setBearbeite] = useState(null);
   const [eName, setEName] = useState("");
@@ -1961,12 +1966,16 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
     if (!n) return setMeldung("Bitte einen Namen eingeben.");
     let id = vereinKuerzel(n);
     if (id.length < 2) id = `verein-${vereine.length + 1}`;
+    const kz = neuKuerzel.trim().toLowerCase();
+    if (!/^[a-z0-9]{2,8}$/.test(kz)) return setMeldung("Bitte ein Kürzel angeben: 2–8 Zeichen, nur a–z und 0–9 (z. B. fct).");
+    if (vereine.some((v) => v.kuerzel === kz)) return setMeldung("Dieses Kürzel hat schon ein anderer Verein.");
     const frei = (x) => !vereine.some((v) => v.id === x);
     let kandidat = id;
     for (let i = 2; !frei(kandidat); i++) kandidat = `${id.slice(0, 36)}-${i}`;
     try {
-      await dbInsert("vereine", { id: kandidat, name: n });
+      await dbInsert("vereine", { id: kandidat, name: n, kuerzel: kz });
       setNeuName("");
+      setNeuKuerzel("");
       setMeldung(`Verein „${n}“ angelegt.`);
       await onChanged();
     } catch (e) {
@@ -2019,6 +2028,9 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
         <KartenTitel>Neuen Verein anlegen</KartenTitel>
         <label htmlFor="verein-neu" className="nz-sr">Name des Vereins</label>
         <input id="verein-neu" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Name (z. B. SV Heimstetten)" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
+        <label htmlFor="verein-neu-kuerzel" className="nz-sr">Kürzel des Vereins</label>
+        <input id="verein-neu-kuerzel" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} placeholder="Kürzel für die Team-Adressen (z. B. fct)" value={neuKuerzel} onChange={(e) => setNeuKuerzel(e.target.value)} />
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Das Kürzel steht vor jeder Team-Adresse des Vereins (z. B. fct-u8.nachspielzeit.app) und lässt sich später nicht ändern.</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <button style={styles.primaryBtn} onClick={anlegen}>Verein anlegen</button>
         </div>
@@ -2029,7 +2041,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <img src={v.logo_url || CLUB_STD.logo} alt="" style={{ height: 44, maxWidth: 80, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{v.name}</div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{v.name}{v.kuerzel ? ` · ${v.kuerzel}` : ""}</div>
                 <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}{anzahlTeams(v.id) > 0 ? " · Löschen erst möglich, wenn kein Team mehr zugeordnet ist (Teams → archivieren, dann endgültig löschen)" : ""}</div>
               </div>
               {bearbeite !== v.id && <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(v.id); setEName(v.name); setELogo(v.logo_url || ""); setMeldung(""); }}>Bearbeiten</button>}
@@ -2246,6 +2258,64 @@ function DatenbankHinweis() {
       <div style={{ fontSize: 13 }}>Dafür fehlt noch eine Spalte. Einmal in Supabase (SQL Editor) ausführen, danach die Seiten neu laden:</div>
       <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: "6px 0 0", userSelect: "all" }}>{fehlend.map((f) => f.sql).join("\n\n")}</pre>
     </div>
+  );
+}
+
+/* Toast, Bestätigung und Eingabe für die Administration (die Trainer-App hat ihren eigenen Host in App).
+   Ohne diesen Host würden meldung/confirmAnd/frageAnd auf Browser-Dialoge zurückfallen. */
+function AdminDialogHost() {
+  const [toast, setToast] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
+  const [promptState, setPromptState] = useState(null);
+  const timerRef = useRef(null);
+  const abbrechenRef = useRef(null);
+  useEffect(() => {
+    registerToastHandler((message, type) => {
+      clearTimeout(timerRef.current);
+      setToast({ message, type });
+      timerRef.current = setTimeout(() => setToast(null), type === "error" ? 5000 : 4000);
+    });
+    registerConfirmHandler((message, onConfirm) => setConfirmState({ message, onConfirm }));
+    registerPromptHandler((d) => setPromptState(d));
+    return () => {
+      clearTimeout(timerRef.current);
+      registerToastHandler(null);
+      registerConfirmHandler(null);
+      registerPromptHandler(null);
+    };
+  }, []);
+  useEffect(() => {
+    if (!confirmState) return;
+    const vorher = document.activeElement;
+    if (abbrechenRef.current) abbrechenRef.current.focus();
+    const onKey = (e) => { if (e.key === "Escape") setConfirmState(null); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (vorher && vorher.focus) vorher.focus();
+    };
+  }, [confirmState]);
+  return (
+    <>
+      <div className="nz-sr" role="status" aria-live="polite" aria-atomic="true">{toast && toast.type !== "error" ? toast.message : ""}</div>
+      {toast && (
+        <div className="nz-toast" role={toast.type === "error" ? "alert" : undefined} style={{ ...styles.toast, background: toast.type === "error" ? "var(--danger-solid)" : "var(--accent)" }}>
+          <span>{toast.type === "error" ? "⚠ " : ""}{toast.message}</span>
+        </div>
+      )}
+      {promptState && <TkDialog dialog={promptState} onClose={() => setPromptState(null)} />}
+      {confirmState && (
+        <div style={styles.modalOverlay}>
+          <div role="alertdialog" aria-modal="true" aria-describedby="admin-confirm-message" style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <p id="admin-confirm-message" style={styles.modalText}>{confirmState.message}</p>
+            <div style={styles.modalActions}>
+              <button ref={abbrechenRef} style={styles.rowBtnOutline} onClick={() => setConfirmState(null)}>Abbrechen</button>
+              <button style={{ ...styles.rowBtn, background: "var(--danger-solid)" }} onClick={() => { confirmState.onConfirm(); setConfirmState(null); }}>Bestätigen</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2553,6 +2623,7 @@ notify pgrst, 'reload schema';`;
         )}
       </FehlerGrenze>
       </main>
+      <AdminDialogHost />
     </div>
   );
 }
