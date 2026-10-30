@@ -1980,6 +1980,10 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
     confirmAnd(`Verein „${v.name}“ löschen?`, async () => {
       try {
         await dbDelete("vereine", v.id);
+        // hochgeladenes Wappen mit aufräumen; schlägt das fehl, bleibt nur eine unbenutzte Datei im Speicher
+        try {
+          await nszFetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/team/wappen-verein-${v.id}.png`, { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "x-access-code": Sitzung.code } });
+        } catch (e) { console.warn("Wappen-Datei nicht gelöscht", e); }
         await onChanged();
       } catch (e) {
         setMeldung(friendlyError(e));
@@ -2007,7 +2011,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
               <img src={v.logo_url || CLUB_STD.logo} alt="" style={{ height: 44, maxWidth: 80, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{v.name}</div>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}{anzahlTeams(v.id) > 0 ? " · Löschen erst möglich, wenn kein Team mehr zugeordnet ist" : ""}</div>
               </div>
               {bearbeite !== v.id && <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(v.id); setEName(v.name); setELogo(v.logo_url || ""); setMeldung(""); }}>Bearbeiten</button>}
               {anzahlTeams(v.id) === 0 && <button style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => loeschen(v)}>Löschen</button>}
