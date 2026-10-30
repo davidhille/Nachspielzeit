@@ -1339,3 +1339,23 @@ notify pgrst, 'reload schema';
 drop policy if exists "access via code" on public.team_settings;
 create policy "access via code" on public.team_settings for all to public using (nsz_code_ok('u8')) with check (nsz_code_ok('u8'));
 notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- Korrektur Vereins-Admin: Team anlegen (30.10.2026)
+-- ============================================================
+-- Team, zu dem der aktuelle Code gehört (Trainer); sonst null
+create or replace function public.nsz_code_team() returns text
+language sql stable security definer set search_path to 'public' as $$
+  select team_id from access_codes where code = nsz_header_code() and active limit 1
+$$;
+
+-- Teams lesen über die Spalten der Zeile selbst (nicht über eine Suche in der Tabelle): nur so ist eine frisch eingefügte Zeile
+-- schon beim INSERT ... RETURNING lesbar, was die App beim Anlegen verwendet.
+drop policy if exists "teams lesen" on teams;
+create policy "teams lesen" on teams for select using (
+  nsz_is_admin()
+  or id = nsz_code_team()
+  or (verein_id is not null and verein_id = nsz_vereinsadmin_von())
+);
+notify pgrst, 'reload schema';
