@@ -6286,6 +6286,65 @@ function SongPlayer({ songs, cover, team, token, textStart = false }) {
 }
 
 /* Bilanz pro Gegner auf der Elternseite: Saison (Standard) oder Gesamt über alle Saisons */
+/* Gegnerbilanz als sortierbare Tabelle (Trainer-App und Eltern-Seite). Spaltenkopf = Button, Sortierung per Tipp; Punkte: Sieg 3, Unentschieden 1, Niederlage 0. */
+const GEGNER_SPALTEN = [
+  ["spiele", "Spiele", "Spiele"],
+  ["siege", "S", "Siege"],
+  ["unentschieden", "U", "Unentschieden"],
+  ["niederlagen", "N", "Niederlagen"],
+  ["toreFuer", "Tore", "Tore"],
+  ["diff", "Diff.", "Tordifferenz"],
+  ["punkte", "Pkt.", "Punkte"],
+];
+function GegnerBilanzSortierbar({ zeilen }) {
+  const [sort, setSort] = useState(null); // null = Reihenfolge wie geliefert
+  const sortiert = sort ? sortiereGegnerBilanz(zeilen, sort.key, sort.dir) : zeilen;
+  const waehle = (key) => setSort((s) => (s && s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" ? "asc" : "desc" }));
+  const kopf = (key, label, voll, rechts) => {
+    const an = sort && sort.key === key;
+    return (
+      <th key={key} aria-sort={an ? (sort.dir === "asc" ? "ascending" : "descending") : "none"} style={{ ...styles.th, padding: 0, textAlign: rechts ? "right" : "left" }}>
+        <button type="button" onClick={() => waehle(key)} aria-label={`${voll} sortieren`} style={{ display: "inline-flex", alignItems: "center", justifyContent: rechts ? "flex-end" : "flex-start", gap: 4, width: "100%", minHeight: 44, padding: "0 12px", border: "none", background: "transparent", color: "inherit", font: "inherit", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+          {label}
+          <span aria-hidden="true" style={{ opacity: an ? 1 : 0.35 }}>{an ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}</span>
+        </button>
+      </th>
+    );
+  };
+  return (
+    <>
+      <div className="nz-tabelle" style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              {kopf("name", "Gegner", "Gegner", false)}
+              {GEGNER_SPALTEN.map(([key, label, voll]) => kopf(key, label, voll, true))}
+            </tr>
+          </thead>
+          <tbody>
+            {sortiert.map((g) => {
+              const d = g.toreFuer - g.toreGegen;
+              return (
+                <tr key={g.id || g.name}>
+                  <td style={styles.tdName}>{g.name}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{g.spiele}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{g.siege}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{g.unentschieden}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{g.niederlagen}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{g.toreFuer}:{g.toreGegen}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{gegnerPunkte(g.siege, g.unentschieden)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>Punkte: Sieg 3, Unentschieden 1, Niederlage 0.</div>
+    </>
+  );
+}
+
 function GegnerBilanzSeite({ saison, gesamt, saisonLabel }) {
   const [umfang, setUmfang] = useState("saison");
   // „Gesamt“ nur anbieten, wenn es sich von der Saison unterscheidet (also mehr als eine Saison vorliegt)
@@ -6304,32 +6363,7 @@ function GegnerBilanzSeite({ saison, gesamt, saisonLabel }) {
       {liste.length === 0 ? (
         <div style={styles.hint}>Noch keine Spiele in dieser Saison.</div>
       ) : (
-        <div className="nz-tabelle" style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Gegner</th>
-                {["Spiele", "S", "U", "N", "Tore", "Diff."].map((h) => <th key={h} style={{ ...styles.th, textAlign: "right" }}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {liste.map((g) => {
-                const d = g.toreFuer - g.toreGegen;
-                return (
-                  <tr key={g.name}>
-                    <td style={styles.tdName}>{g.name}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{g.spiele}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{g.siege}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{g.unentschieden}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{g.niederlagen}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{g.toreFuer}:{g.toreGegen}</td>
-                    <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: d > 0 ? "var(--success-text)" : d < 0 ? "var(--loss-text)" : "var(--text-2)" }}>{d > 0 ? "+" : ""}{d}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <GegnerBilanzSortierbar zeilen={liste} />
       )}
     </div>
   );
@@ -9420,42 +9454,7 @@ function GegnerBilanzTabelle({ spieltage, gegner, month }) {
       {bilanzen.length === 0 ? (
         <EmptyState text={umfangWirksam === "saison" ? "Noch keine Spiele gegen hinterlegte Gegner in dieser Saison." : "Noch keine Spiele gegen hinterlegte Gegner erfasst."} />
       ) : (
-        <div className="nz-tabelle" style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Gegner</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Spiele</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>S</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>U</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>N</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Tore</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Diff.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bilanzen.map((b) => {
-                const diff = b.toreFuer - b.toreGegen;
-                return (
-                  <tr key={b.id}>
-                    <td style={styles.tdName}>{b.name}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{b.spiele}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{b.siege}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{b.unentschieden}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{b.niederlagen}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>
-                      {b.toreFuer}:{b.toreGegen}
-                    </td>
-                    <td style={{ ...styles.td, textAlign: "right", fontWeight: 700, color: diff > 0 ? "var(--success-text)" : diff < 0 ? "var(--loss-text)" : "var(--text-2)" }}>
-                      {diff > 0 ? "+" : ""}
-                      {diff}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <GegnerBilanzSortierbar zeilen={bilanzen} />
       )}
     </div>
   );

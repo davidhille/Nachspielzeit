@@ -88,3 +88,20 @@ function spielminute(sek, spielzeitMin) {
   const m = Math.floor(Math.max(0, Number(sek) || 0) / 60) + 1;
   return m > gesamt ? `${gesamt}+${m - gesamt}'` : `${m}'`;
 }
+
+/* Bilanz pro Gegner: Punkte wie in der Liga (Sieg 3, Unentschieden 1, Niederlage 0) */
+const GEGNER_PUNKTE = { sieg: 3, unentschieden: 1, niederlage: 0 };
+function gegnerPunkte(siege, unentschieden) {
+  return (Number(siege) || 0) * GEGNER_PUNKTE.sieg + (Number(unentschieden) || 0) * GEGNER_PUNKTE.unentschieden;
+}
+
+/* Sortiert Zeilen der Gegnerbilanz nach einer Spalte (richtung "asc" | "desc").
+   Schlüssel: name, spiele, siege, unentschieden, niederlagen, toreFuer, diff, punkte. Bei Gleichstand nach Name, damit die Reihenfolge stabil bleibt. */
+function sortiereGegnerBilanz(zeilen, schluessel, richtung) {
+  const wert = (z) => (schluessel === "diff" ? z.toreFuer - z.toreGegen : schluessel === "punkte" ? gegnerPunkte(z.siege, z.unentschieden) : z[schluessel]);
+  const f = richtung === "asc" ? 1 : -1;
+  return zeilen.slice().sort((a, b) => {
+    const c = schluessel === "name" ? String(a.name).localeCompare(String(b.name), "de") : wert(a) - wert(b);
+    return c !== 0 ? c * f : String(a.name).localeCompare(String(b.name), "de");
+  });
+}

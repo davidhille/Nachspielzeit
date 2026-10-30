@@ -94,3 +94,21 @@ test("Spielminute: 1. Minute ab 0:00, Nachspielzeit als 12+n", () => {
   assert.equal(B.spielminute(14 * 60, 12), "12+3'");
   assert.equal(B.spielminute(undefined, undefined), "1'");
 });
+
+test("Gegnerbilanz: Punkte (Sieg 3, Unentschieden 1, Niederlage 0) und Sortierung", () => {
+  const G = ladeAusApp(["GEGNER_PUNKTE", "gegnerPunkte", "sortiereGegnerBilanz"]);
+  assert.deepEqual({ ...G.GEGNER_PUNKTE }, { sieg: 3, unentschieden: 1, niederlage: 0 });
+  assert.equal(G.gegnerPunkte(2, 1), 7);
+  assert.equal(G.gegnerPunkte(0, 0), 0);
+  const z = [
+    { name: "B", spiele: 2, siege: 0, unentschieden: 2, niederlagen: 0, toreFuer: 2, toreGegen: 2 },
+    { name: "A", spiele: 3, siege: 1, unentschieden: 0, niederlagen: 2, toreFuer: 4, toreGegen: 6 },
+    { name: "C", spiele: 1, siege: 1, unentschieden: 0, niederlagen: 0, toreFuer: 3, toreGegen: 0 },
+  ];
+  const namen = (s, r) => G.sortiereGegnerBilanz(z, s, r).map((x) => x.name);
+  assert.deepEqual(namen("punkte", "desc"), ["A", "C", "B"]); // A=3, C=3 (Gleichstand nach Name), B=2
+  assert.deepEqual(namen("diff", "asc"), ["A", "B", "C"]); // -2, 0, +3
+  assert.deepEqual(namen("name", "desc"), ["C", "B", "A"]);
+  assert.deepEqual(namen("spiele", "desc"), ["A", "B", "C"]);
+  assert.deepEqual(namen("toreFuer", "desc"), ["A", "C", "B"]);
+});
