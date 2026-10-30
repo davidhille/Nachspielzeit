@@ -633,6 +633,7 @@ const FEATURES = [
   { key: "eltern_spieltage", label: "Bereich Spieltage", beschreibung: "Tab „Spieltage“ mit den Spieltagskarten", unter: "eltern_seite" },
   { key: "eltern_karten", label: "Bereich Karten", beschreibung: "Tab „Karten“ mit den Sammelkarten", unter: "eltern_seite" },
   { key: "eltern_songs", label: "Bereich Songs", beschreibung: "Tab „Songs“ mit Player und Liedtext", unter: "eltern_seite" },
+  { key: "eltern_briefkasten", label: "Bereich Briefkasten", beschreibung: "Tab „Briefkasten“: Eltern werfen anonym Lob, Kritik und Ideen ein (standardmäßig aus; dafür vorher das SQL aus der Fehlermeldung hier einmalig ausführen)", unter: "eltern_seite" },
   { key: "taktik", label: "Taktik-Board", beschreibung: "Tab „Taktik“ (interaktives Taktikboard mit Spielern, Laufwegen und Animation)" },
   { key: "geburtstage", label: "Geburtstagsreminder", beschreibung: "Hinweis auf der Home-Seite, wenn ein Spieler bald Geburtstag hat (Vorlauf in den Team-Einstellungen)" },
 ];
@@ -5629,6 +5630,7 @@ function elternPakete(f, players, trainings, spieltage, gegner, teamInfo) {
     gegner: an("eltern_bilanz_gegner"),
     spieltage: an("eltern_spieltage"),
     songs: an("eltern_songs"),
+    briefkasten: an("eltern_briefkasten"),
     karten: an("eltern_karten"),
   });
   return { snap, plus };
@@ -5712,7 +5714,7 @@ function berechneKartenPlus(spieltage, gegner, players, teamName, songs, cover, 
     version: 1,
     team: teamName,
     saison: saison ? saison.replace("-", "/") : "",
-    bereiche: { bilanz: mitBilanz, spieltage: o.spieltage, karten: o.karten !== false, songs: o.songs },
+    bereiche: { bilanz: mitBilanz, spieltage: o.spieltage, karten: o.karten !== false, songs: o.songs, briefkasten: o.briefkasten === true },
     spieltage: o.spieltage ? tage : [],
     saisonBilanz: mitBilanz && o.saison ? bil : null,
     torschuetzen: mitBilanz && o.torschuetzen ? torschuetzen : [],
@@ -6278,6 +6280,91 @@ function GegnerBilanzSeite({ saison, gesamt, saisonLabel }) {
   );
 }
 
+/* ---------- Briefkasten (Eltern-Seite): anonymes Feedback an die Trainer ----------
+   Geschrieben wird nur über die RPC-Funktion briefkasten_senden (prüft Token, Schalter, Länge, Honeypot, Limit). */
+const BRIEFKASTEN_MAX = 1000;
+const BRIEFKASTEN_KATEGORIEN = [["lob", "Lob"], ["kritik", "Kritik"], ["idee", "Idee"], ["sonstiges", "Sonstiges"]];
+const BRIEFKASTEN_MELDUNG = {
+  ungueltig: "Dieser Link ist nicht mehr gültig.",
+  aus: "Der Briefkasten ist gerade geschlossen.",
+  laenge: "Bitte schreibe zwischen 1 und 1000 Zeichen.",
+  zu_viele: "Gerade sind sehr viele Nachrichten eingegangen. Bitte versuche es in einer Stunde noch einmal.",
+};
+function BriefkastenFormular({ token }) {
+  const [kategorie, setKategorie] = useState("sonstiges");
+  const [text, setText] = useState("");
+  const [falle, setFalle] = useState(""); // Honeypot: Menschen sehen das Feld nicht
+  const [stand, setStand] = useState("bereit"); // bereit | sendet | ok
+  const [fehler, setFehler] = useState("");
+  const rest = BRIEFKASTEN_MAX - text.length;
+  const senden = async () => {
+    if (stand === "sendet" || !text.trim()) return;
+    setStand("sendet");
+    setFehler("");
+    try {
+      const res = await fetch(REST + "rpc/briefkasten_senden", {
+        method: "POST",
+        headers: baseHeaders(),
+        body: JSON.stringify({ p_token: token, p_nachricht: text, p_kategorie: kategorie, p_website: falle }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const code = await res.json();
+      if (code !== "ok") {
+        setFehler(BRIEFKASTEN_MELDUNG[code] || "Das hat leider nicht geklappt. Bitte versuche es später noch einmal.");
+        setStand("bereit");
+        return;
+      }
+      setText("");
+      setStand("ok");
+    } catch (e) {
+      setFehler("Das hat leider nicht geklappt. Prüfe kurz deine Verbindung und versuche es noch einmal. Dein Text bleibt erhalten.");
+      setStand("bereit");
+    }
+  };
+  if (stand === "ok") {
+    return (
+      <div role="status" style={{ textAlign: "center", padding: "12px 0" }}>
+        <h3 style={{ ...styles.h3Plain, marginTop: 0 }}>Danke, deine Nachricht ist angekommen.</h3>
+        <p style={{ fontSize: 14, color: "var(--text-2)", margin: "0 0 16px" }}>Die Trainer lesen sie. Antworten können wir nicht, weil du anonym bleibst.</p>
+        <button style={styles.rowBtn} onClick={() => { setStand("bereit"); setKategorie("sonstiges"); }}>Noch eine schreiben</button>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <h3 style={{ ...styles.h3Plain, marginTop: 0 }}>Briefkasten</h3>
+      <p style={{ fontSize: 14, color: "var(--text-2)", margin: "0 0 14px" }}>
+        Lob, Kritik oder eine Idee für die Trainer? Einfach einwerfen. Die App speichert weder Namen noch Kontaktdaten und zeigt den Trainern nur das Datum. Eine Antwort ist deshalb nicht möglich. Für ein persönliches Gespräch sprich uns gern direkt an.
+      </p>
+      <div role="group" aria-label="Kategorie" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {BRIEFKASTEN_KATEGORIEN.map(([k, l]) => (
+          <button key={k} type="button" aria-pressed={kategorie === k} onClick={() => setKategorie(k)} style={{ ...styles.chip, ...(kategorie === k ? styles.chipActive : null) }}>{l}</button>
+        ))}
+      </div>
+      <label htmlFor="briefkasten-text" style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Deine Nachricht</label>
+      <textarea
+        id="briefkasten-text"
+        value={text}
+        maxLength={BRIEFKASTEN_MAX}
+        onChange={(e) => setText(e.target.value)}
+        rows={6}
+        style={{ ...styles.input, width: "100%", boxSizing: "border-box", minHeight: 140, fontSize: 16, resize: "vertical" }}
+      />
+      <div style={{ display: "flex", justifyContent: "flex-end", fontSize: 13, color: rest < 50 ? "var(--danger-text)" : "var(--muted)", fontVariantNumeric: "tabular-nums", marginTop: 4 }}>
+        {text.length} / {BRIEFKASTEN_MAX}
+      </div>
+      {/* Honeypot: für Menschen und Screenreader unsichtbar, Bots füllen es aus */}
+      <div aria-hidden="true" style={{ position: "absolute", left: -9999, width: 1, height: 1, overflow: "hidden" }}>
+        <label>Website<input type="text" tabIndex={-1} autoComplete="off" value={falle} onChange={(e) => setFalle(e.target.value)} /></label>
+      </div>
+      {fehler && <div role="alert" style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 10 }}>{fehler}</div>}
+      <button style={{ ...styles.primaryBtn, width: "100%", marginTop: 14, opacity: !text.trim() || stand === "sendet" ? 0.6 : 1 }} disabled={!text.trim() || stand === "sendet"} onClick={senden}>
+        {stand === "sendet" ? "Sende …" : "Einwerfen"}
+      </button>
+    </div>
+  );
+}
+
 function KartenSeitePlus({ token }) {
   const [karten, setKarten] = useState(undefined);
   const [plus, setPlus] = useState(undefined);
@@ -6500,6 +6587,7 @@ function KartenSeiteVorschau({ token }) {
   if (plus && be.spieltage && plus.spieltage && plus.spieltage.length > 0) tabs.push({ k: "spieltage", label: "Spieltage", n: plus.spieltage.length });
   if (be.karten && karten.spieler.length > 0) tabs.push({ k: "karten", label: "Karten", n: karten.spieler.length });
   if (plus && be.songs && plus.songs && plus.songs.length > 0) tabs.push({ k: "songs", label: "Songs", n: plus.songs.length });
+  if (plus && be.briefkasten) tabs.push({ k: "briefkasten", label: "Briefkasten" });
   const aktTab = tab && tabs.some((t) => t.k === tab) ? tab : tabs.length ? tabs[0].k : null;
   const waehle = (k) => { setTab(k); setBesucht((v) => (v[k] ? v : { ...v, [k]: true })); try { window.scrollTo({ top: 0 }); } catch (e) {} };
   // Bereiche bleiben nach dem ersten Öffnen eingebunden (die Musik läuft beim Wechseln weiter)
@@ -6599,6 +6687,11 @@ function KartenSeiteVorschau({ token }) {
         {plus && be.songs && plus.songs && plus.songs.length > 0 && panel("songs", (
           <section style={{ ...styles.card, marginTop: 16 }}>
             <SongPlayer songs={plus.songs} cover={plus.cover} team={karten.team} token={token} />
+          </section>
+        ))}
+        {plus && be.briefkasten && panel("briefkasten", (
+          <section style={{ ...styles.card, marginTop: 16, position: "relative", maxWidth: 560 }}>
+            <BriefkastenFormular token={token} />
           </section>
         ))}
       </main>
