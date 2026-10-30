@@ -2360,6 +2360,11 @@ notify pgrst, 'reload schema';`;
                       <KartenTitel>Eltern-Seite</KartenTitel>
                       {eltern.map((f) => zeile(f, true))}
                     </div>
+                    <div style={{ ...styles.card, marginBottom: 16 }}>
+                      <KartenTitel zuStart>Briefkasten einrichten (SQL)</KartenTitel>
+                      <div style={styles.cardDesc}>Einmalig im Supabase SQL Editor ausführen, bevor „Bereich Briefkasten“ eingeschaltet wird. Das SQL ist wiederholbar und gilt für alle Teams.</div>
+                      <pre style={{ fontSize: 13, whiteSpace: "pre-wrap", margin: 0, userSelect: "all" }}>{SQL_BRIEFKASTEN}</pre>
+                    </div>
                   </>
                 );
               })()
@@ -2781,6 +2786,53 @@ function App() {
     }
   };
 
+  /* Briefkasten (SVH-6): anonyme Nachrichten der Eltern. Wird nur geladen, wenn die Funktion eingeschaltet ist. */
+  const briefkastenAn = featureAn(features, "eltern_briefkasten") && features.eltern_seite !== false;
+  const [briefkasten, setBriefkasten] = useState(null); // null = noch nicht geladen
+  const [briefkastenFehler, setBriefkastenFehler] = useState("");
+  const ladeBriefkasten = useCallback(async () => {
+    try {
+      const rows = await dbSelect("briefkasten");
+      setBriefkasten(rows.filter((r) => !r.deleted_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)) || y.id - x.id));
+      setBriefkastenFehler("");
+    } catch (e) {
+      console.error(e);
+      setBriefkasten([]);
+      setBriefkastenFehler("Der Briefkasten konnte nicht geladen werden. Falls er neu ist, muss der Admin unter Funktionen einmalig das SQL ausführen.");
+    }
+  }, []);
+  useEffect(() => {
+    if (briefkastenAn) ladeBriefkasten();
+  }, [briefkastenAn, ladeBriefkasten]);
+  // Leichtgewichtig: nur der Briefkasten wird neu geladen, nicht die ganze App
+  const briefkastenAktion = async (fn, msg, undo) => {
+    try {
+      await fn();
+      await ladeBriefkasten();
+      if (msg) showToast(msg, undo);
+      return true;
+    } catch (e) {
+      console.error(e);
+      meldeFehler("aktion", e);
+      showToast(friendlyError(e), null, "error");
+      return false;
+    }
+  };
+  const briefkastenStatus = (id, status) => briefkastenAktion(() => dbUpdate("briefkasten", id, { status }));
+  const briefkastenAlleGelesen = () =>
+    briefkastenAktion(async () => {
+      for (const r of (briefkasten || []).filter((x) => x.status === "neu")) await dbUpdate("briefkasten", r.id, { status: "gelesen" });
+    }, "Alle als gelesen markiert");
+  const briefkastenLoeschen = (id) =>
+    confirmAnd("Diese Nachricht löschen?", () =>
+      briefkastenAktion(
+        () => dbUpdate("briefkasten", id, { deleted_at: new Date().toISOString() }),
+        "Nachricht gelöscht",
+        () => briefkastenAktion(() => dbUpdate("briefkasten", id, { deleted_at: null }), "Wiederhergestellt")
+      )
+    );
+  const briefkastenNeu = briefkastenAn && briefkasten ? briefkasten.filter((r) => r.status === "neu").length : 0;
+
   /* Öffentlicher Karten-Link: Token liegt in teams.config.share_token; der Snapshot wird bei Änderungen automatisch neu veröffentlicht */
   setzeEinstellungen(teamInfo?.config);
   TEAM_NAME = (teamInfo && teamInfo.name) || Sitzung.team.toUpperCase();
@@ -3039,6 +3091,8 @@ function App() {
             selectedPlayerId={selectedPlayerId}
             onSelectPlayer={setSelectedPlayerId}
             onOpenSettings={openPlayerSettings}
+            briefkastenNeu={briefkastenNeu}
+            onBriefkasten={() => { NZ_SETUP_START = "briefkasten"; setTab("verwaltung"); }}
           />
         )}
         {tab === "training" && (
@@ -3210,6 +3264,7 @@ function App() {
 
         {tab === "verwaltung" && (
           <Verwaltung
+            briefkasten={{ an: briefkastenAn, liste: briefkasten, fehler: briefkastenFehler, neu: briefkastenNeu, onStatus: briefkastenStatus, onAlleGelesen: briefkastenAlleGelesen, onLoeschen: briefkastenLoeschen }}
             kartenBox={
               teamInfo && elternAn ? (
                 <KartenLinkBox token={kartenToken} altTokens={kartenAlt} onAltOff={kartenAltAbschalten} onCreate={kartenLinkErzeugen} onRevoke={kartenLinkSperren} onRefresh={kartenLinkAktualisieren} voll={!!teamInfo?.config?.share_voll} onToggleVoll={kartenVollUmschalten} busy={busy} songs={teamInfo?.config?.songs || []} onSongAdd={songHinzufuegen} onSongChange={songAendern} />
@@ -8040,6 +8095,66 @@ function GeburtstagsKarte({ players, vorlauf }) {
   );
 }
 
+/* Briefkasten, Trainer-Ansicht (Setup → Briefkasten): anonyme Nachrichten der Eltern */
+const BRIEFKASTEN_LABEL = { lob: "Lob", kritik: "Kritik", idee: "Idee", sonstiges: "Sonstiges" };
+const BRIEFKASTEN_STATUS = { neu: "Neu", gelesen: "Gelesen", erledigt: "Erledigt" };
+function BriefkastenListe({ daten }) {
+  const { liste, fehler, neu, onStatus, onAlleGelesen, onLoeschen } = daten;
+  const datum = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const knopf = { ...styles.rowBtnOutline, height: 44 }; // Touch-Ziel mindestens 44 px
+  return (
+    <section style={styles.card}>
+      <KartenTitel>Briefkasten</KartenTitel>
+      <p style={styles.cardDesc}>Anonyme Nachrichten der Eltern. Du siehst nur das Datum, keine Namen. Antworten ist nicht möglich.</p>
+      {fehler && <div role="alert" style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 12 }}>{fehler}</div>}
+      {liste === null ? (
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Lade …</div>
+      ) : liste.length === 0 ? (
+        !fehler && <EmptyState text="Noch keine Nachrichten. Sobald Eltern etwas einwerfen, erscheint es hier." />
+      ) : (
+        <>
+          {neu > 0 && (
+            <button type="button" style={{ ...knopf, marginBottom: 12 }} onClick={onAlleGelesen}>Alle als gelesen markieren ({neu})</button>
+          )}
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+            {liste.map((r) => (
+              <li key={r.id} style={{ border: "1px solid var(--border)", borderLeft: r.status === "neu" ? "4px solid var(--accent)" : "1px solid var(--border)", borderRadius: 12, background: "var(--surface)", padding: 12 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+                  <strong style={{ color: "var(--text)" }}>{BRIEFKASTEN_LABEL[r.kategorie] || "Sonstiges"}</strong>
+                  <span>·</span>
+                  <span>{datum(r.created_at)}</span>
+                  <span>·</span>
+                  <span style={{ fontWeight: r.status === "neu" ? 700 : 400, color: r.status === "neu" ? "var(--accent-text)" : undefined }}>{BRIEFKASTEN_STATUS[r.status] || r.status}</span>
+                </div>
+                <div style={{ fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere", color: "var(--text)" }}>{r.nachricht}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                  {r.status === "neu" && <button type="button" style={knopf} onClick={() => onStatus(r.id, "gelesen")}>Gelesen</button>}
+                  <button type="button" aria-pressed={r.status === "erledigt"} style={{ ...knopf, ...(r.status === "erledigt" ? styles.chipActive : null) }} onClick={() => onStatus(r.id, r.status === "erledigt" ? "gelesen" : "erledigt")}>
+                    {r.status === "erledigt" ? "Erledigt ✓" : "Erledigt"}
+                  </button>
+                  <button type="button" style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => onLoeschen(r.id)}>Löschen</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+/* Hinweis auf Home, solange ungelesene Briefkasten-Nachrichten da sind */
+function BriefkastenHinweis({ neu, onOpen }) {
+  if (!neu) return null;
+  return (
+    <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 180, fontSize: 14 }}>
+        <strong>{neu === 1 ? "1 neue Nachricht" : `${neu} neue Nachrichten`}</strong> im Briefkasten
+      </div>
+      <button type="button" style={styles.rowBtn} onClick={onOpen}>Lesen</button>
+    </div>
+  );
+}
+
 function Dashboard({
   players,
   basis,
@@ -8055,6 +8170,8 @@ function Dashboard({
   selectedPlayerId,
   onSelectPlayer,
   onOpenSettings,
+  briefkastenNeu = 0,
+  onBriefkasten,
 }) {
   const months = useMemo(() => {
     const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
@@ -8181,6 +8298,7 @@ function Dashboard({
       </div>
       </div>
       <div className="dash-side">
+        <BriefkastenHinweis neu={briefkastenNeu} onOpen={onBriefkasten} />
         <HeuteKarte termine={termine} spieltage={spieltage} trainings={trainings} onOpen={onOpenTermin} />
         <TermineLeiste termine={termine} spieltage={spieltage} onOpen={onOpenTermin} />
         {fGeburtstage && <GeburtstagsKarte players={players} vorlauf={Number(teamInfo?.config?.geburtstage_vorlauf ?? 7)} />}
@@ -9816,6 +9934,8 @@ function ChevronIcon({ size = 16, open }) {
 
 /* Kachel-Titel: Klick klappt die ganze Kachel (Eltern-Element) auf/zu. Zustand bleibt pro Titel bis zum Neuladen erhalten. */
 const NZ_ZU = {};
+/* Einmalig: welcher Unterbereich in Setup beim nächsten Öffnen vorne liegt (z. B. von Home aus der Briefkasten) */
+let NZ_SETUP_START = null;
 function KartenTitel({ children, block = false, aktion = null, zuStart = false, style }) {
   const ref = useRef(null);
   const key = [].concat(children).join("");
@@ -11178,8 +11298,9 @@ function Verwaltung({
   onSaveBestand,
   onDeleteMaterialEintrag,
   kartenBox,
+  briefkasten,
 }) {
-  const [subTab, setSubTab] = useState("spieler");
+  const [subTab, setSubTab] = useState(() => { const s = NZ_SETUP_START; NZ_SETUP_START = null; return s || "spieler"; });
   const fUebungen = useFeature("uebungen");
   const fMaterial = useFeature("material");
   const fEltern = useFeature("eltern_seite");
@@ -11191,6 +11312,7 @@ function Verwaltung({
     ["spieltage", "Spieltage"],
     fMaterial && ["material", "Material"],
     fEltern && kartenBox && ["eltern", "Eltern-Seite"],
+    fEltern && briefkasten && briefkasten.an && ["briefkasten", `Briefkasten${briefkasten.neu > 0 ? ` (${briefkasten.neu})` : ""}`],
     ["darstellung", "Darstellung"],
     ["papierkorb", `Papierkorb${trashCount > 0 ? ` (${trashCount})` : ""}`],
   ].filter(Boolean);
@@ -11211,6 +11333,7 @@ function Verwaltung({
       </div>
 
       {subTab === "eltern" && fEltern && kartenBox}
+      {subTab === "briefkasten" && fEltern && briefkasten && briefkasten.an && <BriefkastenListe daten={briefkasten} />}
       {subTab === "spieler" && (
         <SpielerBereich
           players={players}
