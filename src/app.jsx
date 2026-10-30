@@ -1834,6 +1834,20 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
       setMeldung(friendlyError(e));
     }
   };
+  /* Endgültig löschen: nur für archivierte Teams, Teamname muss zur Bestätigung eingetippt werden.
+     Die Datenbankfunktion team_loeschen entfernt das Team samt Spielern, Trainings, Spieltagen, Notizen, Briefkasten und Zugangscodes. */
+  const endgueltigLoeschen = (t) =>
+    frageAnd(`Team „${t.name}“ endgültig löschen? Alle Daten (Spieler, Trainings, Spieltage, Notizen, Zugangscodes) sind danach weg. Zur Bestätigung den Teamnamen eintippen:`, "", async (eingabe) => {
+      if (String(eingabe).trim().toLowerCase() !== t.name.trim().toLowerCase()) return setMeldung("Der Name passte nicht, das Team wurde nicht gelöscht.");
+      try {
+        const res = await nszFetch(REST + "rpc/team_loeschen", { method: "POST", headers: baseHeaders(), body: JSON.stringify({ p_team: t.id }) });
+        if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+        setMeldung(`Team „${t.name}“ gelöscht.`);
+        await onChanged();
+      } catch (e) {
+        setMeldung(friendlyError(e));
+      }
+    });
   return (
     <section>
       <div style={{ ...styles.card, marginBottom: 14 }}>
@@ -1892,6 +1906,9 @@ function TeamsVerwaltung({ teams, vereine, fehler, aktuellesTeam, onSelect, onCh
               )}
               {!fehler && t.id !== "u8" && (
                 <button style={styles.rowBtnOutline} onClick={() => archivieren(t)}>{t.archived ? "Reaktivieren" : "Archivieren"}</button>
+              )}
+              {!fehler && t.id !== "u8" && t.archived && (
+                <button style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => endgueltigLoeschen(t)}>Endgültig löschen</button>
               )}
             </div>
             {bearbeite === t.id && (
@@ -2014,7 +2031,7 @@ function VereineVerwaltung({ vereine, teams, onChanged }) {
               <img src={v.logo_url || CLUB_STD.logo} alt="" style={{ height: 44, maxWidth: 80, objectFit: "contain", background: "var(--surface-2)", borderRadius: 8, padding: 4 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{v.name}</div>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}{anzahlTeams(v.id) > 0 ? " · Löschen erst möglich, wenn kein Team mehr zugeordnet ist" : ""}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{anzahlTeams(v.id) === 1 ? "1 Team" : `${anzahlTeams(v.id)} Teams`}{anzahlTeams(v.id) > 0 ? " · Löschen erst möglich, wenn kein Team mehr zugeordnet ist (Teams → archivieren, dann endgültig löschen)" : ""}</div>
               </div>
               {bearbeite !== v.id && <button style={styles.rowBtnOutline} onClick={() => { setBearbeite(v.id); setEName(v.name); setELogo(v.logo_url || ""); setMeldung(""); }}>Bearbeiten</button>}
               {anzahlTeams(v.id) === 0 && <button style={{ ...styles.dangerBtn, minHeight: 44, border: "none", cursor: "pointer", fontSize: 14 }} onClick={() => loeschen(v)}>Löschen</button>}

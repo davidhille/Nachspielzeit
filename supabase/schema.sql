@@ -1102,3 +1102,30 @@ select 'sv-heimstetten',
 on conflict (id) do nothing;
 update teams set verein_id = 'sv-heimstetten' where verein_id is null;
 notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- Team endgültig löschen (30.10.2026)
+-- Nur Haupt-Admin, nur für archivierte Teams, nicht für 'u8'. Wiederholbar.
+-- ============================================================
+create or replace function public.team_loeschen(p_team text) returns void
+language plpgsql security definer set search_path to 'public' as $$
+declare t text;
+begin
+  if not nsz_is_admin() then raise exception 'Nur ein Admin-Code darf Teams löschen.'; end if;
+  if p_team is null or p_team = 'u8' then raise exception 'Dieses Team darf nicht gelöscht werden.'; end if;
+  if not exists (select 1 from teams where id = p_team and archived) then raise exception 'Das Team muss zuerst archiviert werden.'; end if;
+  -- Kindtabellen zuerst, dann Elterntabellen
+  foreach t in array array['torschuetzen','spiele','spieltag_teilnehmer','spieltag_gegner','spieltage','training_uebungen','trainings','entwicklungen','basisqualitaet','trainingstermine','players','gegner','material_bestand','app_features','taktik_boards','training_boards','briefkasten','notizen'] loop
+    if to_regclass('public.' || t) is not null then
+      execute format('delete from public.%I where team_id = $1', t) using p_team;
+    end if;
+  end loop;
+  -- Übungen: gehörte sie nur diesem Team, weg; sonst nur das Team aus der Liste nehmen
+  delete from uebungen where team_ids = array[p_team];
+  update uebungen set team_ids = array_remove(team_ids, p_team) where p_team = any(team_ids);
+  delete from access_codes where team_id = p_team;
+  delete from teams where id = p_team;
+end $$;
+grant execute on function public.team_loeschen(text) to anon, authenticated, service_role;
+notify pgrst, 'reload schema';
