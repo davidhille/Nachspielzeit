@@ -2419,7 +2419,9 @@ function AdminApp() {
     setFeatures(null);
     setTeamState(t);
   };
-  const [teams, setTeams] = useState([{ id: "u8", name: "U8" }]);
+  // Platzhalter-Team nur für den Haupt-Admin (falls die Teams-Tabelle fehlt); ein Vereins-Admin ohne Teams sieht eine leere Liste
+  const [teams, setTeams] = useState(zugangsRolle(Sitzung.info) === "verein" ? [] : [{ id: "u8", name: "U8" }]);
+  const [teamsGeladen, setTeamsGeladen] = useState(false);
   const [teamsFehler, setTeamsFehler] = useState(null);
   const [vereine, setVereine] = useState(undefined); // undefined = lädt, null = Tabelle fehlt noch
   const ladeVereine = async () => setVereine(await ladeVereineListe());
@@ -2427,7 +2429,8 @@ function AdminApp() {
   const ladeTeams = async (waehle) => {
     try {
       const rows = (await dbSelect("teams")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-      if (rows.length > 0) setTeams(rows);
+      if (rows.length > 0 || zugangsRolle(Sitzung.info) === "verein") setTeams(rows);
+      setTeamsGeladen(true);
       setTeamsFehler(null);
     } catch (e) {
       setTeamsFehler(friendlyError(e));
@@ -2446,8 +2449,8 @@ function AdminApp() {
     .map(([k, l]) => [k, !istHaupt && k === "vereine" ? "Verein" : l]);
   // Gemerktes Team gehört nicht (mehr) zu diesem Zugang, z. B. nach Wechsel des Codes im selben Browser: zurück zur Übersicht
   useEffect(() => {
-    if (team !== ADMIN_SCOPE && teams.some((t) => t.created_at !== undefined) && !teams.some((t) => t.id === team)) setTeam(ADMIN_SCOPE);
-  }, [teams]);
+    if (team !== ADMIN_SCOPE && teamsGeladen && !teams.some((t) => t.id === team)) setTeam(ADMIN_SCOPE);
+  }, [teams, teamsGeladen]);
   const tab = tabListe.some((t) => t[0] === tabWahl) ? tabWahl : tabListe[0][0];
   useEffect(() => { FEHLER_BEREICH = `admin/${tab}`; }, [tab]);
   const [features, setFeatures] = useState(null);
@@ -2579,9 +2582,11 @@ notify pgrst, 'reload schema';`;
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          {(istHaupt || teams.length > 0) && (
           <a href={trainerUrl(imAdminBereich ? (teams.find((t) => !t.archived) || teams[0] || { id: "u8" }).id : team)} style={{ ...styles.logoutBtn, textDecoration: "none" }}>
             Zur Trainer-App
           </a>
+          )}
           <button
             style={styles.logoutBtn}
             onClick={() => {
@@ -5704,8 +5709,9 @@ function TeamWechsler() {
     setOffen((o) => !o);
   };
   if (!istAdmin) return null;
-  const liste = teams && teams.length > 0 ? teams : [{ id: Sitzung.team, name: Sitzung.team.toUpperCase() }];
-  const aktuell = liste.find((t) => t.id === Sitzung.team) || { name: Sitzung.team.toUpperCase() };
+  const nurVerein = zugangsRolle(Sitzung.info) === "verein"; // Vereins-Admin: nur die Teams seines Vereins, ohne Platzhalter
+  const liste = teams && teams.length > 0 ? teams : nurVerein && teams ? [] : [{ id: Sitzung.team, name: Sitzung.team.toUpperCase() }];
+  const aktuell = liste.find((t) => t.id === Sitzung.team) || { name: nurVerein ? "Admin" : Sitzung.team.toUpperCase() };
   // Gruppen nach Verein; bei nur einem Verein (oder ohne Vereinstabelle) eine Gruppe ohne Überschrift
   const gruppen = (() => {
     const vl = vereine || [];

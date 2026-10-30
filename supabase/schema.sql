@@ -1330,3 +1330,12 @@ language sql stable security definer set search_path to 'public' as $$
   )
 $$;
 notify pgrst, 'reload schema';
+
+
+-- ============================================================
+-- team_settings (alte Einzeltabelle fürs U8-Mannschaftsfoto) nur noch für u8 (30.10.2026)
+-- Vorher las und schrieb jeder gültige Code die Tabelle (nsz_code_ok() ohne Team), auch ein Vereins-Admin eines anderen Vereins. Wiederholbar.
+-- ============================================================
+drop policy if exists "access via code" on public.team_settings;
+create policy "access via code" on public.team_settings for all to public using (nsz_code_ok('u8')) with check (nsz_code_ok('u8'));
+notify pgrst, 'reload schema';
